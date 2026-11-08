@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { tetrisRotate, tetrisLock, tetrisClear, tetrisTetris, tetrisMusicStart, tetrisMusicStop } from './sounds';
 import SaveForm from './SaveForm';
 import FullscreenBtn from './FullscreenBtn';
+import MandosEnJuego from '../mandos/RelevosMandos.jsx';
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
@@ -88,6 +89,7 @@ export default function Tetris({ onExit, contained = false, panelId = null, cont
     const mutedRef = useRef(false);
     mutedRef.current = muted;
     const [showSave, setShowSave] = useState(false);
+    const mandosApi = useRef(null);
 
     const boardRef = useRef(board);
     const pieceRef = useRef(piece);
@@ -192,6 +194,9 @@ export default function Tetris({ onExit, contained = false, panelId = null, cont
         if (!mutedRef.current) tetrisMusicStart();
     }
 
+    // Mandos micro:bit: puntos de la partida al mando que jugaba
+    useEffect(() => { if (gameOver) mandosApi.current?.finPartida([score]); }, [gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // Ghost piece
     function ghostY() {
         let gy = piece.y;
@@ -252,6 +257,13 @@ export default function Tetris({ onExit, contained = false, panelId = null, cont
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             fontFamily: "'Courier New', monospace", overflowY: 'auto',
         }}>
+            {(!panelId || !window.__arkadePanel) && (
+                <MandosEnJuego clave="TETRIS" juego="Tetris" apiRef={mandosApi}
+                    teclas={[{ I: 'ArrowLeft', D: 'ArrowRight', T: 'ArrowDown', A: ' ', B: 'ArrowDown', S: ' ', repetir: { ArrowLeft: 200, ArrowRight: 200, ArrowDown: 70 } }]}
+                    estiloFlot={contained ? { position: 'absolute' } : null}
+                    onEvento={(i, ev) => { if ((!started || gameOver) && (ev.accion === 'S' || (ev.accion === 'A' && ev.on))) restart(); }}
+                    controles={<>Inclina a los lados para mover la pieza y <b>hacia atrás</b> (o mantén <b>B</b>) para bajarla rápido. <b>A</b> o agitar = girar. Agita para empezar otra partida.</>} />
+            )}
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
                 <button onClick={() => { tetrisMusicStop(); onExit(); }} style={{

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
-import { shuffle, datosSimplificar, problemasCientifica, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir, datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar } from './utils/potenciasRadicales';
+import { shuffle, datosSimplificar, problemasCientifica, problemasMedidas, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir, datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar } from './utils/potenciasRadicales';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -10,6 +10,7 @@ import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import { CompeticionCuerda } from './components/TironCuerdaEscena';
 import { useMandoPregunta, LetraMando } from './components/MandosCuerda';
 import PizarraEjercicio, { BotonLapiz } from './components/PizarraEjercicio';
+import { renderMath, rad, potStr } from './utils/MathRender';
 
 // ─── Sonidos ───────────────────────────────────────────────────────────────────
 const playSound = (type) => {
@@ -436,6 +437,10 @@ function genCientificaProb(n = 5) {
 }
 
 // Ej. 6: radical → potencia de exponente fraccionario
+// Problemas de áreas y volúmenes: 'potencia' (² y ³) o 'raiz' (√ y ∛); respuesta = número + unidad
+const genMedidas = (clase) => (n = 5) => problemasMedidas(n, clase).map((p, i) => ({ id: `md${clase[0]}${i}`, emoji: p.emoji, enun: p.enun, format: 'medida', ans: { val: p.v, unidad: p.unidad, tol: 0.011 }, op: p.op }));
+const genMedidasPot = genMedidas('potencia');
+const genMedidasRaiz = genMedidas('raiz');
 function genRadPotencia(n = 6) {
   return Array.from({ length: n }, (_, i) => {
     const d = datosRadPotencia(), r = rad(d.idx, potStr(d.a, d.m));
@@ -526,9 +531,11 @@ const MODES = [
   { id: 'base', grupo: 'Potencias', label: '🔟 Potencia de base entera', gen: genPotenciaBase, desc: 'Escribe el número como potencia de base entera lo más simple posible (base y exponente).' },
   { id: 'propiedades', grupo: 'Potencias', label: '✖️ Propiedades', gen: genPropiedad, desc: 'Simplifica a UNA sola potencia: escribe la base (entera o a/b) y el exponente.' },
   { id: 'simplificar', grupo: 'Potencias', label: '🧮 Simplificar (bases distintas)', gen: genSimplificar, desc: 'Descompón cada base en factores primos (6 = 2·3, 12 = 2²·3…), aplica las propiedades y simplifica. Resultado: signo y número entero o fracción a/b.' },
+  { id: 'medidasPot', grupo: 'Potencias', label: '📐 Problemas: áreas y volúmenes', gen: genMedidasPot, desc: 'Eleva al cuadrado o al cubo para calcular áreas y volúmenes. Si hay decimales, redondea a 2 (usa π = 3,14).' },
   { id: 'factor', grupo: 'Potencias', label: '➕ Factor común', gen: genFactorComun, desc: 'Saca factor común la MENOR potencia. Resultado: coeficiente · base^exponente.' },
   { id: 'cientifica', grupo: 'Notación científica', label: '🔬 Notación científica', gen: genCientifica, desc: 'Escribe el número en notación científica a × 10ⁿ (con 1 ≤ a < 10).' },
   { id: 'cientificaProb', grupo: 'Notación científica', label: '🌌 Problemas: universo y átomos', gen: genCientificaProb, desc: 'Resuelve el problema y da el resultado en notación científica a × 10ⁿ, con a redondeado a 2 decimales.' },
+  { id: 'medidasRaiz', grupo: 'Raíces y radicales', label: '📏 Problemas: lado, arista y radio', gen: genMedidasRaiz, desc: 'Usa la raíz cuadrada o cúbica para hallar el lado, la arista o el radio a partir del área o el volumen (usa π = 3,14).' },
   { id: 'radPotencia', grupo: 'Raíces y radicales', label: 'ⁿ√ → Potencia', gen: genRadPotencia, desc: 'Escribe el radical como potencia de exponente fraccionario: base y exponente (m/n).' },
   { id: 'potRadical', grupo: 'Raíces y radicales', label: 'aᵐ⁄ⁿ → Radical', gen: genPotRadical, desc: 'Escribe la potencia en forma de radical: índice y radicando (puedes escribirlo como 5^3).' },
   { id: 'extraer', grupo: 'Raíces y radicales', label: '√ Extraer factores', gen: genExtraer, desc: 'Saca todos los factores posibles fuera de la raíz: c·ⁿ√r. Escribe el coeficiente y el radicando.' },
@@ -657,6 +664,7 @@ function checkAns(item, u = {}) {
   if (item.format === 'coefpow') return normAns(u.coef) === normAns(item.ans.coef) && normAns(u.base) === normAns(item.ans.base) && normAns(u.exp) === normAns(item.ans.exp);
   if (item.format === 'sci') { const m = parseFloat((u.mant || '').toString().replace(',', '.')); return !isNaN(m) && Math.abs(m - parseFloat(item.ans.mant)) < (item.ans.tol || 1e-6) && normAns(u.exp) === normAns(item.ans.exp); }
   if (item.format === 'mayor') return u.choice === item.ans.choice;
+  if (item.format === 'medida') { const v = parseFloat(normAns(u.val)); return !isNaN(v) && Math.abs(v - item.ans.val) < (item.ans.tol || 1e-6); }
   if (item.format === 'powfrac') return normAns(u.base) === normAns(item.ans.base) && casiIgual(evalNum(u.exp), item.ans.exp);
   // Coeficiente vacío = 1 (p. ej. √5 en vez de 1·√5)
   const coefU = normAns(u.coef) === '' ? 1 : evalNum(u.coef);
@@ -833,6 +841,14 @@ function AnswerInputs({ item, u, onChange, isMobile }) {
       </div>
     );
   }
+  if (item.format === 'medida') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input type="text" inputMode="decimal" placeholder="Valor" value={u.val || ''} onChange={(e) => onChange('val', e.target.value)} style={S('val')} />
+        <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>{item.ans.unidad}</span>
+      </div>
+    );
+  }
   if (item.format === 'radical') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -889,6 +905,7 @@ function solucionMath(item) {
     case 'powfrac': return `${a.base}^{${aFracMath(a.exp)}}`;
     case 'radn': return `${a.coef != null && a.coef !== 1 ? a.coef : ''}${rad(a.idx || 2, a.rad)}`;
     case 'racMono': case 'racConj': return item.sol || null;
+    case 'medida': return `${String(a.val).replace('.', ',')} ${a.unidad}`;
     default: return null;
   }
 }
@@ -1004,7 +1021,7 @@ function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, 
 function CompeticionPot({ isMobile, onSalir }) {
   const [tipo, setTipo] = useState('calcular');
   return (
-    <CompeticionCuerda metaInicial={5} isMobile={isMobile} onSalir={onSalir}
+    <CompeticionCuerda nombre="Potencias y raíces" metaInicial={5} isMobile={isMobile} onSalir={onSalir}
       configExtra={(
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
           <span>Tipo:</span>

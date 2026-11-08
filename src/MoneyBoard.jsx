@@ -17,6 +17,8 @@ import {
 import EditorMoneyBoard from './components/EditorMoneyBoard';
 import { useEfectosPuntos, CapaEfectos, ESTILOS_EFECTO } from './components/EfectosPuntos';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import MandosEnJuego from './mandos/RelevosMandos.jsx';
+import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
 
 /* =====================================================================
  *  MONEY BOARD  (tablero de categorías, estilo concurso por equipos)
@@ -410,7 +412,7 @@ function PantallaConfig({ titulo, categorias, onBack, onJugar }) {
 // =====================================================================
 //  MODAL DE PREGUNTA
 // =====================================================================
-function ModalPregunta({ casilla, categoria, modo, equipos, turno, segundos, origen, onPuntuar, onCerrar, sonido, sonidoOk, sonidoMal }) {
+function ModalPregunta({ casilla, categoria, modo, equipos, turno, segundos, origen, onPuntuar, onCerrar, sonido, sonidoOk, sonidoMal, juegoMandos = null }) {
     const { pregunta, doble } = casilla;
     const valor = casilla.valor * (doble ? 2 : 1);
 
@@ -467,6 +469,21 @@ function ModalPregunta({ casilla, categoria, modo, equipos, turno, segundos, ori
     };
 
     const equipoActivo = equipos[turno];
+
+    // Mandos micro:bit (un mando por equipo, letras A-D = opciones): responde el equipo del turno;
+    // si falla o se acaba el tiempo, el resto de equipos puede rebotar con su mando.
+    useEffect(() => () => { if (juegoMandos) juegoMandos.current.onEvento = null; }, [juegoMandos]);
+    if (juegoMandos) juegoMandos.current.onEvento = (i, ev) => {
+        if (pregunta.tipo !== 'MULTIPLE' || ev.tipo !== 'letra') return;
+        const op = pregunta.opciones['ABCD'.indexOf(ev.letra)];
+        const eq = equipos[i];
+        if (op === undefined || !eq || puntuados[eq.id]) return;
+        const ok = esRespuestaCorrecta(pregunta, op);
+        const id = juegoMandos.current.pilotoDe?.(i);
+        if (id != null && id < 900) feedbackMando(id, ok);
+        if (i === turno && !revelada) comprobar(op, null);
+        else if (revelada && resultado && resultado !== 'OK') puntuarEquipo(eq, ok, null);
+    };
 
     return (
         <div style={{
@@ -533,6 +550,7 @@ function ModalPregunta({ casilla, categoria, modo, equipos, turno, segundos, ori
                                         background: esCorrecta ? 'rgba(46,204,113,0.25)' : 'rgba(255,255,255,0.08)',
                                         color: 'white', cursor: (modo === 'AUTO' && !revelada) ? 'pointer' : 'default',
                                     }}>
+                                    {juegoMandos?.current.activos && <b style={{ color: '#f5c518', marginRight: 8 }}>{'ABCD'[i]}</b>}
                                     {op}
                                 </button>
                             );
@@ -928,7 +946,7 @@ function CartelTurno({ anuncio }) {
 // =====================================================================
 //  PARTIDA (tablero + equipos)
 // =====================================================================
-function Partida({ config, titulo, onSalir, onFin }) {
+function Partida({ config, titulo, onSalir, onFin, juegoMandos = null }) {
     const [tablero, setTablero] = useState(() => construirTablero(config.categorias, config.nFilas, config.valorBase, config.mezclar));
     const [equipos, setEquipos] = useState(config.equipos);
     const [turno, setTurno] = useState(0);
@@ -940,6 +958,8 @@ function Partida({ config, titulo, onSalir, onFin }) {
     const [verRanking, setVerRanking] = useState(false);
     const [ajustes, setAjustes] = useState(false);
     const { efectos: efectosPuntos, lanzarDesdeEvento } = useEfectosPuntos();
+
+    useEffect(() => { juegoMandos?.current.setEquipos?.(equipos.map((e) => e.nombre)); }, [equipos, juegoMandos]);
 
     const libres = tablero.reduce((s, c) => s + c.casillas.filter(x => x.pregunta && !x.jugada).length, 0);
 
@@ -1148,7 +1168,7 @@ function Partida({ config, titulo, onSalir, onFin }) {
                             modo={config.modo} equipos={equipos} turno={turno} segundos={config.segundos}
                             origen={abierta.origen}
                             sonido={sonido} sonidoOk={config.sonidoOk} sonidoMal={config.sonidoMal}
-                            onPuntuar={puntuar} onCerrar={cerrarPregunta}
+                            onPuntuar={puntuar} onCerrar={cerrarPregunta} juegoMandos={juegoMandos}
                         />
                     )}
 
@@ -1241,7 +1261,27 @@ function Partida({ config, titulo, onSalir, onFin }) {
 // =====================================================================
 //  COMPONENTE PRINCIPAL
 // =====================================================================
-export default function MoneyBoard({ recurso = null, usuario, onExit, autoStart = false }) {
+// Envoltorio con los mandos micro:bit: un mando por equipo (hasta 4), responden con A-D.
+export default function MoneyBoard(props) {
+    const mandosApi = useRef(null);
+    const juegoMandos = useRef({});
+    const [nombresEquipos, setNombresEquipos] = useState([]);
+    juegoMandos.current.setEquipos = (ns) => setNombresEquipos((a) => (a.join('|') === ns.join('|') ? a : ns));
+    juegoMandos.current.activos = !!mandosApi.current?.activos;
+    juegoMandos.current.pilotoDe = (i) => mandosApi.current?.pilotoDe(i);
+    return (
+        <>
+            <MoneyBoardJuego {...props} juegoMandos={juegoMandos} mandosApi={mandosApi} />
+            <MandosEnJuego clave="MONEYBOARD" juego="Money Board" tipo="MONEYBOARD_MANDOS" apiRef={mandosApi}
+                nJug={Math.max(1, Math.min(4, nombresEquipos.length || 2))} nombresHueco={nombresEquipos.map((n) => `👥 ${n}`)}
+                modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras" relevosPorDefecto={false}
+                onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
+                controles={<>Un mando por <b>equipo</b> (hasta 4). En las preguntas de opciones, <b>A</b> cambia la letra y <b>B</b> o agitar la envía: responde el equipo del turno y, si falla o se acaba el tiempo, los demás pueden rebotar con su mando. Las casillas las sigue eligiendo el profe en la pizarra.</>} />
+        </>
+    );
+}
+
+function MoneyBoardJuego({ recurso = null, usuario, onExit, autoStart = false, juegoMandos = null, mandosApi = null }) {
     const [pantalla, setPantalla] = useState('MENU');
     const [categorias, setCategorias] = useState([]);
     const [titulo, setTitulo] = useState('');
@@ -1250,6 +1290,11 @@ export default function MoneyBoard({ recurso = null, usuario, onExit, autoStart 
     const [modalEnviar, setModalEnviar] = useState(false);
     const [guardado, setGuardado] = useState(false);
     const [semilla, setSemilla] = useState(0);
+    // Mandos: al acabar, los puntos de cada equipo van al mando que lo llevaba
+    useEffect(() => {
+        if (pantalla !== 'FIN' || !mandosApi?.current?.activos) return;
+        mandosApi.current.finPartida(equiposFin.map((e) => e.puntos), { aciertos: equiposFin.map((e) => e.aciertos || 0), intentos: equiposFin.map((e) => (e.aciertos || 0) + (e.fallos || 0)) });
+    }, [pantalla]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const preparar = useCallback((r, cats) => {
         const c = cats || categoriasDeRecurso(r);
@@ -1309,7 +1354,7 @@ export default function MoneyBoard({ recurso = null, usuario, onExit, autoStart 
 
     if (pantalla === 'JUEGO') {
         return <Partida key={'p' + semilla} config={config} titulo={titulo}
-            onSalir={() => setPantalla('MENU')} onFin={terminarPartida} />;
+            onSalir={() => setPantalla('MENU')} onFin={terminarPartida} juegoMandos={juegoMandos} />;
     }
 
     if (pantalla === 'FINAL') {

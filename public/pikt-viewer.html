@@ -121,6 +121,53 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 
 .video-direct { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; }
 .video-caption { font-size: clamp(0.75rem,2vw,0.9rem); text-align: center; flex-shrink: 0; font-style: italic; opacity: 0.75; }
 .video-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 120px; color: rgba(255,255,255,0.35); font-size: 1rem; gap: 8px; }
+
+/* ── Lienzo libre: superficie fija 960×540 escalada (igual que en el editor) ── */
+.surface { position: absolute; left: 50%; top: 50%; width: 960px; height: 540px; transform: translate(-50%,-50%) scale(var(--k,1)); transform-origin: center center; pointer-events: none; z-index: 5; }
+.surface .el { position: absolute; box-sizing: border-box; pointer-events: auto; }
+.surface .el[data-link] { cursor: pointer; }
+.pk-in, .pk-loop { width: 100%; height: 100%; }
+.scene.active .pk-in { animation: var(--pa) var(--pd) cubic-bezier(.2,.8,.2,1) var(--pl) both; }
+.scene.active .pk-loop { animation: var(--la) var(--ld) var(--le) var(--ll) infinite; }
+@keyframes pk-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes pk-up { from { opacity: 0; transform: translateY(40px) } to { opacity: 1; transform: none } }
+@keyframes pk-down { from { opacity: 0; transform: translateY(-40px) } to { opacity: 1; transform: none } }
+@keyframes pk-left { from { opacity: 0; transform: translateX(70px) } to { opacity: 1; transform: none } }
+@keyframes pk-right { from { opacity: 0; transform: translateX(-70px) } to { opacity: 1; transform: none } }
+@keyframes pk-zoom { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: none } }
+@keyframes pk-pop { 0% { opacity: 0; transform: scale(.3) } 60% { opacity: 1; transform: scale(1.12) } 80% { transform: scale(.95) } 100% { opacity: 1; transform: none } }
+@keyframes pk-drop { 0% { opacity: 0; transform: translateY(-140px) } 60% { opacity: 1; transform: translateY(12px) } 80% { transform: translateY(-6px) } 100% { opacity: 1; transform: none } }
+@keyframes pk-spin { from { opacity: 0; transform: rotate(-200deg) scale(.3) } to { opacity: 1; transform: none } }
+@keyframes pk-flip { from { opacity: 0; transform: perspective(700px) rotateY(90deg) } to { opacity: 1; transform: none } }
+@keyframes pk-blur { from { opacity: 0; filter: blur(16px) } to { opacity: 1; filter: none } }
+@keyframes pk-l-pulse { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.08) } }
+@keyframes pk-l-float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
+@keyframes pk-l-wiggle { 0%, 100% { transform: rotate(-4deg) } 50% { transform: rotate(4deg) } }
+@keyframes pk-l-girar { from { transform: rotate(0) } to { transform: rotate(360deg) } }
+@keyframes pk-l-parpadeo { 0%, 100% { opacity: 1 } 50% { opacity: .4 } }
+
+/* Transiciones entre diapositivas */
+.scene[data-trans="fade"] { transform: none; }
+.scene[data-trans="slide"] { transform: translateX(8%); }
+.scene[data-trans="zoom"] { transform: scale(.82); }
+.scene[data-trans="flip"] { transform: perspective(1400px) rotateY(-28deg); }
+.scene[data-trans="none"] { transition: none; transform: none; }
+.scene.active[data-trans] { transform: none; }
+
+/* Notas del profesor (tecla N) */
+.notes { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); width: min(720px, 92vw); max-height: 40vh; overflow-y: auto; background: rgba(17,24,39,0.94); color: #e5e7eb; border: 1px solid #6c63ff; border-radius: 14px; padding: 12px 16px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; z-index: 300; display: none; }
+.notes.open { display: block; }
+.notes b { color: #a78bfa; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; display: block; margin-bottom: 4px; }
+
+/* Modo PDF / imprimir (?print=1) */
+body.print { overflow: visible; height: auto; background: #fff; }
+body.print .stage { position: static; height: auto; overflow: visible; }
+body.print .scene { position: relative; width: 1920px; height: 1080px; opacity: 1 !important; transform: none !important; transition: none !important; break-after: page; page-break-after: always; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.print .slide-label { display: none; }
+body.print .pk-in, body.print .pk-loop { animation: none !important; }
+.print-bar { position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; gap: 8px; }
+.print-bar button { background: #6c63ff; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+@media print { .print-bar { display: none; } }
 </style>
 </head>
 <body>
@@ -159,7 +206,29 @@ const THEMES = {
   blue: { bg:'linear-gradient(160deg,#0A0E45 0%,#0d0d2b 100%)', accent:'#a78bfa', text:'#fff', sub:'rgba(255,255,255,0.65)', card:'rgba(255,255,255,0.08)', cardBorder:'rgba(255,255,255,0.12)', tag:'rgba(108,99,255,0.25)', tagBorder:'rgba(108,99,255,0.5)', tagText:'#a78bfa' },
   green: { bg:'linear-gradient(135deg,#064e3b 0%,#065f46 100%)', accent:'#34d399', text:'#fff', sub:'rgba(255,255,255,0.75)', card:'rgba(255,255,255,0.1)', cardBorder:'rgba(52,211,153,0.3)', tag:'rgba(52,211,153,0.2)', tagBorder:'rgba(52,211,153,0.5)', tagText:'#6ee7b7' },
   orange: { bg:'linear-gradient(135deg,#7c2d12 0%,#431407 100%)', accent:'#fb923c', text:'#fff', sub:'rgba(255,255,255,0.75)', card:'rgba(255,255,255,0.1)', cardBorder:'rgba(251,146,60,0.3)', tag:'rgba(251,146,60,0.2)', tagBorder:'rgba(251,146,60,0.5)', tagText:'#fdba74' },
+  // (copia de src/components/presentacion/temas.js)
+  blanco: { bg:'#ffffff', accent:'#2563eb', text:'#111827', sub:'#4b5563', card:'#f3f4f6', cardBorder:'#e5e7eb', tag:'#dbeafe', tagBorder:'#93c5fd', tagText:'#1d4ed8' },
+  pizarra: { bg:'linear-gradient(160deg,#1f3b2c 0%,#16291f 100%)', accent:'#fde68a', text:'#f8fafc', sub:'rgba(248,250,252,0.75)', card:'rgba(255,255,255,0.08)', cardBorder:'rgba(253,230,138,0.35)', tag:'rgba(253,230,138,0.18)', tagBorder:'rgba(253,230,138,0.5)', tagText:'#fde68a' },
+  papel: { bg:'#fdf6e3', accent:'#b45309', text:'#3f2d1a', sub:'#7c5e3c', card:'#fffaf0', cardBorder:'#e9d8b4', tag:'#fde9c4', tagBorder:'#e0b973', tagText:'#92400e' },
+  coral: { bg:'linear-gradient(135deg,#ff7e5f 0%,#feb47b 100%)', accent:'#ffffff', text:'#ffffff', sub:'rgba(255,255,255,0.85)', card:'rgba(255,255,255,0.22)', cardBorder:'rgba(255,255,255,0.4)', tag:'rgba(255,255,255,0.25)', tagBorder:'rgba(255,255,255,0.5)', tagText:'#ffffff' },
+  oceano: { bg:'linear-gradient(135deg,#0ea5e9 0%,#1e3a8a 100%)', accent:'#fde047', text:'#ffffff', sub:'rgba(255,255,255,0.8)', card:'rgba(255,255,255,0.14)', cardBorder:'rgba(255,255,255,0.3)', tag:'rgba(253,224,71,0.2)', tagBorder:'rgba(253,224,71,0.5)', tagText:'#fef08a' },
 };
+
+// Fuentes de Google (misma lista que FUENTES en src/components/presentacion/render.jsx)
+const FUENTES_Q = ['Inter:wght@400;600;700;900','Poppins:wght@400;600;700;900','Montserrat:wght@400;700;900','Nunito:wght@400;700;900','Raleway:wght@400;700;900','Oswald:wght@400;700','Playfair+Display:ital,wght@0,400;0,700;0,900;1,400','Merriweather:wght@400;700;900','Lora:ital,wght@0,400;0,700;1,400','Roboto+Slab:wght@400;700;900','Bebas+Neue','Righteous','Lobster','Press+Start+2P','Special+Elite','Fredoka:wght@400;600;700','Baloo+2:wght@400;700','Comic+Neue:wght@400;700','Patrick+Hand','Caveat:wght@400;700','Dancing+Script:wght@400;700','Pacifico','Indie+Flower','Permanent+Marker','Amatic+SC:wght@400;700','Source+Code+Pro:wght@400;700'];
+{
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?' + FUENTES_Q.map(q => 'family=' + q).join('&') + '&display=swap';
+  document.head.appendChild(l);
+}
+const MODO_PDF = new URLSearchParams(location.search).get('print') === '1';
+function ajustarEscala() {
+  const k = MODO_PDF ? 2 : Math.min(window.innerWidth / 960, window.innerHeight / 540);
+  document.documentElement.style.setProperty('--k', k);
+}
+ajustarEscala();
+window.addEventListener('resize', ajustarEscala);
 
 const root = document.getElementById('root');
 const params = new URLSearchParams(window.location.search);
@@ -182,8 +251,10 @@ async function loadPresentation(id) {
     slides = data.slides || [];
     autoPlay = data.autoPlay !== false;
     document.title = data.titulo || 'PiKT Presentación';
+    if (MODO_PDF) { construirPDF(); return; }
     buildStage(data);
-    requestAnimationFrame(() => goTo(0));
+    const ini = Math.max(0, Math.min(slides.length - 1, (parseInt(params.get('s'), 10) || 1) - 1));
+    requestAnimationFrame(() => goTo(ini));
   } catch(e) {
     root.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
@@ -276,105 +347,222 @@ async function _playMusicEl(btn) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function renderFreeSlide(slide, t) {
-  if (!slide.elements?.length) return '<div style="width:100%;height:100%;"></div>';
-  const elHtml = slide.elements.map(el => {
-    const op = el.opacity != null ? el.opacity : 1;
-    const base = `position:absolute;left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;box-sizing:border-box;overflow:hidden;opacity:${op};`;
+// ── Lienzo libre: réplica en HTML de src/components/presentacion/render.jsx ──
+const PX_X = 9.6, PX_Y = 5.4;
+const FORMAS = {
+  rect: { txt: '4%' }, circle: { txt: '14%' }, line: {},
+  triangle: { d: 'M50 2 L98 98 L2 98 Z', txt: '40% 18% 4% 18%' },
+  diamond: { d: 'M50 2 L98 50 L50 98 L2 50 Z', txt: '25%' },
+  pentagon: { d: 'M50 2 L98 38 L80 98 L20 98 L2 38 Z', txt: '25% 14% 6% 14%' },
+  hexagon: { d: 'M25 3 L75 3 L98 50 L75 97 L25 97 L2 50 Z', txt: '10% 14%' },
+  octagon: { d: 'M30 2 L70 2 L98 30 L98 70 L70 98 L30 98 L2 70 L2 30 Z', txt: '12%' },
+  star: { d: 'M50 2 L61.8 36 L98 36 L68.5 57.5 L79.5 92 L50 71 L20.5 92 L31.5 57.5 L2 36 L38.2 36 Z', txt: '34% 26% 22% 26%' },
+  heart: { d: 'M50 92 C20 70 2 52 2 30 C2 14 14 4 28 4 C38 4 46 10 50 18 C54 10 62 4 72 4 C86 4 98 14 98 30 C98 52 80 70 50 92 Z', txt: '18% 16% 26% 16%' },
+  bubble: { d: 'M8 4 L92 4 Q98 4 98 10 L98 62 Q98 68 92 68 L40 68 L22 94 L26 68 L8 68 Q2 68 2 62 L2 10 Q2 4 8 4 Z', txt: '4% 4% 34% 4%' },
+  cloud: { d: 'M25 82 C10 82 2 72 2 60 C2 47 12 39 24 40 C25 25 37 14 51 14 C64 14 74 22 77 34 C90 34 98 45 98 58 C98 71 88 82 75 82 Z', txt: '28% 14% 20% 14%' },
+  arrow: { d: 'M2 35 L62 35 L62 12 L98 50 L62 88 L62 65 L2 65 Z', txt: '34% 30% 34% 4%' },
+  arrowL: { d: 'M98 35 L38 35 L38 12 L2 50 L38 88 L38 65 L98 65 Z', txt: '34% 4% 34% 30%' },
+  doubleArrow: { d: 'M2 50 L25 15 L25 35 L75 35 L75 15 L98 50 L75 85 L75 65 L25 65 L25 85 Z', txt: '34% 22%' },
+  chevron: { d: 'M2 4 L72 4 L98 50 L72 96 L2 96 L28 50 Z', txt: '10% 24% 10% 28%' },
+  banner: { d: 'M2 18 L98 18 L86 50 L98 82 L2 82 L14 50 Z', txt: '20% 16%' },
+  parallelogram: { d: 'M22 4 L98 4 L78 96 L2 96 Z', txt: '8% 22%' },
+  trapezoid: { d: 'M22 4 L78 4 L98 96 L2 96 Z', txt: '8% 18%' },
+  cross: { d: 'M35 2 L65 2 L65 35 L98 35 L98 65 L65 65 L65 98 L35 98 L35 65 L2 65 L2 35 L35 35 Z', txt: '36%' },
+  lightning: { d: 'M58 2 L18 56 L46 56 L38 98 L82 40 L54 40 Z', txt: '40%' },
+  moon: { d: 'M62 4 A46 46 0 1 0 96 70 A38 38 0 1 1 62 4 Z', txt: '30%' },
+};
+const MASCARAS = {
+  circulo: 'ellipse(50% 50% at 50% 50%)', redondeado: 'inset(0 round 12%)', pildora: 'inset(0 round 999px)',
+  arco: 'inset(0 round 50% 50% 0 0)', hexagono: 'polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%)',
+  rombo: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)', triangulo: 'polygon(50% 0, 100% 100%, 0 100%)',
+  estrella: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
+};
+const BUCLE_DUR = { pulse: 1.8, float: 3, wiggle: 1.4, girar: 6, parpadeo: 1.6 };
+const PREFIJOS = { bullet: () => '•', number: i => `${i + 1}.`, check: () => '✓', arrow: () => '➜', star: () => '★' };
 
-    if (el.type === 'image') {
-      const fit = el.objectFit || 'cover';
-      const br  = el.borderRadius ? `${el.borderRadius}px` : '0';
-      return `<div style="${base}padding:0;"><img src="${escHtml(el.src)}" alt="" style="width:100%;height:100%;object-fit:${fit};border-radius:${br};display:block;"/></div>`;
+const degradado = g => `linear-gradient(${g.angle ?? 135}deg, ${g.from}, ${g.to})`;
+const giro = el => (el.flipH || el.flipV) ? `scale(${el.flipH ? -1 : 1},${el.flipV ? -1 : 1})` : '';
+function sombraFiltro(el) {
+  const c = el.shadowColor;
+  switch (el.shadow) {
+    case 'suave': return `drop-shadow(0 6px 12px ${c || 'rgba(0,0,0,0.45)'})`;
+    case 'fuerte': return `drop-shadow(0 14px 22px ${c || 'rgba(0,0,0,0.7)'})`;
+    case 'brillo': return `drop-shadow(0 0 12px ${c || '#a78bfa'})`;
+    case 'solida': return `drop-shadow(6px 6px 0 ${c || '#000000'})`;
+    default: return '';
+  }
+}
+function sombraTexto(el) {
+  const c = el.shadowColor;
+  switch (el.shadow) {
+    case 'suave': return `0 3px 8px ${c || 'rgba(0,0,0,0.5)'}`;
+    case 'fuerte': return `0 6px 16px ${c || 'rgba(0,0,0,0.85)'}`;
+    case 'brillo': return `0 0 8px ${c || '#a78bfa'}, 0 0 22px ${c || '#a78bfa'}`;
+    case 'solida': return `4px 4px 0 ${c || '#000000'}`;
+    default: return '';
+  }
+}
+function filtroCss(f) {
+  if (!f) return '';
+  const v = Object.assign({ brillo: 100, contraste: 100, saturacion: 100, gris: 0, sepia: 0, desenfoque: 0, matiz: 0 }, f);
+  const p = [];
+  if (v.brillo !== 100) p.push(`brightness(${v.brillo}%)`);
+  if (v.contraste !== 100) p.push(`contrast(${v.contraste}%)`);
+  if (v.saturacion !== 100) p.push(`saturate(${v.saturacion}%)`);
+  if (v.gris) p.push(`grayscale(${v.gris}%)`);
+  if (v.sepia) p.push(`sepia(${v.sepia}%)`);
+  if (v.matiz) p.push(`hue-rotate(${v.matiz}deg)`);
+  if (v.desenfoque) p.push(`blur(${v.desenfoque}px)`);
+  return p.join(' ');
+}
+
+function estiloTexto(el, t, enForma) {
+  const st = el.textStyle;
+  const defColor = enForma ? '#ffffff' : st === 'cta' ? t.accent : st === 'sub' ? t.sub : t.text;
+  const defSize = st === 'heading' ? 32 : st === 'sub' ? 14 : enForma ? 18 : 16;
+  const defWt = st === 'heading' ? 'bold' : st === 'sub' ? '600' : enForma ? '700' : 'normal';
+  let s = `font-family:${el.fontFamily || "'Inter','Segoe UI',sans-serif"};font-size:${el.fontSize || defSize}px;`
+    + `font-weight:${el.fontWeight || defWt};font-style:${el.fontStyle || 'normal'};text-decoration:${el.textDecoration || 'none'};`
+    + `text-align:${el.textAlign || (enForma ? 'center' : 'left')};color:${el.color || defColor};line-height:${el.lineHeight || (enForma ? 1.25 : 1.5)};`
+    + `letter-spacing:${el.letterSpacing != null ? el.letterSpacing + 'em' : (st === 'sub' ? '0.1em' : 'normal')};text-transform:${el.uppercase ? 'uppercase' : 'none'};`;
+  const ts = sombraTexto(el);
+  if (el.textStrokeW) s += `-webkit-text-stroke:${el.textStrokeW}px ${el.textStrokeColor || '#000000'};paint-order:stroke fill;`;
+  if (el.gradient) {
+    s += `background-image:${degradado(el.gradient)};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${el.gradient.from};`;
+    if (ts) s += `filter:${sombraFiltro(el)};`;
+  } else if (ts) s += `text-shadow:${ts};`;
+  return s;
+}
+function textoHtml(el, t, align) {
+  if (!el.lista || !PREFIJOS[el.lista]) return `<div style="white-space:pre-wrap;word-break:break-word;">${escHtml(el.text || '')}</div>`;
+  const just = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+  const marca = escHtml(el.listaColor || (el.gradient ? el.gradient.from : t.accent));
+  let k = 0;
+  return String(el.text || '').split('\n').map(l => (l.trim() === ''
+    ? '<div>&nbsp;</div>'
+    : `<div style="display:flex;gap:0.45em;justify-content:${just};"><span style="flex-shrink:0;color:${marca};-webkit-text-fill-color:${marca};font-weight:800;">${PREFIJOS[el.lista](k++)}</span><span style="white-space:pre-wrap;word-break:break-word;">${escHtml(l)}</span></div>`)).join('');
+}
+function cajaTexto(el, t, enForma) {
+  const v = el.vAlign || (enForma ? 'middle' : 'top');
+  const pad = el.bgColor ? '6px 12px' : enForma ? '4px 8px' : '4px 6px';
+  const bg = el.bgColor ? `background:${el.bgColor};border-radius:${el.bgRadius ?? 8}px;` : '';
+  const st = `width:100%;height:100%;box-sizing:border-box;padding:${pad};display:flex;flex-direction:column;justify-content:${v === 'middle' ? 'center' : v === 'bottom' ? 'flex-end' : 'flex-start'};${bg}${estiloTexto(el, t, enForma)}`;
+  return `<div style="${escHtml(st)}">${textoHtml(el, t, el.textAlign || (enForma ? 'center' : 'left'))}</div>`;
+}
+function lineaHtml(el, t) {
+  const W = Math.max(1, el.w * PX_X), H = Math.max(1, el.h * PX_Y);
+  const sw = el.strokeWidth || 3, col = escHtml(el.fill || t.text), y = H / 2;
+  const cab = Math.max(10, sw * 3.2);
+  const fin = (el.lineEnd === 'arrow' || el.lineEnd === 'both') ? cab * 0.9 : 0;
+  const ini = el.lineEnd === 'both' ? cab * 0.9 : 0;
+  const dash = el.strokeDash === 'dashed' ? `${sw * 3} ${sw * 2}` : el.strokeDash === 'dotted' ? `0.1 ${sw * 2}` : '';
+  return `<svg width="100%" height="100%" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible;">`
+    + `<line x1="${sw / 2 + ini}" y1="${y}" x2="${W - sw / 2 - fin}" y2="${y}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`
+    + (fin > 0 ? `<polygon points="${W},${y} ${W - cab},${y - cab * 0.6} ${W - cab},${y + cab * 0.6}" fill="${col}"/>` : '')
+    + (ini > 0 ? `<polygon points="0,${y} ${cab},${y - cab * 0.6} ${cab},${y + cab * 0.6}" fill="${col}"/>` : '')
+    + '</svg>';
+}
+function formaHtml(el, t) {
+  const tipo = FORMAS[el.shapeType] ? el.shapeType : 'rect';
+  const sf = sombraFiltro(el);
+  if (tipo === 'line') return `<div style="width:100%;height:100%;${sf ? `filter:${sf};` : ''}">${lineaHtml(el, t)}</div>`;
+  const trazo = el.stroke && el.stroke !== 'none' ? el.stroke : null;
+  const sw = el.strokeWidth ?? 2;
+  let fig;
+  if (tipo === 'rect' || tipo === 'circle') {
+    const st = `width:100%;height:100%;box-sizing:border-box;background:${el.fillGradient ? degradado(el.fillGradient) : (el.fill || '#6c63ff')};`
+      + `border-radius:${tipo === 'circle' ? '50%' : (el.borderRadius || 0) + 'px'};border:${trazo ? `${sw}px ${el.strokeDash || 'solid'} ${trazo}` : 'none'};`;
+    fig = `<div style="${escHtml(st)}"></div>`;
+  } else {
+    const gid = 'pkg_' + String(el.id).replace(/[^\w-]/g, '');
+    let defs = '', relleno = escHtml(el.fill || '#6c63ff');
+    if (el.fillGradient) {
+      const a = (el.fillGradient.angle ?? 135) * Math.PI / 180, s = Math.sin(a), c = Math.cos(a);
+      defs = `<defs><linearGradient id="${gid}" x1="${0.5 - s / 2}" y1="${0.5 + c / 2}" x2="${0.5 + s / 2}" y2="${0.5 - c / 2}"><stop offset="0" stop-color="${escHtml(el.fillGradient.from)}"/><stop offset="1" stop-color="${escHtml(el.fillGradient.to)}"/></linearGradient></defs>`;
+      relleno = `url(#${gid})`;
     }
-
-    if (el.type === 'music') {
+    const dash = el.strokeDash === 'dashed' ? `${sw * 3} ${sw * 2}` : el.strokeDash === 'dotted' ? `1 ${sw * 2}` : '';
+    const fl = giro(el);
+    fig = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block;overflow:visible;${fl ? `transform:${fl};` : ''}">${defs}`
+      + `<path d="${FORMAS[tipo].d}" fill="${relleno}" stroke="${trazo ? escHtml(trazo) : 'none'}" stroke-width="${trazo ? sw : 0}" vector-effect="non-scaling-stroke"${dash ? ` stroke-dasharray="${dash}"` : ''} stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+  const txt = el.text ? `<div style="position:absolute;inset:${FORMAS[tipo].txt || '6%'};">${cajaTexto(el, t, true)}</div>` : '';
+  return `<div style="width:100%;height:100%;position:relative;${sf ? `filter:${sf};` : ''}">${fig}${txt}</div>`;
+}
+function imagenHtml(el) {
+  const mask = MASCARAS[el.mask || ''] || '';
+  const sf = sombraFiltro(el), fl = filtroCss(el.filters), flip = giro(el);
+  const st = `width:100%;height:100%;display:block;box-sizing:border-box;object-fit:${el.objectFit || 'cover'};object-position:${el.objPos || 'center'};`
+    + `border-radius:${mask ? 0 : (el.borderRadius || 0)}px;${mask ? `clip-path:${mask};-webkit-clip-path:${mask};` : ''}${fl ? `filter:${fl};` : ''}`
+    + `${flip ? `transform:${flip};` : ''}${el.borderW ? `border:${el.borderW}px solid ${el.borderColor || '#ffffff'};` : ''}`;
+  return `<div style="width:100%;height:100%;${sf ? `filter:${sf};` : ''}"><img src="${escHtml(el.src)}" alt="" style="${escHtml(st)}"/></div>`;
+}
+function contenidoHtml(el, t) {
+  switch (el.type) {
+    case 'text': return cajaTexto(el, t, false);
+    case 'shape': return formaHtml(el, t);
+    case 'image': return imagenHtml(el);
+    case 'music': {
       const itemsJson = escHtml(JSON.stringify(el.items || []));
-      const bpm = el.bpm || 90;
-      return `<div style="${base}padding:0;position:relative;">
+      return `<div style="width:100%;height:100%;position:relative;">
         <img src="${escHtml(el.src)}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;"/>
-        <button data-music-id="${el.id}" data-bpm="${bpm}" data-items-json="${itemsJson}"
-          style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:2px solid rgba(255,255,255,0.5);color:#fff;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:10;transition:background 0.2s;"
-          title="Reproducir música" onmouseover="this.style.background='rgba(108,99,255,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.65)'">▶</button>
+        <button data-music-id="${escHtml(el.id)}" data-bpm="${el.bpm || 90}" data-items-json="${itemsJson}"
+          style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:2px solid rgba(255,255,255,0.5);color:#fff;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:10;"
+          title="Reproducir música">▶</button>
       </div>`;
     }
-
-    if (el.type === 'text') {
-      // Support both legacy textStyle and new explicit properties
-      const defColor  = el.textStyle==='cta' ? t.accent : el.textStyle==='sub' ? t.sub : t.text;
-      const defSize   = el.textStyle==='heading' ? '2rem' : el.textStyle==='sub' ? '0.9rem' : '1rem';
-      const defWeight = el.textStyle==='heading' ? '900' : el.textStyle==='sub' ? '600' : 'normal';
-      const defLine   = el.textStyle==='heading' ? 1.2 : 1.5;
-      const defLS     = el.textStyle==='sub' ? '0.1em' : 'normal';
-
-      const ff = el.fontFamily ? `font-family:${el.fontFamily};` : '';
-      const fs = el.fontSize   ? `font-size:${el.fontSize}px;`  : `font-size:${defSize};`;
-      const fw = el.fontWeight ? `font-weight:${el.fontWeight};`: `font-weight:${defWeight};`;
-      const fi = el.fontStyle  ? `font-style:${el.fontStyle};`  : '';
-      const td = el.textDecoration && el.textDecoration !== 'none' ? `text-decoration:${el.textDecoration};` : '';
-      const ta = `text-align:${el.textAlign||'left'};`;
-      const col= `color:${el.color || defColor};`;
-      const lh = `line-height:${el.lineHeight || defLine};`;
-      const ls = `letter-spacing:${defLS};`;
-      const ts = `${ff}${fs}${fw}${fi}${td}${ta}${col}${lh}${ls}`;
-      const lines = (el.text||'').split('\n').map(l => `<div>${escHtml(l)||'&nbsp;'}</div>`).join('');
-      return `<div style="${base}padding:4px 6px;${ts}word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;">${lines}</div>`;
+    case 'youtube': {
+      const embed = `https://www.youtube.com/embed/${escHtml(el.ytId || '')}?autoplay=0&rel=0&modestbranding=1`;
+      return `<iframe src="${embed}" style="width:100%;height:100%;border:none;display:block;" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe>`;
     }
-
-    if (el.type === 'youtube') {
-      const ytId = escHtml(el.ytId || '');
-      const embed = `https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0&modestbranding=1`;
-      return `<div style="${base}padding:0;"><iframe src="${embed}" style="width:100%;height:100%;border:none;" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe></div>`;
+    case 'webview':
+      return `<iframe src="${escHtml(el.src || '')}" style="width:100%;height:100%;border:none;display:block;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
+    case 'equation': {
+      const col = escHtml(el.color || t.text), fs = `${el.fontSize || 28}px`, sf = sombraFiltro(el);
+      return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:2px 6px;box-sizing:border-box;${sf ? `filter:${sf};` : ''}" data-latex="${escHtml(el.latex || '')}" data-color="${col}" data-fs="${fs}"><span style="color:${col};font-size:${fs};">${escHtml(el.latex || '')}</span></div>`;
     }
-
-    if (el.type === 'webview') {
-      const src = escHtml(el.src || '');
-      return `<div style="${base}padding:0;"><iframe src="${src}" style="width:100%;height:100%;border:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe></div>`;
-    }
-
-    if (el.type === 'shape') {
-      const fill   = escHtml(el.fill   || '#6c63ff');
-      const stroke = el.stroke && el.stroke !== 'none' ? escHtml(el.stroke) : 'none';
-      const sw     = el.strokeWidth || 2;
-      const br     = el.borderRadius ? `${el.borderRadius}px` : '0';
-
-      if (el.shapeType === 'circle') {
-        return `<div style="${base}"><div style="width:100%;height:100%;background:${fill};border-radius:50%;${stroke!=='none'?`border:${sw}px solid ${stroke};`:''}box-sizing:border-box;"></div></div>`;
-      }
-      if (el.shapeType === 'rect') {
-        return `<div style="${base}"><div style="width:100%;height:100%;background:${fill};border-radius:${br};${stroke!=='none'?`border:${sw}px solid ${stroke};`:''}box-sizing:border-box;"></div></div>`;
-      }
-      if (el.shapeType === 'triangle') {
-        return `<div style="${base}padding:0;"><svg viewBox="0 0 100 100" style="width:100%;height:100%;" preserveAspectRatio="none"><polygon points="50,2 98,98 2,98" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/></svg></div>`;
-      }
-      if (el.shapeType === 'line') {
-        return `<div style="${base}padding:0;"><svg viewBox="0 0 100 10" style="width:100%;height:100%;" preserveAspectRatio="none"><line x1="2" y1="5" x2="98" y2="5" stroke="${fill}" stroke-width="${sw}" stroke-linecap="round"/></svg></div>`;
-      }
-    }
-
-    if (el.type === 'equation') {
-      const col = el.color ? escHtml(el.color) : t.text;
-      const fs  = el.fontSize ? `${el.fontSize}px` : '28px';
-      return `<div style="${base}display:flex;align-items:center;justify-content:center;padding:2px 6px;" data-latex="${escHtml(el.latex||'')}" data-color="${col}" data-fs="${fs}"><span class="katex-placeholder" style="color:${col};font-size:${fs};">${escHtml(el.latex||'')}</span></div>`;
-    }
-
-    return '';
-  }).join('');
-  return `<div style="position:relative;width:100%;height:100%;">${elHtml}</div>`;
+    default: return '';
+  }
+}
+function elHtml(el, t) {
+  if (el.hidden) return '';
+  let inner = contenidoHtml(el, t);
+  if (!inner) return '';
+  const a = el.anim || {};
+  if (a.bucle && BUCLE_DUR[a.bucle]) {
+    const ini = a.tipo ? (a.delay ?? 0) + (a.dur ?? 0.7) : 0;
+    inner = `<div class="pk-loop" style="--la:pk-l-${a.bucle};--ld:${BUCLE_DUR[a.bucle]}s;--le:${a.bucle === 'girar' ? 'linear' : 'ease-in-out'};--ll:${ini}s;">${inner}</div>`;
+  }
+  if (a.tipo && /^[a-z]+$/.test(a.tipo)) inner = `<div class="pk-in" style="--pa:pk-${a.tipo};--pd:${a.dur ?? 0.7}s;--pl:${a.delay ?? 0}s;">${inner}</div>`;
+  const caja = `left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;opacity:${el.opacity ?? 1};${el.rotation ? `transform:rotate(${el.rotation}deg);` : ''}`;
+  const link = el.link && el.link !== 'https://' ? ` data-link="${escHtml(el.link)}"` : '';
+  return `<div class="el"${link} style="${caja}">${inner}</div>`;
+}
+function renderFreeSlide(slide, t) {
+  return `<div class="surface">${(slide.elements || []).map(el => elHtml(el, t)).join('')}</div>`;
+}
+function fondoCss(slide, t) {
+  if (slide.bgImage) {
+    const o = slide.bgOverlay || 0;
+    const capa = o ? `linear-gradient(rgba(0,0,0,${o}),rgba(0,0,0,${o})), ` : '';
+    return `background:${capa}url("${slide.bgImage}") center / cover no-repeat;`;
+  }
+  if (slide.bgGradient) return `background:${degradado(slide.bgGradient)};`;
+  if (slide.bgColor) return `background:${slide.bgColor};`;
+  return `background:${t.bg};`;
 }
 
 function renderSlide(slide, idx) {
   const t = THEMES[slide.theme] || THEMES.dark;
   const accent33 = t.accent + '33';
   const ctaColor = t.accent === '#ffffff' ? '#6c63ff' : t.accent;
-  const bgStyle = slide.bgImage
-    ? `background:${t.bg};background-image:url(${slide.bgImage});background-size:cover;background-position:center;`
-    : `background:${t.bg};`;
+  const bgStyle = escHtml(fondoCss(slide, t));
+  const trans = /^[a-z]+$/.test(slide.transition || '') ? ` data-trans="${slide.transition}"` : '';
 
   // Free (pure element-based) layout
   if (slide.layout === 'free') {
     const freeContent = renderFreeSlide(slide, t);
-    return `<div class="scene" id="s${idx}" style="${bgStyle}">
+    return `<div class="scene" id="s${idx}"${trans} style="${bgStyle}">
       <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
       ${freeContent}
     </div>`;
@@ -511,7 +699,7 @@ function renderSlide(slide, idx) {
     </div>`;
   }
 
-  return `<div class="scene" id="s${idx}" style="${bgStyle}">
+  return `<div class="scene" id="s${idx}"${trans} style="${bgStyle}">
     <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
     ${content}
     ${elementsOverlay}
@@ -529,6 +717,7 @@ function buildStage(data) {
       <button class="skip-btn" id="skipBtn">siguiente ›</button>
       <button class="prev-btn" id="prevBtn">‹</button>
       <button class="next-btn" id="nextBtn">›</button>
+      <div class="notes" id="notes"></div>
     </div>`;
 
   // Wire music play buttons
@@ -536,21 +725,20 @@ function buildStage(data) {
     btn.onclick = (e) => { e.stopPropagation(); _playMusicEl(btn); };
   });
 
-  // Render KaTeX equations (deferred because katex.js loads async)
-  function renderEquations() {
-    if (typeof katex === 'undefined') { setTimeout(renderEquations, 100); return; }
-    document.querySelectorAll('[data-latex]').forEach(el => {
-      const latex = el.getAttribute('data-latex');
-      const color = el.getAttribute('data-color') || '#fff';
-      const fs    = el.getAttribute('data-fs') || '28px';
-      try {
-        el.innerHTML = katex.renderToString(latex, { throwOnError: false, displayMode: true, output: 'html' });
-        const inner = el.querySelector('.katex');
-        if (inner) { inner.style.color = color; inner.style.fontSize = fs; }
-      } catch {}
-    });
-  }
   renderEquations();
+
+  // Enlaces de los elementos (web o «ir a la diapositiva N»)
+  document.getElementById('stage').addEventListener('click', e => {
+    const l = e.target.closest('[data-link]');
+    if (!l) return;
+    const v = l.getAttribute('data-link') || '';
+    if (v.startsWith('slide:')) {
+      const n = parseInt(v.slice(6), 10) - 1;
+      if (n >= 0 && n < slides.length) { clearTimeout(timer); goTo(n); }
+    } else if (/^https?:\/\//i.test(v)) {
+      window.open(v, '_blank', 'noopener');
+    }
+  });
 
   // Dots
   const dotsEl = document.getElementById('sceneDots');
@@ -576,6 +764,7 @@ function buildStage(data) {
     if (e.key === ' ') { e.preventDefault(); togglePause(); }
     if (e.key === 'ArrowRight') { clearTimeout(timer); goTo((current+1)%slides.length); }
     if (e.key === 'ArrowLeft')  { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); }
+    if (e.key === 'n' || e.key === 'N') { notasAbiertas = !notasAbiertas; pintarNotas(); }
   });
 
   // Touch swipe navigation
@@ -594,6 +783,48 @@ function buildStage(data) {
       else         goTo((current-1+slides.length)%slides.length);
     }
   }, { passive: true });
+}
+
+// Ecuaciones KaTeX (katex.js se carga de forma diferida)
+function renderEquations() {
+  if (typeof katex === 'undefined') { setTimeout(renderEquations, 100); return; }
+  document.querySelectorAll('[data-latex]').forEach(el => {
+    const latex = el.getAttribute('data-latex');
+    const color = el.getAttribute('data-color') || '#fff';
+    const fs    = el.getAttribute('data-fs') || '28px';
+    try {
+      el.innerHTML = katex.renderToString(latex, { throwOnError: false, displayMode: true, output: 'html' });
+      const inner = el.querySelector('.katex');
+      if (inner) { inner.style.color = color; inner.style.fontSize = fs; }
+    } catch {}
+  });
+}
+
+// Notas del profesor (tecla N)
+let notasAbiertas = false;
+function pintarNotas() {
+  const n = document.getElementById('notes');
+  if (!n) return;
+  const txt = slides[current]?.notes || '';
+  n.innerHTML = `<b>Notas · diapositiva ${current + 1}</b>${escHtml(txt) || '<i style="opacity:.6">Sin notas en esta diapositiva</i>'}`;
+  n.classList.toggle('open', notasAbiertas);
+}
+
+// Modo PDF: todas las diapositivas una debajo de otra, sin animaciones, y se abre imprimir
+async function construirPDF() {
+  document.body.classList.add('print');
+  const st = document.createElement('style');
+  st.textContent = '@page { size: 1920px 1080px; margin: 0; }';
+  document.head.appendChild(st);
+  root.innerHTML = `<div class="print-bar"><button onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button></div>
+    <div class="stage">${slides.map((s, i) => renderSlide(s, i)).join('')}</div>`;
+  document.querySelectorAll('.scene').forEach(s => s.classList.add('active'));
+  renderEquations();
+  const esperaKatex = new Promise(r => { const t0 = Date.now(); const f = () => (typeof katex !== 'undefined' || Date.now() - t0 > 4000) ? r() : setTimeout(f, 100); f(); });
+  const imagenes = [...document.images].map(img => (img.complete ? null : new Promise(r => { img.onload = img.onerror = r; })));
+  await Promise.race([Promise.all([esperaKatex, document.fonts?.ready, ...imagenes]), new Promise(r => setTimeout(r, 8000))]);
+  renderEquations();
+  setTimeout(() => window.print(), 500);
 }
 
 let gameOverlayOpen = false;
@@ -698,6 +929,7 @@ function goTo(idx) {
   if (!el) return;
   el.classList.add('active');
   current = idx;
+  pintarNotas();
   slideStartedAt = Date.now();
   elapsedAtPause = 0;
 

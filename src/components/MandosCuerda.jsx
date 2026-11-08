@@ -65,6 +65,7 @@ export function useMandosCuerda(bloqueado) {
   const [activo, setActivo] = useState(false);
   const [mandos, setMandos] = useState({}); // id → { id, nombre, equipo: 0 | 1 | 2 }
   const [votos, setVotos] = useState({ 1: {}, 2: {} });
+  const [resultados, setResultados] = useState({}); // id → { aciertos, intentos } (para guardar el informe)
   const preguntas = useRef({ 1: null, 2: null });
   const votosRef = useRef(votos); votosRef.current = votos;
   const mandosRef = useRef(mandos); mandosRef.current = mandos;
@@ -89,6 +90,16 @@ export function useMandosCuerda(bloqueado) {
     const empatadas = cuenta.map((c, i) => (c === max ? i : -1)).filter(i => i >= 0);
     const elegida = empatadas[Math.floor(Math.random() * empatadas.length)];
     if (p.correcta != null) Object.entries(v).forEach(([id, l]) => { if (Number(id) < 900) feedbackMando(Number(id), LETRAS.indexOf(l) === p.correcta); });
+    if (p.correcta != null) {
+      setResultados((r) => {
+        const s = { ...r };
+        Object.entries(v).forEach(([id, l]) => {
+          const ok = LETRAS.indexOf(l) === p.correcta;
+          s[id] = { aciertos: (s[id]?.aciertos || 0) + (ok ? 1 : 0), intentos: (s[id]?.intentos || 0) + 1 };
+        });
+        return s;
+      });
+    }
     p.elegir(elegida);
   }, []);
 
@@ -146,7 +157,10 @@ export function useMandosCuerda(bloqueado) {
     return Object.fromEntries(ids.map((id, i) => [id, { ...x[id], equipo: (i % 2) + 1 }]));
   });
 
-  return { api, activo, setActivo, mandos, votos, cambiarEquipo, renombrar, repartir, miembros: (e) => Object.values(mandos).filter(m => m.equipo === e) };
+  return {
+    api, activo, setActivo, mandos, votos, cambiarEquipo, renombrar, repartir, miembros: (e) => Object.values(mandos).filter(m => m.equipo === e),
+    resultados, borrarResultados: () => setResultados({}),
+  };
 }
 
 /** Proveedor para que los paneles (useMandoPregunta) encuentren los mandos. */

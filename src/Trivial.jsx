@@ -25,6 +25,8 @@ import wrongSound from './assets/negative_beeps-6008.mp3';
 import wedgeSound from './assets/sonidorespcorrecta.mp3';
 import Confetti from 'react-confetti';
 import { basePublica } from './utils/urlPublica';
+import MandosEnJuego from './mandos/RelevosMandos.jsx';
+import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
 
 // ─── SONIDOS ──────────────────────────────────────────────────────────────────
 // Preload so the browser doesn't block on first interaction
@@ -1260,6 +1262,49 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
         }
     };
 
+    // ── Mandos micro:bit: un mando por jugador (hasta 4), solo cuenta el del turno ──
+    //   esperando dado → cualquier letra tira · eligiendo casilla → A, B, C… = destino ·
+    //   pregunta de opciones → A-D · tras fallar → cualquier letra continúa.
+    const mandosApi = useRef(null);
+    const mandosStats = useRef({ ac: [0, 0, 0, 0, 0, 0], it: [0, 0, 0, 0, 0, 0] });
+    const destinosMando = () => {
+        const eng = engineRef.current;
+        if (!eng?.destinations) return [];
+        return [...eng.destinations.entries()].map(([id, path]) => ({ id, path, node: eng.board.nodes.get(id) }));
+    };
+    const eventoMando = (i, ev) => {
+        if (ev.tipo !== 'letra' || pausaActiva || i !== activePlayerIdx) return;
+        const k = 'ABCD'.indexOf(ev.letra);
+        if (gameState === 'WAITING_ROLL') { tirarDado(); return; }
+        if (gameState === 'SELECTING') {
+            const d = destinosMando()[k];
+            if (!d) return;
+            const eng = engineRef.current;
+            eng.targetNode = d.node; eng.movingPath = d.path; eng.moveProgress = 0;
+            eng.destinations.clear(); eng.state = 'MOVING';
+            setGameState('MOVING');
+            return;
+        }
+        if (gameState === 'QUESTION' && modalData) {
+            if (mostrandoRespuesta) { cerrarModal(); return; }
+            if ((modalData.qData?.tipo || 'SELECCION') !== 'SELECCION') return;
+            const ans = modalData.answers?.[k];
+            if (ans === undefined) return;
+            const ok = ans === modalData.correct;
+            mandosStats.current.it[i]++; if (ok) mandosStats.current.ac[i]++;
+            const id = mandosApi.current?.pilotoDe(i);
+            if (id != null && id < 900) feedbackMando(id, ok);
+            responderPregunta(ok);
+        }
+    };
+    useEffect(() => {
+        if (gameState !== 'WON' || !mandosApi.current?.activos) return;
+        const n = mandosApi.current.nJug; const s = mandosStats.current;
+        mandosApi.current.finPartida(players.slice(0, n).map((p, i) => (p.wedges?.length || 0) * 100 + s.ac[i] * 10 + (i === activePlayerIdx ? 500 : 0)),
+            { ganador: activePlayerIdx < n ? activePlayerIdx : null, aciertos: s.ac.slice(0, n), intentos: s.it.slice(0, n) });
+        mandosStats.current = { ac: [0, 0, 0, 0, 0, 0], it: [0, 0, 0, 0, 0, 0] };
+    }, [gameState]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // ════════════════════════════════════════════════════════════════════════
     // RENDER: PANTALLA SETUP
     // ════════════════════════════════════════════════════════════════════════
@@ -1845,6 +1890,21 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     return (
         <div style={st.appContainer}>
             {gameState === 'WON' && <Confetti recycle={false} numberOfPieces={500} />}
+            <MandosEnJuego clave="TRIVIAL" juego="Trivial" tipo="TRIVIAL_MANDOS" apiRef={mandosApi}
+                nJug={Math.max(1, Math.min(4, players.length || 1))} nombresHueco={players.slice(0, 4).map((p) => p.name)}
+                colores={players.slice(0, 4).map((p, i) => (typeof p.color === 'string' ? p.color : p.color?.hex) || ['#22d3ee', '#f472b6', '#facc15', '#4ade80'][i])}
+                modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras" relevosPorDefecto={false}
+                onEvento={eventoMando}
+                controles={<>Un mando por <b>jugador</b> (hasta 4) y solo cuenta el del turno. <b>A</b> cambia la letra y <b>B</b> o agitar la envía: para <b>tirar el dado</b> envía cualquier letra; para <b>elegir casilla</b>, la letra del destino (sale en la lista); en las preguntas de opciones, <b>A-D</b>; si fallas, envía cualquier letra para seguir.</>} />
+            {gameState === 'SELECTING' && mandosApi.current?.activos && (
+                <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 2147482000, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'none', fontFamily: 'system-ui, sans-serif' }}>
+                    {destinosMando().slice(0, 4).map((d, k) => (
+                        <div key={d.id} style={{ background: 'rgba(10,15,36,0.88)', border: `3px solid ${d.node?.color?.hex || '#fff'}`, color: '#fff', borderRadius: 12, padding: '6px 12px', fontWeight: 900 }}>
+                            🎮 {'ABCD'[k]} → <span style={{ color: d.node?.color?.hex || '#fff' }}>{d.node?.type === 'wedge' ? '🧀 ' : ''}{d.node?.color?.name || 'casilla'}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
             <FullscreenBtn bottom={isMobile ? 100 : 20} />
 
             {/* ── TIRA DE JUGADORES (móvil: arriba fijo / escritorio: esquinas) ── */}
@@ -2045,7 +2105,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                 <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{t(qData.q)}</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 12 }}>
                                     {modalData.answers.map((ans, i) => (
-                                        <button key={i} onClick={() => !mostrandoRespuesta && responderPregunta(ans === modalData.correct)} disabled={mostrandoRespuesta} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem', opacity: mostrandoRespuesta ? 0.4 : 1, cursor: mostrandoRespuesta ? 'default' : 'pointer' }}>{t(ans)}</button>
+                                        <button key={i} onClick={() => !mostrandoRespuesta && responderPregunta(ans === modalData.correct)} disabled={mostrandoRespuesta} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem', opacity: mostrandoRespuesta ? 0.4 : 1, cursor: mostrandoRespuesta ? 'default' : 'pointer' }}>{mandosApi.current?.activos && <b style={{ color: '#facc15', marginRight: 8 }}>{'ABCD'[i]}</b>}{t(ans)}</button>
                                     ))}
                                 </div>
                             </>);

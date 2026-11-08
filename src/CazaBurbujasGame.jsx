@@ -17,6 +17,7 @@ import bg3 from './assets/pantalla3.jpeg';
 import bg4 from './assets/pantalla4.jpeg';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import MandosEnJuego, { COLORES_HUECO } from './mandos/RelevosMandos.jsx';
 
 const BACKGROUNDS = [bg1, bg2, bg3, bg4]; // Array para elegir al azar
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';
@@ -162,7 +163,49 @@ const generarPreguntasMatematicas = (config) => {
 
 
 
-export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null, autoStart = false, hojaInicial = null, modoJuegoInicial = 'Burbujas' }) {
+// Envoltorio con los mandos micro:bit: una mira por mando (1 a 4 a la vez) o relevos.
+// Con varios a la vez, cada mira suma sus aciertos (el primero que explota la correcta se la lleva).
+const RONDA_VACIA = () => ({ ac: [0, 0, 0, 0], fa: [0, 0, 0, 0] });
+export default function CazaBurbujasGame(props) {
+    const mandosApi = useRef(null);
+    const ronda = useRef(RONDA_VACIA());
+    const [, setVersion] = useState(0);
+    const mandosBurbujas = useRef({});
+    mandosBurbujas.current = {
+        onMando: (i, ok) => { (ok ? ronda.current.ac : ronda.current.fa)[i]++; setVersion((v) => v + 1); },
+        onInicio: () => { ronda.current = RONDA_VACIA(); setVersion((v) => v + 1); },
+        onFin: (puntuacion) => {
+            const api = mandosApi.current;
+            if (!api?.activos) return;
+            const r = ronda.current; const n = api.nJug;
+            const pts = n === 1 ? [puntuacion] : r.ac.map((a, i) => Math.max(0, a * 100 - r.fa[i] * 50));
+            api.finPartida(pts.slice(0, n), { aciertos: r.ac.slice(0, n), intentos: r.ac.map((a, i) => a + r.fa[i]).slice(0, n) });
+        },
+    };
+    const api = mandosApi.current;
+    const r = ronda.current;
+    const hayRonda = api?.activos && api.nJug > 1 && r.ac.concat(r.fa).some(Boolean);
+    return (
+        <>
+            <CazaBurbujasJuego {...props} mandosBurbujas={mandosBurbujas} />
+            {!props.modoOlimpico && (
+                <MandosEnJuego clave="BURBUJAS" juego="Burbujas" tipo="BURBUJAS_MANDOS" maxJug={4} cursor apiRef={mandosApi}
+                    controles={<>Cada mando lleva una <b>mira</b>: inclínalo para moverla y pulsa <b>A</b> (o agita) para explotar la burbuja. Con <b>1</b> jugador se juega por relevos; con <b>2 a 4 a la vez</b>, el primero que explota la correcta se lleva los puntos (+100 acierto, −50 fallo).</>} />
+            )}
+            {hayRonda && (
+                <div style={{ position: 'fixed', top: 70, right: 10, zIndex: 2147482000, display: 'flex', flexDirection: 'column', gap: 4, pointerEvents: 'none', fontFamily: 'system-ui, sans-serif' }}>
+                    {Array.from({ length: api.nJug }, (_, i) => (
+                        <div key={i} style={{ background: 'rgba(10,15,36,0.85)', border: `2px solid ${COLORES_HUECO[i]}`, color: '#fff', borderRadius: 10, padding: '4px 10px', fontWeight: 800, fontSize: '0.9rem' }}>
+                            <span style={{ color: COLORES_HUECO[i] }}>●</span> {api.nombreJugador(i) || `Mira ${i + 1}`} · ✓ {r.ac[i]} · ✗ {r.fa[i]}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </>
+    );
+}
+
+function CazaBurbujasJuego({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null, autoStart = false, hojaInicial = null, modoJuegoInicial = 'Burbujas', mandosBurbujas = null }) {
     const [fase, setFase] = useState('SETUP');
     const [puntuacion, setPuntuacion] = useState(0);
     const [modo, setModo] = useState('Burbujas');
@@ -324,6 +367,13 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
         }
     };
 
+    // Mandos: reparto de puntos de la ronda
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => {
+        if (fase === 'COUNTDOWN') mandosBurbujas?.current.onInicio();
+        if (fase === 'FIN') mandosBurbujas?.current.onFin(puntuacion);
+    }, [fase]); // eslint-disable-line react-hooks/exhaustive-deps
+
     if (fase === 'SETUP' && !verRanking) return <PantallaSetup recurso={recurso} onStart={iniciar} onRanking={() => setVerRanking(true)} onExit={alTerminar} />;
     if (verRanking) return <PantallaRanking recurso={recurso} usuario={usuario} onBack={() => setVerRanking(false)} />;
     
@@ -373,6 +423,7 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
             playSound={playSound}
             modoOlimpico={modoOlimpico} // Pasamos la variable al motor
             tiempoOlimpico={tiempoRestante} // <--- PASAMOS EL TIEMPO
+            onMando={(i, ok) => mandosBurbujas?.current.onMando(i, ok)}
         />
     );
 }
@@ -631,7 +682,7 @@ function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerm
     );
 }
 
-function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onExit, playSound, modoOlimpico, tiempoOlimpico }) {
+function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onExit, playSound, modoOlimpico, tiempoOlimpico, onMando }) {
     const [preguntaActualState, setPreguntaActualState] = useState(null);
     const [puntos, setPuntos] = useState(0);
     const [tiempoBarra, setTiempoBarra] = useState(100);
@@ -833,6 +884,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
         const esEspecial = datosActuales.esEspecial;
 
         if (bloqueoRef.current && !esEspecial) return;
+        if (e.piktMira != null) onMando?.(e.piktMira, ok); // clic hecho con la mira de un mando micro:bit
 
         if (ok) {
             playSound('CORRECT');

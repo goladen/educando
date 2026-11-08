@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { R, pick, N, P, mcd, mcm, sup, frac } from '../fuenteTexto';
 import {
-    datosSimplificar, problemasCientifica, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir,
+    datosSimplificar, problemasCientifica, problemasMedidas, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir,
     datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar,
 } from '../../utils/potenciasRadicales';
 import { rad as radM, potStr as potM } from '../../utils/MathRender';
@@ -96,6 +96,23 @@ export const POTENCIAS = {
                 return { e: `${p.emoji} ${sci10(p.enun)}`, largo: true, s: `${N(p.mant)} · 10${sup(p.exp)}`,
                     r: [{ etiqueta: 'a =', tipo: 'frac', v: p.mant, tol: 0.011, placeholder: '4,25' }, { etiqueta: 'n =', tipo: 'frac', v: p.exp, tol: 0, placeholder: '−9' }],
                     pasos: [`Operación: ${sci10(p.op)}`, 'Ajusta el resultado para que 1 ≤ a < 10'] };
+            },
+        },
+        // Problemas de áreas y volúmenes (generadores compartidos con la app)
+        medidasPot: {
+            label: '📐 Problemas: áreas y volúmenes (² y ³)', titulo: 'Resuelve elevando al cuadrado o al cubo. Si hay decimales, redondea a 2 (usa π = 3,14).', cols: 1, alto: 95, max: 8, niveles: false,
+            gen: () => {
+                const [p] = problemasMedidas(1, 'potencia');
+                return { e: `${p.emoji} ${p.enun}`, largo: true, s: `${N(p.v)} ${p.unidad}`,
+                    r: [{ tipo: 'frac', v: p.v, tol: 0.011, unidad: p.unidad, placeholder: '0' }], pasos: [p.op] };
+            },
+        },
+        medidasRaiz: {
+            label: '📏 Problemas: lado, arista y radio (√ y ∛)', titulo: 'Resuelve con la raíz cuadrada o cúbica (usa π = 3,14).', cols: 1, alto: 95, max: 8, niveles: false,
+            gen: () => {
+                const [p] = problemasMedidas(1, 'raiz');
+                return { e: `${p.emoji} ${p.enun}`, largo: true, s: `${N(p.v)} ${p.unidad}`,
+                    r: [{ tipo: 'frac', v: p.v, tol: 0.011, unidad: p.unidad, placeholder: '0' }], pasos: [p.op] };
             },
         },
         raices: {

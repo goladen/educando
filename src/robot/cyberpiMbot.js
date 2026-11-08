@@ -16,7 +16,7 @@
 //              (ESP-NOW, sin router) al CyberPi del robot, que ejecuta PROGRAMA_RECEPTOR.
 //              Mensaje "pk" = "seq,izq,der,pitidos,antichoque". Si el robot deja de recibir 1 s, se para solo.
 //
-// ANTICHOQUE (sensor de ultrasonidos del mBot2, mbuild.ultrasonic2): si se va hacia delante y hay algo a
+// ANTICHOQUE (sensor de ultrasonidos del mBot2, cyberpi.ultrasonic2): si se va hacia delante y hay algo a
 // menos de N cm, el robot se para (girar sobre sí mismo y marcha atrás siguen funcionando). Lo comprueba
 // el propio robot: en 'antena' el receptor mide sin parar; en 'cable' y 'bluetooth' cada orden hacia
 // delante lleva la comprobación y mientras se avanza se repite cada 200 ms. Sin sensor (lectura 0) no hace nada.
@@ -30,10 +30,15 @@ const REENVIO_ANTICHOQUE_MS = 200; // cable/bluetooth: al avanzar con antichoque
 
 /** Programa para el CyberPi del ROBOT en modo sin cable (también se puede subir con mBlock). */
 export const PROGRAMA_RECEPTOR = `import cyberpi, mbot2, time
+# Ultrasonidos: cyberpi.ultrasonic2 (firmware 44.01); si no, mbuild.ultrasonic2; si no hay, None
 try:
-    import mbuild
-except ImportError:
-    mbuild = None
+    US = cyberpi.ultrasonic2
+except Exception:
+    try:
+        import mbuild
+        US = mbuild.ultrasonic2
+    except Exception:
+        US = None
 try:
     from time import ticks_ms, ticks_diff
 except ImportError:
@@ -55,7 +60,50 @@ dr = 0
 lim = 0
 bloq = False
 tu = 0
+# Misiones desde el ordenador (mapaSim.js): "pm" = "seq,orden,valor" -> responde "pr" = "seq,resultado"
+#   F cm avanzar · T grados girar · D medir distancia · Y leer el giroscopio · Z poner el giroscopio a 0 · S pitido
+prevm = cyberpi.wifi_broadcast.get("pm")
+ultpr = ""
+tpr = 0
 while True:
+    q = cyberpi.wifi_broadcast.get("pm")
+    if q and q != prevm:
+        prevm = q
+        p = str(q).split(",")
+        res = "0"
+        try:
+            o = p[1]
+            if o == "F":
+                mbot2.straight(int(p[2]))
+            elif o == "T":
+                mbot2.turn(int(p[2]))
+            elif o == "D":
+                # mediana de 3 lecturas; 0 = sin lectura
+                s = []
+                for i in range(3):
+                    try:
+                        s.append(int(US.get(1) or 0) if US else 0)
+                    except Exception:
+                        s.append(0)
+                    time.sleep(0.02)
+                s.sort()
+                res = str(s[1])
+            elif o == "Y":
+                res = str(int(cyberpi.get_yaw()))
+            elif o == "Z":
+                cyberpi.reset_yaw()
+            elif o == "S":
+                cyberpi.audio.play_tone(990, 0.08)
+        except Exception:
+            res = "E"
+        ultpr = p[0] + "," + res
+        cyberpi.wifi_broadcast.set("pr", ultpr)
+        tpr = ticks_ms()
+        ultimo = ticks_ms()
+    elif ultpr and ticks_diff(ticks_ms(), tpr) > 500:
+        # la respuesta se repite por si se perdio
+        cyberpi.wifi_broadcast.set("pr", ultpr)
+        tpr = ticks_ms()
     m = cyberpi.wifi_broadcast.get("pk")
     if m and m != previo:
         previo = m
@@ -79,10 +127,10 @@ while True:
         cyberpi.led.on(255, 120, 0)
         parado = True
     # Antichoque: lim > 0 solo mientras la orden es ir hacia delante
-    if lim and not parado and mbuild and ticks_diff(ticks_ms(), tu) > 60:
+    if lim and not parado and US and ticks_diff(ticks_ms(), tu) > 60:
         tu = ticks_ms()
         try:
-            d = mbuild.ultrasonic2.get(1)
+            d = US.get(1)
         except Exception:
             d = 0
         if d and 2 < d < lim:
@@ -135,7 +183,7 @@ const guardaActual = () => (antichoque && avanza ? antichoque : 0);
 // Orden hacia delante con antichoque (cable/bluetooth): mide y, si hay algo cerca, manda (0,0) y luz roja
 // (compacta: una trama con más de ~240 bytes de python se ignora; ver MAX_TRAMA_PY)
 const conGuarda = (l, r, g, mods) =>
-  `import ${mods},mbuild,cyberpi as c\nl=${l};r=${r}\ntry:d=mbuild.ultrasonic2.get(1)\nexcept:d=0\nif 2<d<${g}:l=r=0;c.led.on(255,0,0)\nelse:c.led.off()\nmbot2.drive_power(l,r)`;
+  `import ${mods},cyberpi as c\nl=${l};r=${r}\ntry:d=c.ultrasonic2.get(1)\nexcept:d=0\nif 2<d<${g}:l=r=0;c.led.on(255,0,0)\nelse:c.led.off()\nmbot2.drive_power(l,r)`;
 const ordenDrive = (l, r, g = 0) => {
   if (modo === 'antena') return `import cyberpi\ncyberpi.wifi_broadcast.set("pk", "${(seq = (seq + 1) % 10000)},${l},${r},${pitidos},${g}")`;
   const bt = modo === 'bluetooth';
@@ -858,4 +906,177 @@ export async function cargarTestEnRobot(preguntas, { ranura, nombre, onProgreso,
   limpiar();
   emitir({ estado: 'desconectado', error: '' });
   return true;
+}
+
+// ── Mapas, rutas y tractor (mapaSim.js / programasMapa.js) ──────────────────
+
+let t0Mision = 0;
+let seqMision = Math.floor(Math.random() * 5000);
+/** Lo que ha impreso la última trama: a veces llega un poco después de su {"ret"}. null si no llega. */
+async function esperarSalida(re, ms = 800) {
+  for (let t = 0; t <= ms; t += 40) {
+    const m = acumulado.match(re);
+    if (m) return m[1];
+    await dormir(40);
+  }
+  return null;
+}
+
+/**
+ * Prepara una misión dirigida desde el ordenador con la conexión ya abierta (Bluetooth, cable o
+ * antena de 2 CyberPi): se paran las órdenes de conducción para que no se cuelen entre los pasos.
+ */
+export async function prepararMisionReal() {
+  if (!escritor || estado.estado !== 'listo') throw new Error('Conecta antes el robot (o la antena CyberPi).');
+  clearInterval(temporizador);
+  temporizador = 0;
+  deseado = [0, 0];
+  if (modo === 'antena') await ejecutar('import cyberpi\ncyberpi.wifi_broadcast.set("pk", "0,0,0,0,0")');
+  else await ejecutar('import mbot2\nmbot2.drive_power(0,0)');
+  t0Mision = Date.now();
+}
+
+/** Vuelve a dejar la conexión lista para conducir. */
+export function terminarMisionReal() {
+  deseado = [0, 0];
+  enviado = null;
+  if (escritor && !temporizador && estado.estado === 'listo') temporizador = setInterval(tic, INTERVALO_MS);
+}
+
+/** Sin cable: la orden va por la antena al receptor del robot y se espera su respuesta («pr»). */
+async function ordenAntena(orden, valor, ms) {
+  seqMision = (seqMision % 9999) + 1;
+  const s = seqMision;
+  const enviar = () => ejecutar(`import cyberpi\ncyberpi.wifi_broadcast.set("pm", "${s},${orden},${valor}")`);
+  await enviar();
+  const t0 = Date.now();
+  let reenvio = t0;
+  while (Date.now() - t0 < ms) {
+    await dormir(120);
+    await ejecutar('import cyberpi\nprint("PR="+str(cyberpi.wifi_broadcast.get("pr")))');
+    await dormir(30);
+    const m = acumulado.match(/PR=(\d+),(-?[\w.]+)/);
+    if (m && Number(m[1]) === s) {
+      if (m[2] === 'E') throw new Error('El robot no ha podido hacer la orden ' + orden + '.');
+      return m[2];
+    }
+    // El robot ignora la misma orden repetida: reenviarla es seguro
+    if (Date.now() - reenvio > 1500) {
+      reenvio = Date.now();
+      await enviar();
+    }
+  }
+  throw new Error('El robot no contesta por la antena. ¿Tiene instalado el receptor nuevo y está encendido?');
+}
+
+/** Ejecuta una acción de misión en el robot real y devuelve su resultado. */
+export async function accionRobotReal(a) {
+  if (a.t === 'tiempo') return Date.now() - t0Mision;
+  if (modo === 'antena') {
+    if (a.t === 'girar') { await ordenAntena('T', Math.round(a.grados), 15000); return null; }
+    if (a.t === 'avanzar') { await ordenAntena('F', Math.round(a.cm), 15000); return null; }
+    if (a.t === 'medir') return Number(await ordenAntena('D', 0, 5000));
+    if (a.t === 'yaw') return Number(await ordenAntena('Y', 0, 5000));
+    if (a.t === 'resetYaw') { await ordenAntena('Z', 0, 5000); return null; }
+    if (a.t === 'sembrar') { await ordenAntena('S', 0, 5000); return null; }
+    return null;
+  }
+  switch (a.t) {
+    case 'girar':
+      await ejecutar(`import mbot2\nmbot2.turn(${Math.round(a.grados)})`, 15000);
+      return null;
+    case 'avanzar':
+      await ejecutar(`import mbot2\nmbot2.straight(${Math.round(a.cm)})`, 15000);
+      return null;
+    case 'medir': {
+      // Mediana de 3 lecturas, con cyberpi.ultrasonic2 o, si no existe, mbuild.ultrasonic2; -1 = sin lectura
+      await ejecutar('import cyberpi as c\ntry:u=c.ultrasonic2\nexcept:import mbuild;u=mbuild.ultrasonic2\ns=[]\nfor i in range(3):\n try:s.append(u.get(1) or 0)\n except:s.append(-1)\ns.sort()\nprint("D="+str(s[1]))');
+      const d = await esperarSalida(/D=(-?[\d.]+)/);
+      return d == null ? 0 : Math.max(0, Number(d));
+    }
+    case 'yaw': {
+      await ejecutar('import cyberpi\ntry:\n    v=cyberpi.get_yaw()\nexcept:\n    v=0\nprint("Y="+str(v))');
+      return Number((await esperarSalida(/Y=(-?[\d.]+)/)) ?? 0);
+    }
+    case 'resetYaw':
+      await ejecutar('import cyberpi\ntry:\n    cyberpi.reset_yaw()\nexcept:\n    pass');
+      return null;
+    case 'sembrar':
+      await ejecutar('import cyberpi\ncyberpi.audio.play_tone(990, 0.08)');
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** Programas autónomos en las ranuras (puerto abierto con prepararCargaTest). No pisa programas ajenos. */
+export async function instalarProgramasMapa({ ranuraMapa, ranuraRuta, onProgreso } = {}) {
+  const { programaMapear, programaRuta, MARCA_MAPA, MARCA_RUTA } = await import('./programasMapa.js');
+  if (!escritor) throw new Error('Se ha perdido la conexión con el robot.');
+  const propias = [MARCA_MAPA, MARCA_RUTA];
+  try {
+    emitir({ estado: 'conectando', error: '' });
+    await ejecutar('import mbot2\nmbot2.drive_power(0,0)');
+    for (const [n, que] of [[ranuraMapa, 'mapear'], [ranuraRuta, 'ir y volver']]) {
+      if (!(n >= 1 && n <= 8)) continue;
+      if ((await tamanoEnPlaca(rutaRanura(n))) > 0) {
+        await ejecutar('f=open("' + rutaRanura(n) + '")\nprint("INI="+f.read(' + MARCA_MAPA.length + '))\nf.close()');
+        await dormir(100);
+        if (!propias.some((p) => acumulado.includes('INI=' + p))) {
+          throw new Error(`La ranura ${n} ya tiene otro programa (para «${que}»). Elige otra ranura o vacíala con mBlock.`);
+        }
+      }
+    }
+    onProgreso?.('Preparando el robot');
+    for (let i = 0; i < AUX_LINEAS.length; i++) {
+      await ejecutar('f=open("pku.py","' + (i ? 'a' : 'w') + '")\nf.write(' + JSON.stringify(AUX_LINEAS[i] + '\n') + ')\nf.close()');
+      await dormir(150);
+    }
+    if (ranuraMapa >= 1 && ranuraMapa <= 8) {
+      onProgreso?.('Guardando «Mapear la clase»');
+      await subirBinario(rutaRanura(ranuraMapa), ENC.encode(programaMapear()));
+    }
+    if (ranuraRuta >= 1 && ranuraRuta <= 8) {
+      onProgreso?.('Guardando «Ir y volver»');
+      await subirBinario(rutaRanura(ranuraRuta), ENC.encode(programaRuta()));
+    }
+  } catch (e) {
+    limpiar();
+    emitir({ estado: 'desconectado', error: '' });
+    throw e;
+  }
+  limpiar();
+  emitir({ estado: 'desconectado', error: '' });
+  return true;
+}
+
+/** Lee el mapa que guardó el programa autónomo (cable o Bluetooth, con la conexión abierta). */
+export async function leerMapaRobot() {
+  const { RUTA_MAPA } = await import('./programasMapa.js');
+  if (!escritor) throw new Error('Conecta antes el robot.');
+  const conducia = !!temporizador;
+  clearInterval(temporizador);
+  temporizador = 0;
+  try {
+    if ((await tamanoEnPlaca(RUTA_MAPA)) <= 0) throw new Error('El robot todavía no tiene ningún mapa: usa antes el programa «Mapear la clase».');
+    let txt = '';
+    for (let o = 0; o < 20000; o += 400) {
+      await ejecutar(`f=open("${RUTA_MAPA}")\nf.seek(${o})\nprint("M<"+f.read(400)+">M")\nf.close()`);
+      await dormir(80);
+      const m = acumulado.match(/M<([^<>]*)>M/);
+      if (!m) throw new Error('No se ha podido leer el mapa del robot.');
+      txt += m[1];
+      if (m[1].length < 400) break;
+    }
+    return JSON.parse(txt);
+  } finally {
+    if (conducia) terminarMisionReal();
+  }
+}
+
+/** Deja un destino (celdas desde la base: x a la derecha, y al frente) para el programa «Ir y volver». */
+export async function enviarDestinoRobot(dx, dy) {
+  const { RUTA_DESTINO } = await import('./programasMapa.js');
+  if (!escritor) throw new Error('Conecta antes el robot.');
+  await ejecutar(`f=open("${RUTA_DESTINO}","w")\nf.write('{"x":${Math.round(dx)},"y":${Math.round(dy)}}')\nf.close()`);
 }

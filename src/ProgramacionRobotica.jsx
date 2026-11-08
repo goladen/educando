@@ -17,6 +17,7 @@ const FutbolMandos = lazy(() => import('./futbol3d/FutbolMandos.jsx'));
 const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const ConducirMbot = lazy(() => import('./robot/ConducirMbot.jsx'));
 const CargarTestRobot = lazy(() => import('./robot/CargarTestRobot.jsx'));
+const MapaClase = lazy(() => import('./robot/MapaClase.jsx'));
 const LabKeyestudio = lazy(() => import('./keyestudio/LabKeyestudio.jsx'));
 import mbot2Img from './assets/Imagenmbot.avif';
 import microbitImg from './assets/imagenmicrobit.jfif';
@@ -135,7 +136,7 @@ const KITS = [
 ];
 
 export default function ProgramacionRobotica({ usuario = null, onLoginRequest, onExit }) {
-  const [vista, setVista] = useState('hub'); // 'hub' | 'bloques' | 'retos' | 'mandos' | 'escape' | 'futbol' | 'conducir'
+  const [vista, setVista] = useState('hub'); // 'hub' | 'bloques' | 'retos' | 'mandos' | 'escape' | 'futbol' | 'conducir' | 'mapa'
   const [infoKit, setInfoKit] = useState(null); // kit seleccionado para "más info"
 
   if (vista === 'bloques') {
@@ -165,6 +166,13 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
     return (
       <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
         <ConducirMbot onExit={() => setVista('hub')} />
+      </Suspense>
+    );
+  }
+  if (vista === 'mapa') {
+    return (
+      <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+        <MapaClase onExit={() => setVista('hub')} />
       </Suspense>
     );
   }
@@ -274,6 +282,13 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
             <span style={styles.editorBtnTitle}>Conducir el mBot2</span>
             <span style={styles.editorBtnDesc}>
               Simulador con retos en el suelo. Conduce con la mano (webcam), un mando micro:bit o el teclado, y si conectas el CyberPi, el robot real se mueve a la vez.
+            </span>
+          </button>
+          <button onClick={() => setVista('mapa')} style={styles.editorBtn('#15803d')}>
+            <span style={{ fontSize: 34 }}>🚜</span>
+            <span style={styles.editorBtnTitle}>Mapas, rutas y tractor</span>
+            <span style={styles.editorBtnDesc}>
+              El mBot2 mapea la clase como una Roomba, va a un punto y vuelve, o siembra un campo en surcos como un tractor autónomo. En el simulador o con el robot en directo.
             </span>
           </button>
         </div>

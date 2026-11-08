@@ -1,0 +1,81 @@
+/* Invasión Pi — Tailwind v4 SOLO para este juego.
+   El resto de pikt.es no usa Tailwind: se escanean únicamente los archivos de src/invasores
+   (source(none) + @source) y la hoja se carga con el chunk perezoso del juego.
+   Sin preflight, para no tocar los estilos globales de la web. */
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities" source(none);
+@source "./";
+
+@theme {
+  --font-arcade: "Press Start 2P", ui-monospace, monospace;
+  --font-pixel: "VT323", ui-monospace, monospace;
+
+  --animate-inv-temblor: inv-temblor 0.28s linear 2;
+  --animate-inv-parpadeo: inv-parpadeo 1s steps(2, start) infinite;
+  --animate-inv-latido: inv-latido 1.2s ease-in-out infinite;
+  --animate-inv-entrada: inv-entrada 0.35s ease-out both;
+
+  @keyframes inv-temblor {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-7px); }
+    75% { transform: translateX(7px); }
+  }
+  @keyframes inv-parpadeo {
+    to { visibility: hidden; }
+  }
+  @keyframes inv-latido {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+  @keyframes inv-entrada {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Reset mínimo SOLO dentro del juego, con especificidad 0 para que las utilidades ganen. */
+:where(.inv-root) :where(button) {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(.inv-root) :where(input, select) {
+  font: inherit;
+}
+:where(.inv-root) :where(*, *::before, *::after) {
+  box-sizing: border-box;
+}
+:where(.inv-root) :where(h1, h2, h3, h4, p) {
+  margin: 0;
+}
+
+/* Cielo estrellado en dos capas con desplazamiento lento (parallax). */
+.inv-estrellas {
+  background-color: #0f172a;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #e2e8f0 50%, transparent 51%),
+    radial-gradient(1px 1px at 90px 120px, #94a3b8 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 150px 60px, #f8fafc 50%, transparent 51%),
+    radial-gradient(1px 1px at 60px 170px, #64748b 50%, transparent 51%),
+    radial-gradient(1px 1px at 180px 190px, #cbd5e1 50%, transparent 51%);
+  background-size: 200px 200px;
+  animation: inv-cielo 40s linear infinite;
+}
+@keyframes inv-cielo {
+  from { background-position: 0 0; }
+  to { background-position: 0 400px; }
+}
+
+/* Líneas de barrido CRT. */
+.inv-scanlines {
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0, rgba(0, 0, 0, 0.22) 1px, transparent 1px, transparent 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-estrellas { animation: none; }
+}

@@ -8,6 +8,7 @@ import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { M_FactorComun, M_Factorizacion, PASOS_NOMBRE } from './algebra/Factorizacion';
+import BotonFichas from './components/BotonFichas';
 
 // ─── Math utilities ───────────────────────────────────────────────────────────
 const SUP = { 0:'', 1:'', 2:'²', 3:'³', 4:'⁴', 5:'⁵' };
@@ -859,6 +860,11 @@ export default function AlgebraApp({ onExit, usuario }) {
                     </div>
                 </div>
                 {MODS_JSX[modIdx]}
+                {!cfgReto && (
+                    <div style={{marginTop:20}}>
+                        <BotonFichas tema="polinomios" color="#8e44ad" texto="Fichas de polinomios para imprimir" subtexto="Operaciones, identidades y factorización por método (con gráfica) · PDF y pizarra" />
+                    </div>
+                )}
             </div>
 
             {showComp && esRetoCompeticion && (

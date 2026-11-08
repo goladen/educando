@@ -369,7 +369,7 @@ export default function TironCuerdaJuego({ primaria = false }) {
           <span style={{ fontSize:'1.1rem', fontWeight:900, color:'#FFE234' }}>🪢 Tirón de Cuerda</span>
           <button onClick={() => setPantalla('menu')} style={{ ...btnBase, padding:'7px 14px', fontSize:'0.8rem', background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)' }}>⚙️ Operaciones</button>
         </div>
-        <CompeticionCuerda key={partida} metaInicial={LIMITE} isMobile={movil} onSalir={() => setPantalla('menu')}
+        <CompeticionCuerda nombre="Tirón de cuerda" key={partida} metaInicial={LIMITE} isMobile={movil} onSalir={() => setPantalla('menu')}
           renderPanel={(equipo, { key, aplicar, bloqueado }) => (
             <PanelEquipoFeria key={key} equipo={equipo} aplicar={aplicar} bloqueado={bloqueado} tipoNum={tipoNum} tiposOp={tiposOp} primaria={primaria} />
           )} />

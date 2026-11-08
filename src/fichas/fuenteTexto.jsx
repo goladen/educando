@@ -14,7 +14,11 @@ import { renderMath } from '../utils/MathRender';
 //    { e: enunciado, s: solución, pasos?: [..], largo?: bool,
 //      m?: enunciado en notación matemática (FRAC/SQRT/ROOT/^, ver utils/MathRender) en lugar de e,
 //      sm?: solución en notación matemática; un paso puede ser { m: '…' },
-//      r?: [{ etiqueta?, tipo: 'num'|'frac'|'texto'|'opcion', v, unidad?, opciones?, tol? }] }
+//      r?: [{ etiqueta?, tipo: 'num'|'frac'|'texto'|'opcion'|'lista', v, unidad?, opciones?, tol? }] }
+//      ('lista': varios números en cualquier orden, separados por «;», v = [números])
+//  Un tipo puede tener categorias: [[k, label]] → selector extra por ejercicio
+//  (ej.catProb), que llega como 2.º argumento: gen(nivel, catProb).
+//  def.Visual({ ap, size, solucion }): dibujo; si ap.v.enSolucion también sale en la solución.
 //  En la pizarra se revela un paso por clic y, al final, la solución.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -73,6 +77,17 @@ const normalizar = (t) => String(t || '').toLowerCase().normalize('NFD').replace
     .replace(/(\d)x10/g, '$110').replace(/[·*]/g, '').replace(/,/g, '.');
 export const comprobador = (q) => (valor) => {
     if (q.tipo === 'opcion') return { ok: valor === q.v };
+    if (q.tipo === 'lista') {
+        const items = String(valor || '').replace(/xs*[=:]/gi, '').split(/[;s]+|,(?=s|$)/).map(t => t.trim()).filter(Boolean);
+        if (!items.length) return null;
+        const vals = items.map(leerFrac);
+        if (vals.some(Number.isNaN)) return null;
+        const tol = q.tol ?? 0.01;
+        const unicos = vals.filter((v, i) => vals.findIndex(w => Math.abs(w - v) <= tol) === i);
+        const esperado = [].concat(q.v);
+        const ok = unicos.length === esperado.length && esperado.every(e => unicos.some(v => Math.abs(v - e) <= tol));
+        return { ok, nota: ok ? null : `Son ${esperado.length} raíces distintas` };
+    }
     if (q.tipo === 'texto') {
         const t = normalizar(valor);
         if (!t) return null;
@@ -97,13 +112,13 @@ export const crearFuente = (def) => {
         const vistos = new Set(existentes.map(clave));
         const out = [];
         for (let i = 0; out.length < n && i < n * 40; i++) {
-            const a = t.gen(ej.nivel || 1);
+            const a = t.gen(ej.nivel || 1, ej.catProb);
             if (!a || vistos.has(clave(a))) continue;
             vistos.add(clave(a));
             out.push({ tipo: ej.tipo, ...a });
         }
         // t.repetir: si se agotan los distintos (p. ej. 8 notas), se permiten repeticiones
-        for (let i = 0; t.repetir && out.length < n && i < n * 10; i++) { const a = t.gen(ej.nivel || 1); if (a) out.push({ tipo: ej.tipo, ...a }); }
+        for (let i = 0; t.repetir && out.length < n && i < n * 10; i++) { const a = t.gen(ej.nivel || 1, ej.catProb); if (a) out.push({ tipo: ej.tipo, ...a }); }
         return out;
     };
 
@@ -129,6 +144,7 @@ export const crearFuente = (def) => {
         <div style={{ color: '#c0392b', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.5 }}>
             <div style={{ fontSize: '1.02rem', fontWeight: 900 }}>{ap.sm ? renderMath(ap.sm, false, '1.15rem') : ap.s}</div>
             {ap.pasos?.length > 0 && <div style={{ color: '#7f8c8d', fontWeight: 600 }}><PasosLinea pasos={ap.pasos} size="1rem" /></div>}
+            {Visual && ap.v?.enSolucion && <div style={{ marginTop: 6 }}><Visual ap={ap} size="1rem" solucion /></div>}
         </div>
     );
 
@@ -148,6 +164,7 @@ export const crearFuente = (def) => {
                 {final && (
                     <div style={{ marginTop: 4, background: '#e8f5e9', borderRadius: 12, padding: '8px 12px', fontWeight: 900, color: '#1e8449', fontSize: `${1.2 * zoom}rem` }}>✅ {ap.sm ? renderMath(ap.sm, false, `${1.4 * zoom}rem`) : ap.s}</div>
                 )}
+                {final && Visual && ap.v?.enSolucion && <div style={{ maxWidth: 520 }}><Visual ap={ap} size={`${zoom}rem`} solucion /></div>}
             </div>
         );
     };
@@ -168,6 +185,7 @@ export const crearFuente = (def) => {
         layout: (ej) => { const t = tipoDe(ej); return { cols: t.cols || 2, alto: t.alto || 80 }; },
         generarApartados,
         maxApartados: (ej) => tipoDe(ej).max || 12,
+        categorias: (tipo) => def.tipos[tipo]?.categorias || null,
         usaNivel: (tipo) => (def.tipos[tipo]?.niveles !== false),
         esTexto: (ap) => !!ap.largo,
         sizeHoja: () => '1.3rem',

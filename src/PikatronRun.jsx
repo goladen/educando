@@ -29,6 +29,7 @@ import respCorrecta from './assets/sonidorespcorrecta.mp3';
 import monedaIncorrecta from './assets/sonidomonedamal.mp3';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import MandosEnJuego from './mandos/RelevosMandos.jsx';
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
 const audioJump             = _mkAudio(jumpSoundFile);
 const audioCorrect          = _mkAudio(correctSoundFile);
@@ -172,6 +173,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
     // ESTADOS
     const [gameState, setGameState] = useState('SETUP');
     const [score, setScore] = useState(0);
+    const mandosApi = useRef(null);
 
     // --- NUEVO: CRONÓMETRO Y LÓGICA OLÍMPICA ---
     const [tiempoRestante, setTiempoRestante] = useState(tiempoOlimpico || 60);
@@ -692,6 +694,11 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
         return () => cancelAnimationFrame(animationFrameId);
     }, [gameState]);
 
+    // Mandos micro:bit: puntos de la partida al mando que jugaba (con relevos, la siguiente la juega otro)
+    useEffect(() => {
+        if (gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'TIMEOUT') mandosApi.current?.finPartida([score], { ganador: gameState === 'WIN' ? 0 : null });
+    }, [gameState]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // CONTROLES
     useEffect(() => {
         const handleInput = () => {
@@ -936,6 +943,12 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                 </div>
             )}
 
+            {!modoOlimpico && (
+                <MandosEnJuego clave="PIKATRON" juego="Pikatron" tipo="PIKATRON_MANDOS" apiRef={mandosApi}
+                    teclas={[{ A: ' ', B: ' ', F: 'ArrowUp', S: ' ' }]}
+                    onEvento={(i, ev) => { if (gameState === 'LEVEL_INTRO' && ev.accion === 'S') startLevelPlaying(); }}
+                    controles={<><b>A</b>, <b>B</b>, agitar o inclinar hacia delante = saltar. En la pantalla de nivel, <b>agita</b> para empezar.</>} />
+            )}
             {/* PANTALLAS SUPERPUESTAS (INTRO, GAMEOVER, WIN) */}
             {/* PANTALLA RANKING (ENCIMA DE TODO) */}
             {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}

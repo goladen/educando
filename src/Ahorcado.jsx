@@ -8,6 +8,8 @@ import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import MandosEnJuego, { COLORES_HUECO } from './mandos/RelevosMandos.jsx';
+import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
 
 // --- CONFIGURACIÓN DE IDIOMAS (igual que Wordle / Sopa) ---
 const LANGUAGES = {
@@ -152,7 +154,26 @@ function ShareModal({ url, titulo, onClose }) {
     );
 }
 
-export default function Ahorcado({ usuario, onExit, recurso }) {
+// Envoltorio con los mandos micro:bit (modo abecedario): por relevos (una palabra por mando) o
+// 2-4 a la vez por turnos de letra: si aciertas sigues, si fallas le toca al siguiente.
+// +10 por letra acertada y +30 a quien completa la palabra.
+export default function Ahorcado(props) {
+    const mandosApi = useRef(null);
+    const juegoMandos = useRef({});
+    return (
+        <>
+            <AhorcadoJuego {...props} mandosApi={mandosApi} juegoMandos={juegoMandos} />
+            <MandosEnJuego clave="AHORCADO" juego="Ahorcado" tipo="AHORCADO_MANDOS" maxJug={4} apiRef={mandosApi}
+                modo={MODOS.TEXTO} acepta={(ev) => ev.tipo === 'texto'} tutorial="abecedario"
+                onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
+                controles={<>El mando en modo <b>abecedario</b>: <b>A</b> letra anterior, <b>B</b> siguiente (mantener acelera) y <b>agitar</b> (o A+B) dice la letra. Con <b>1</b> jugador, cada palabra la juega un mando (relevos); con <b>2 a 4</b>, se turnan letra a letra: si aciertas sigues, si fallas pasa al siguiente. +10 por letra y +30 a quien completa la palabra.</>} />
+        </>
+    );
+}
+
+const RONDA_AHORCADO = () => ({ pts: [0, 0, 0, 0], ac: [0, 0, 0, 0], it: [0, 0, 0, 0], turno: 0 });
+
+function AhorcadoJuego({ usuario, onExit, recurso, mandosApi, juegoMandos }) {
     // PANTALLAS: CONFIG, LOADING, MODE_SELECT, GAME, VICTORY, LOST, TIMEOUT, RANKING, PVP_SETUP, PVP_PLAY, GAME_OVER
     const [screen, setScreen] = useState('CONFIG');
 
@@ -503,6 +524,49 @@ export default function Ahorcado({ usuario, onExit, recurso }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [screen, status, guessed, solution, mistakes, inputWord]);
 
+    // --- MANDOS micro:bit ---
+    const mandosRonda = useRef(RONDA_AHORCADO());
+    const [, setMandosV] = useState(0);
+    if (juegoMandos) juegoMandos.current.onEvento = (i, ev) => {
+        if (!(screen === 'GAME' || screen === 'PVP_PLAY') || status !== 'playing') return;
+        const n = mandosApi?.current?.nJug || 1;
+        const r = mandosRonda.current;
+        if (n > 1 && i !== r.turno) return; // no le toca
+        const key = String(ev.caracter || '').toUpperCase();
+        if (!/^[A-ZÑ]$/.test(key) || guessed.includes(key)) return;
+        const ok = solution.includes(key);
+        r.it[i]++;
+        if (ok) { r.ac[i]++; r.pts[i] += 10; } else if (n > 1) r.turno = (r.turno + 1) % n;
+        const id = mandosApi?.current?.pilotoDe(i);
+        if (id != null && id < 900) feedbackMando(id, ok);
+        setMandosV(v => v + 1);
+        pulsarLetra(key);
+    };
+    useEffect(() => {
+        if (status !== 'won' && status !== 'lost') return;
+        const api = mandosApi?.current;
+        const r = mandosRonda.current;
+        mandosRonda.current = RONDA_AHORCADO();
+        if (!api?.activos) return;
+        const n = api.nJug;
+        if (!r.it.slice(0, n).some(Boolean)) return; // nadie ha jugado con mando
+        if (status === 'won') r.pts[r.turno] += 30;
+        api.finPartida(r.pts.slice(0, n), { aciertos: r.ac.slice(0, n), intentos: r.it.slice(0, n) });
+    }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+    const nMandos = mandosApi?.current?.activos ? mandosApi.current.nJug : 0;
+    const turnoMandos = nMandos > 1 && (screen === 'GAME' || screen === 'PVP_PLAY') && status === 'playing' ? (
+        <div style={{ position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 2147482000, display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'none', fontFamily: 'system-ui, sans-serif' }}>
+            {Array.from({ length: nMandos }, (_, i) => {
+                const le = mandosRonda.current.turno === i;
+                return (
+                    <div key={i} style={{ background: le ? COLORES_HUECO[i] : 'rgba(10,15,36,0.8)', color: le ? '#0f172a' : '#fff', border: `2px solid ${COLORES_HUECO[i]}`, borderRadius: 10, padding: '4px 10px', fontWeight: 900, fontSize: le ? '1rem' : '0.85rem' }}>
+                        {le ? '👉 ' : ''}{mandosApi.current.nombreJugador(i) || `Jugador ${i + 1}`} · {mandosRonda.current.pts[i]}
+                    </div>
+                );
+            })}
+        </div>
+    ) : null;
+
     // =========================================================
     // RECURSOS DEL PROFESOR (acepta Wordle y Sopa)
     // =========================================================
@@ -733,6 +797,7 @@ export default function Ahorcado({ usuario, onExit, recurso }) {
     // --- SOLO: GAME ---
     if (screen === 'GAME') return (
         <div style={{ ...styles.screen, backgroundColor: '#2c3e50', justifyContent: 'flex-start' }}>
+            {turnoMandos}
             <div style={{ width: '100%', padding: '12px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', background: 'rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     {gameMode === 'TIME_ATTACK' ? (
@@ -802,6 +867,7 @@ export default function Ahorcado({ usuario, onExit, recurso }) {
     // --- DUELO: ADIVINAR ---
     if (screen === 'PVP_PLAY') return (
         <div style={{ ...styles.screen, backgroundColor: '#2c3e50', justifyContent: 'flex-start' }}>
+            {turnoMandos}
             <div style={{ width: '100%', padding: '12px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', background: 'rgba(0,0,0,0.2)' }}>
                 <div style={{ fontFamily: "'Roboto Mono', monospace", background: timeLeft <= 3 ? '#e74c3c' : 'white', color: timeLeft <= 3 ? 'white' : 'black', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}>⏱ {timeLeft}s</div>
                 <h2 style={{ color: 'white', margin: 0, fontSize: '1rem' }}>Ronda {round}/5 · {p1Score}-{p2Score}</h2>

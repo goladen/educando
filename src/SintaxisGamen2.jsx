@@ -1840,7 +1840,7 @@ function ModoCompeticion({ nivel, recurso, onBack }) {
                 <div style={{ width: 60 }} />
             </div>
             <div style={{ maxWidth: 1040, margin: '16px auto', padding: '0 12px' }}>
-                <CompeticionCuerda onSalir={onBack}
+                <CompeticionCuerda nombre="Sintaxis" onSalir={onBack}
                     configExtra={(
                         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
                             <span style={{ color: '#7d6608' }}>Dificultad:</span>

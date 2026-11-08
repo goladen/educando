@@ -669,7 +669,7 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
       <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e293b)', padding:16, boxSizing:'border-box' }}>
         <button onClick={() => setPantalla('intro')} style={{ background:'rgba(255,255,255,0.12)', border:'none', color:'#f1f5f9', borderRadius:8, padding:'7px 14px', cursor:'pointer', fontSize:'0.9rem', marginBottom:12 }}>← Salir</button>
         <div style={{ maxWidth:1000, margin:'0 auto', background:'#f1f5f9', borderRadius:20, padding:16 }}>
-          <CompeticionCuerda onSalir={() => setPantalla('intro')}
+          <CompeticionCuerda nombre="Biología" onSalir={() => setPantalla('intro')}
             configExtra={(
               <>
                 <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>

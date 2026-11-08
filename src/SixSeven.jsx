@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, orderBy, limit } from 'firebase/firestore';
+import MandosEnJuego, { COLORES_HUECO } from './mandos/RelevosMandos.jsx';
+import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
 
 // ─── Partículas 6/7 ──────────────────────────────────────────────────────────
 const emisor67 = new Set();
@@ -596,7 +598,7 @@ const opcionesArcade = (ans, nivel) => {
   return Array.from(opts).sort(() => Math.random() - 0.5);
 };
 
-const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario }) => {
+const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = null, juegoMandos = null }) => {
   const hard = nivel === 'hard';
   const [round, setRound] = useState(1);
   const maxTime = timeLimit === 'inf' ? null : timeLimit * 1000;
@@ -683,6 +685,21 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario }) => {
     guardarRegistroLocal('SIXSEVEN', { titulo: `Six Seven · Speed Run${hard ? ' (hard)' : ''}`, aciertos, intentos: status === 'won' ? 6 : round, via: 'juego' });
   }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- Mandos micro:bit (letras A-D = las 4 opciones) ---
+  // 1 jugador: juega su partida (relevos). 2-4 a la vez: carrera, el primero que acierta se lleva los
+  // puntos de rapidez; quien falla queda fuera de esa pregunta (si fallan todos, se acaba la partida).
+  const mandosRef = useRef({ q: null, fuera: new Set(), pts: [0, 0, 0, 0], ac: [0, 0, 0, 0], it: [0, 0, 0, 0] });
+  const [, setMandosV] = useState(0);
+  const apiM = mandosApi?.current;
+  const nMandos = apiM?.activos ? apiM.nJug : 0;
+  useEffect(() => {
+    if (status !== 'won' && status !== 'lost') return;
+    const m = mandosRef.current;
+    const n = mandosApi?.current?.activos ? mandosApi.current.nJug : 0;
+    if (n && m.it.slice(0, n).some(Boolean)) mandosApi.current.finPartida(n === 1 ? [score] : m.pts.slice(0, n), { aciertos: m.ac.slice(0, n), intentos: m.it.slice(0, n) });
+    m.pts = [0, 0, 0, 0]; m.ac = [0, 0, 0, 0]; m.it = [0, 0, 0, 0];
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const reiniciar = () => { setRound(1); setScore(0); setUltimo(null); setVerRanking(false); setStatus('playing'); generateQuestion(1); setFlash(null); };
 
   const handleAnswer = (opt, e) => {
@@ -710,6 +727,25 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario }) => {
       setStatus('lost');
       setFlash(theme.neonPink);
     }
+  };
+
+  if (juegoMandos) juegoMandos.current.onEvento = (i, ev) => {
+    if (status !== 'playing' || !question || ev.tipo !== 'letra') return;
+    const opt = question.options['ABCD'.indexOf(ev.letra)];
+    if (opt === undefined) return;
+    const m = mandosRef.current;
+    if (m.q !== question) { m.q = question; m.fuera = new Set(); }
+    const n = mandosApi?.current?.nJug || 1;
+    if (m.fuera.has(i)) return;
+    const ok = opt === question.ans;
+    const id = mandosApi?.current?.pilotoDe(i);
+    if (id != null && id < 900) feedbackMando(id, ok);
+    m.it[i]++;
+    if (ok) { m.ac[i]++; m.pts[i] += puntosPorTiempo((performance.now() - inicioPregunta.current) / 1000); }
+    if (ok || n === 1) { setMandosV(v => v + 1); handleAnswer(opt); return; }
+    m.fuera.add(i);
+    setMandosV(v => v + 1);
+    if (m.fuera.size >= n) handleAnswer(opt);
   };
 
   return (
@@ -798,6 +834,18 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario }) => {
                   {question.q}
                 </div>
 
+                {nMandos > 1 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 16 }}>
+                    {Array.from({ length: nMandos }, (_, i) => {
+                      const fuera = mandosRef.current.q === question && mandosRef.current.fuera.has(i);
+                      return (
+                        <div key={i} style={{ border: `2px solid ${COLORES_HUECO[i]}`, borderRadius: 10, padding: '4px 10px', fontWeight: 900, color: '#fff', opacity: fuera ? 0.35 : 1 }}>
+                          <span style={{ color: COLORES_HUECO[i] }}>●</span> {apiM.nombreJugador(i) || `Jugador ${i + 1}`} · {mandosRef.current.pts[i]}{fuera ? ' ✗' : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(15px, 4vw, 30px)', width: '100%' }}>
                   {question.options.map((opt, i) => (
                     <button
@@ -823,6 +871,7 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario }) => {
                         e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
                       }}
                     >
+                      {nMandos > 0 && <span style={{ fontSize: '0.45em', color: theme.neonCyan, marginRight: 10, verticalAlign: 'middle' }}>{'ABCD'[i]}</span>}
                       {opt}
                     </button>
                   ))}
@@ -1665,6 +1714,8 @@ const MainMenu = ({ setMode, onExit, usuario }) => {
 
 export default function SixSeven({ onExit, usuario = null }) {
   const [mode, setMode] = useState('menu');
+  const mandosApi = useRef(null);
+  const juegoMandos = useRef({});
   const [settings, setSettings] = useState({ arcadeTime: 13, matrixTime: 67 });
   useWindowSize();
 
@@ -1678,7 +1729,7 @@ export default function SixSeven({ onExit, usuario = null }) {
   else if ((mode === 'arcade' || mode === 'target') && !nivel) pantalla = mode === 'arcade'
     ? <SelectorNivel titulo="SPEED RUN" normal="Como siempre: opciones cercanas a la respuesta" dificil="Todas las opciones acaban en la misma cifra" onElegir={setNivel} onBack={alMenu} />
     : <SelectorNivel titulo="TARGET 67" normal="Como siempre: sumas y restas suelen bastar" dificil="Necesitas × o ÷ y usar casi todos los números" onElegir={setNivel} onBack={alMenu} />;
-  else if (mode === 'arcade') pantalla = <ArcadeGame key={nivel} nivel={nivel} usuario={usuario} timeLimit={settings.arcadeTime} onBack={alMenu} />;
+  else if (mode === 'arcade') pantalla = <ArcadeGame key={nivel} nivel={nivel} usuario={usuario} timeLimit={settings.arcadeTime} onBack={alMenu} mandosApi={mandosApi} juegoMandos={juegoMandos} />;
   else if (mode === 'target') pantalla = <TargetGame key={nivel} nivel={nivel} onBack={alMenu} />;
   else if (mode === 'matrix') pantalla = <MatrixGame usuario={usuario} timeLimit={settings.matrixTime} onBack={() => setMode('menu')} />;
   else pantalla = <MainMenu setMode={setMode} onExit={onExit} usuario={usuario} />;
@@ -1686,6 +1737,12 @@ export default function SixSeven({ onExit, usuario = null }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: theme.bg, overflowY: 'auto', overflowX: 'hidden' }}>
       {pantalla}
+      {mode === 'arcade' && nivel && (
+        <MandosEnJuego clave="SIXSEVEN" juego="Six Seven · Speed Run" tipo="SIXSEVEN_MANDOS" maxJug={4} apiRef={mandosApi}
+          modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras"
+          onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
+          controles={<>Las 4 opciones son <b>A, B, C y D</b> (en orden de lectura). En el mando, <b>A</b> cambia la letra y <b>B</b> o agitar la envía. Con <b>1</b> jugador cada partida la juega un mando (relevos); con <b>2 a 4</b> es una carrera: el primero que acierta se lleva los puntos y quien falla queda fuera de esa pregunta.</>} />
+      )}
       <CapaSeisSiete />
     </div>
   );

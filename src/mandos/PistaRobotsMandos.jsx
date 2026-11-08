@@ -20,6 +20,7 @@ import {
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from '../utils/sonidosFeedback';
 import { GENERADORES, barajar } from './QuizMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz, ElegirHoja, preguntasDeHoja } from './SelectorRecursoMandos.jsx';
+import GuardarResultadosMandos from './GuardarResultadosMandos.jsx';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import ChipAntena from './ChipAntena.jsx';
 
@@ -183,7 +184,7 @@ export default function PistaRobotsMandos({ onExit }) {
     let r = j.robots[id];
     if (!r) {
       const { x, y } = casillaLibre(j, c, f, 1);
-      r = { id, x, y, rot: 0, puntos: 0, lapiz: false, color: COLORES[j.orden % COLORES.length], aturdidoHasta: 0 };
+      r = { id, x, y, rot: 0, puntos: 0, aciertos: 0, fallos: 0, lapiz: false, color: COLORES[j.orden % COLORES.length], aturdidoHasta: 0 };
       j.orden += 1;
       j.robots[id] = r;
       if (modo === 'estrellas' && estrellas) reponerEstrellas();
@@ -217,6 +218,7 @@ export default function PistaRobotsMandos({ onExit }) {
           if (!ficha) continue;
           if (ficha.i === j.pregunta.q.correcta) {
             r.puntos += PUNTOS_BIEN;
+            r.aciertos = (r.aciertos || 0) + 1;
             j.pregunta.ganador = id;
             efecto(nx, ny, `+${PUNTOS_BIEN}`, '#4ade80');
             sonidoCorrecto();
@@ -227,6 +229,7 @@ export default function PistaRobotsMandos({ onExit }) {
             }, PAUSA_GANADOR);
           } else {
             r.puntos = Math.max(0, r.puntos - PUNTOS_MAL);
+            r.fallos = (r.fallos || 0) + 1;
             r.aturdidoHasta = Date.now() + ATURDIDO_MS;
             efecto(nx, ny, `−${PUNTOS_MAL}`, '#f87171');
             sonidoIncorrecto();
@@ -611,7 +614,16 @@ export default function PistaRobotsMandos({ onExit }) {
                 <b>{r.puntos} pts</b>
               </div>
             ))}
-            <div style={{ textAlign: 'center' }}>
+            <div style={{ textAlign: 'center', display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {modoJuego === 'preguntas' && (
+                <GuardarResultadosMandos
+                  tipo="PISTA_ROBOTS"
+                  juego="Pista de robots"
+                  recursoTitulo={fuente === 'recurso' ? recurso?.titulo || 'Recurso' : fuente === 'sumas' ? 'Sumas y restas' : 'Tablas de multiplicar'}
+                  hoja={fuente === 'recurso' && hojaSel >= 0 ? hojasRecurso[hojaSel]?.nombre || '' : ''}
+                  jugadores={ranking.map((r) => ({ id: r.id, nombre: nombre(r.id), aciertos: r.aciertos || 0, fallos: r.fallos || 0, intentos: (r.aciertos || 0) + (r.fallos || 0), puntos: r.puntos }))}
+                />
+              )}
               <button style={st.btnGrande} onClick={() => setFase('config')}>
                 Jugar otra vez
               </button>

@@ -59,6 +59,7 @@ export const JUEGOS_REGISTRO_META = {
     LAB_MICROBIT:        { nombre: 'Laboratorio micro:bit', emoji: '🛰️', color: '#0369a1' },
     CUERPO_HUMANO:       { nombre: 'Cuerpo humano 3D',    emoji: '🦴', color: '#38bdf8' },
     OVNI:                { nombre: 'Ovni Abducción',      emoji: '🛸', color: '#22d3ee' },
+    INVASORES:           { nombre: 'Invasión Pi',         emoji: '👾', color: '#22d3ee' },
     VANILA:              { nombre: 'VaniLa',              emoji: '🔤', color: '#A78BFA' },
     CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
     ESCAPE_HALLOWEEN:    { nombre: 'Escape Room Halloween', emoji: '🎃', color: '#ff8c1a' },
@@ -69,6 +70,7 @@ export const JUEGOS_REGISTRO_META = {
     CALCULADORA:         { nombre: 'Calculadora',         emoji: '🧮', color: '#0f766e' },
     QUIZ_MANOS:          { nombre: 'Quiz con los dedos',  emoji: '✋', color: '#7c3aed' },
     AVATAR_CUERPO:       { nombre: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2' },
+    ORIENTACION:         { nombre: 'Orientación',          emoji: '🚩', color: '#c026d3' },
     MBOT_RETOS:          { nombre: 'Retos del mBot2',     emoji: '🚗', color: '#0284c7' },
 };
 

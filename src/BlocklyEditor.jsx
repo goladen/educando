@@ -18,6 +18,7 @@ import { db } from './firebase';
 import { basePublica } from './utils/urlPublica';
 import { BLOQUES_MANDO_PIKT, definirGeneradoresMandoPikt, CATEGORIA_MANDO_PIKT } from './mandos/mandoPiktBloques';
 import TutorialMandoPikt from './mandos/TutorialMandoPikt.jsx';
+import { RECORRIDOS_MBOT2, COLOR_MBOT2 } from './robot/tutorialMbot2';
 import {
   collection,
   addDoc,
@@ -1002,10 +1003,48 @@ function defineBlocksAndGenerators() {
     },
     {
       type: 'mbot2_line_offset',
-      message0: 'desvío del seguidor de línea',
+      message0: 'desvío de la línea (−100 izq … 100 dcha)',
       output: 'Number',
       colour: 0,
-      tooltip: 'quad_rgb_sensor.get_offset_track(1)',
+      tooltip: 'Sensor de 4 sondas de debajo del robot: negativo = la línea está a la izquierda, positivo = a la derecha, 0 = centrada (quad_rgb_sensor.get_offset_track)',
+    },
+    {
+      type: 'mbot2_line_state',
+      message0: 'sondas que ven la línea (0-15)',
+      output: 'Number',
+      colour: 0,
+      tooltip: 'Las 4 sondas como un número binario: 0 = ninguna ve la línea (se ha salido), 15 = las cuatro (cruce o meta) (quad_rgb_sensor.get_line_sta)',
+    },
+    {
+      type: 'mbot2_straight',
+      message0: 'mBot2 avanzar %1 cm',
+      args0: [{ type: 'input_value', name: 'CM', check: 'Number' }],
+      previousStatement: null,
+      nextStatement: null,
+      colour: 160,
+      tooltip: 'Avanza esa distancia exacta midiendo con los encoders de las ruedas (negativo = hacia atrás). Espera a terminar (mbot2.straight)',
+    },
+    {
+      type: 'mbot2_turn',
+      message0: 'mBot2 girar %1 grados',
+      args0: [{ type: 'input_value', name: 'DEG', check: 'Number' }],
+      previousStatement: null,
+      nextStatement: null,
+      colour: 160,
+      tooltip: 'Gira sobre sí mismo ese ángulo con el giroscopio: positivo = a la derecha, negativo = a la izquierda (mbot2.turn)',
+    },
+    {
+      type: 'mbot2_motores',
+      message0: 'mBot2 motor izquierdo %1 derecho %2 (%)',
+      args0: [
+        { type: 'input_value', name: 'L', check: 'Number' },
+        { type: 'input_value', name: 'R', check: 'Number' },
+      ],
+      inputsInline: true,
+      previousStatement: null,
+      nextStatement: null,
+      colour: 160,
+      tooltip: 'Potencia de cada rueda de −100 a 100 (positivo = hacia delante). Se queda así hasta la siguiente orden',
     },
 
     // ===== ARDUINO — PWM / tono / servo / tiempo =====
@@ -1888,30 +1927,58 @@ function defineBlocksAndGenerators() {
     // Control directo por potencia (drive_power): mueve las ruedas sin esperar
     // a los encoders (mbot2.forward podía quedarse colgado). L/R según el sentido.
     const dir = block.getFieldValue('DIR');
+    // El motor derecho va en espejo: para avanzar va en negativo (drive_power(30, 30) gira sobre sí mismo)
     const map = {
-      forward: [s, s],
-      backward: [-s, -s],
-      turn_left: [-s, s],
-      turn_right: [s, -s],
+      forward: [s, -s],
+      backward: [-s, s],
+      turn_left: [-s, -s],
+      turn_right: [s, s],
     };
     const [l, r] = map[dir] || [s, s];
     return `mbot2.drive_power(${l}, ${r})\ntime.sleep(${t})\nmbot2.drive_power(0, 0)\n`;
   };
   P.forBlock['mbot2_drive_speed'] = function (block, gen) {
     mbot2Import(gen);
-    return `mbot2.drive_power(${block.getFieldValue('L')}, ${block.getFieldValue('R')})\n`;
+    // positivo = hacia delante en las dos ruedas (el motor derecho va en espejo)
+    return `mbot2.drive_power(${block.getFieldValue('L')}, ${-Number(block.getFieldValue('R')) || 0})\n`;
   };
   P.forBlock['mbot2_stop'] = function (block, gen) {
     mbot2Import(gen);
     return 'mbot2.drive_power(0, 0)\n';
   };
+  // Sensores del mBot2: según el firmware están en cyberpi.* o en mbuild.*; se prueba uno y luego el otro.
+  // (Funciones sin variables globales: en las tramas del CyberPi las funciones no ven las globales.)
+  const sensorMbot = (gen, nombre, cuerpo1, cuerpo2) => {
+    gen.definitions_['def_' + nombre] =
+      'def ' + nombre + '():\n    try:\n        import cyberpi\n        return ' + cuerpo1 +
+      '\n    except Exception:\n        try:\n            import mbuild\n            return ' + cuerpo2 +
+      '\n        except Exception:\n            return 0';
+  };
   P.forBlock['mbot2_ultrasonic'] = function (block, gen) {
-    gen.definitions_['import_ultrasonic'] = 'from mbuild import ultrasonic2';
-    return ['ultrasonic2.get_distance(1)', Order.ATOMIC];
+    sensorMbot(gen, '_pikt_distancia', 'cyberpi.ultrasonic2.get(1)', 'mbuild.ultrasonic2.get(1)');
+    return ['_pikt_distancia()', Order.FUNCTION_CALL];
   };
   P.forBlock['mbot2_line_offset'] = function (block, gen) {
-    gen.definitions_['import_quad'] = 'from mbuild import quad_rgb_sensor';
-    return ['quad_rgb_sensor.get_offset_track(1)', Order.ATOMIC];
+    sensorMbot(gen, '_pikt_desvio', 'cyberpi.quad_rgb_sensor.get_offset_track()', 'mbuild.quad_rgb_sensor.get_offset_track(1)');
+    return ['_pikt_desvio()', Order.FUNCTION_CALL];
+  };
+  P.forBlock['mbot2_line_state'] = function (block, gen) {
+    sensorMbot(gen, '_pikt_sondas', 'cyberpi.quad_rgb_sensor.get_line_sta()', 'mbuild.quad_rgb_sensor.get_line_sta(1)');
+    return ['_pikt_sondas()', Order.FUNCTION_CALL];
+  };
+  P.forBlock['mbot2_straight'] = function (block, gen) {
+    mbot2Import(gen);
+    return 'mbot2.straight(' + (gen.valueToCode(block, 'CM', Order.NONE) || '0') + ')\n';
+  };
+  P.forBlock['mbot2_turn'] = function (block, gen) {
+    mbot2Import(gen);
+    return 'mbot2.turn(' + (gen.valueToCode(block, 'DEG', Order.NONE) || '0') + ')\n';
+  };
+  P.forBlock['mbot2_motores'] = function (block, gen) {
+    mbot2Import(gen);
+    const l = gen.valueToCode(block, 'L', Order.NONE) || '0';
+    const r = gen.valueToCode(block, 'R', Order.NONE) || '0';
+    return 'mbot2.drive_power(int(' + l + '), -int(' + r + '))\n';
   };
 
   /* ───────── GENERADOR ARDUINO (C++) ───────── */
@@ -2292,11 +2359,16 @@ const TOOLBOXES = {
       },
       {
         kind: 'category', name: 'mBot2 · Motores', colour: '160',
-        contents: [blk('mbot2_drive'), blk('mbot2_drive_speed'), blk('mbot2_stop')],
+        contents: [
+          blk('mbot2_straight', { CM: { shadow: { type: 'math_number', fields: { NUM: 30 } } } }),
+          blk('mbot2_turn', { DEG: { shadow: { type: 'math_number', fields: { NUM: 90 } } } }),
+          blk('mbot2_motores', { L: { shadow: { type: 'math_number', fields: { NUM: 40 } } }, R: { shadow: { type: 'math_number', fields: { NUM: 40 } } } }),
+          blk('mbot2_drive'), blk('mbot2_drive_speed'), blk('mbot2_stop'),
+        ],
       },
       {
         kind: 'category', name: 'mBot2 · Sensores', colour: '15',
-        contents: [blk('mbot2_ultrasonic'), blk('mbot2_line_offset')],
+        contents: [blk('mbot2_ultrasonic'), blk('mbot2_line_offset'), blk('mbot2_line_state')],
       },
       ...STD_CATEGORIES,
       CODE_PY,
@@ -4786,6 +4858,15 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 🎮 Mando
               </button>
             )}
+            {selectedBoard === 'cyberpi' && (
+              <button
+                onClick={() => setRightTab('mbot2')}
+                style={styles.tab(rightTab === 'mbot2')}
+                title="Programa paso a paso el mBot2: seguir la línea del mapa y el tractor de siembra"
+              >
+                🤖 mBot2
+              </button>
+            )}
             <button
               onClick={() => setPanelCollapsed(true)}
               style={styles.collapseBtn}
@@ -4856,6 +4937,22 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 </button>
               </div>
             </>
+          ) : rightTab === 'mbot2' && selectedBoard === 'cyberpi' ? (
+            <TutorialMandoPikt
+              codigo={generatedCode}
+              cargar={cargarEstadoBloques}
+              conectada={isConnected}
+              onGuardar={uploadToBoard}
+              recorridos={RECORRIDOS_MBOT2}
+              color={COLOR_MBOT2}
+              lsKey="pikt_tutorial_mbot2"
+              titulo="🤖 Programa tu mBot2 paso a paso"
+              intro="Recorridos guiados con el CyberPi montado en el mBot2: cada paso explica qué bloques usar y por qué. Puedes comprobar tu programa, pedir una pista o ver la solución."
+              nota={<>Los bloques están en <b>mBot2 · Motores</b> y <b>mBot2 · Sensores</b>.</>}
+              volver="← Elegir otro recorrido"
+              textoGuardar="▶ Ejecutar en el robot"
+              avisoGuardar="Primero conecta el CyberPi con «🔗 Conectar Placa»"
+            />
           ) : rightTab === 'mando' && selectedBoard === 'microbit' ? (
             <TutorialMandoPikt
               codigo={generatedCode}

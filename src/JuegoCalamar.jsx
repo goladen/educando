@@ -18,6 +18,7 @@ import {
 import ChipAntena from './mandos/ChipAntena.jsx';
 import { BotonTutorialMandos } from './mandos/TutorialMandos.jsx';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import GuardarResultadosMandos from './mandos/GuardarResultadosMandos.jsx';
 
 /* =====================================================================
  *  LUZ ROJA · LUZ VERDE  (juego del calamar educativo)
@@ -1637,6 +1638,18 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
                                 <span style={{ ...chip('#34495e'), minWidth: 62, textAlign: 'center' }}>{j.paso}/{meta}</span>
                             </div>
                         ))}
+                    </div>
+                    <div style={{ marginTop: 16 }}>
+                        <GuardarResultadosMandos
+                            tipo="CALAMAR_MANDOS"
+                            juego="Luz roja · Luz verde con mandos"
+                            recursoTitulo={titulo}
+                            config={{ meta, minutos, segRespuesta }}
+                            jugadores={ranking.map(j => ({
+                                id: j.id, nombre: j.nombre, aciertos: j.aciertos, fallos: j.fallos, intentos: j.aciertos + j.fallos,
+                                extra: { pasos: j.paso, meta, completado: !!j.llegada, eliminado: !!j.eliminado, ...(j.llegada ? { llegada: j.llegada } : {}) },
+                            }))}
+                        />
                     </div>
                     <button onClick={() => setFase('LOBBY')} style={{ ...btnPrincipal, marginTop: 16 }}>🔁 Otra partida</button>
                     <button onClick={onSalir} style={btnSecundario}>Salir</button>

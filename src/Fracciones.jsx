@@ -2070,7 +2070,7 @@ export default function Fracciones({ usuario, onExit }) {
             {gameState === 'COMPETICION' && (
                 <div style={{ maxWidth: 1000, margin: '0 auto', width: '100%' }}>
                     <h2 style={{ textAlign: 'center', color: '#e67e22', margin: '0 0 12px', fontSize: isMobile ? '1.3rem' : '1.6rem' }}>🪢 Tirón de cuerda · Fracciones</h2>
-                    <CompeticionCuerda
+                    <CompeticionCuerda nombre="Fracciones"
                         metaInicial={5}
                         isMobile={isMobile}
                         onSalir={() => setGameState('START')}

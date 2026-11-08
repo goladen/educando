@@ -4,6 +4,7 @@
 //  Cada gen(nivel) devuelve { e, s, pasos, r, largo? } (ver fuenteTexto.jsx)
 // ─────────────────────────────────────────────────────────────────────────────
 import { R, pick, N, P, frac, termino, polinomio, mcm } from '../fuenteTexto';
+import { TIPOS_FACTORIZAR, VisualPolinomio } from './factorizarPol.jsx';
 
 const noCero = (a, b) => { let v; do { v = R(a, b); } while (v === 0); return v; };
 // «ax + b» (b puede ser 0 o negativo)
@@ -191,7 +192,8 @@ const resPol = (c) => [{ tipo: 'texto', v: [polinomio(c)], placeholder: 'p. ej. 
 
 export const POLINOMIOS = {
     id: 'polinomios', nombre: 'Polinomios', emoji: '🔣', color: '#8e44ad', etapas: ['eso'],
-    desc: 'Valor numérico, operaciones, identidades notables y factor común',
+    desc: 'Valor numérico, operaciones, identidades notables, factor común y factorización (con gráfica)',
+    Visual: VisualPolinomio,
     tipos: {
         valorNumerico: {
             label: 'Valor numérico', titulo: 'Calcula el valor numérico de cada polinomio.', cols: 2, alto: 80,
@@ -242,6 +244,8 @@ export const POLINOMIOS = {
                 return { e: `${pol(r)} =`, s: `${factor}(${pol(q)})`, r: [{ tipo: 'texto', v: [`${factor}(${pol(q)})`] }], pasos: [`El factor común es ${factor}`] };
             },
         },
+        // Factorización completa por método (factor común, identidades, Ruffini…) y con gráfica
+        ...TIPOS_FACTORIZAR,
     },
 };
 const mcdArr = (arr) => arr.reduce((g, v) => { let a = Math.abs(g), b = Math.abs(v); while (b) [a, b] = [b, a % b]; return a; });

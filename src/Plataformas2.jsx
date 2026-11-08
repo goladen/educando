@@ -16,6 +16,7 @@ import wrongSoundSrc   from './assets/wrong.mp3';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import MandosEnJuego from './mandos/RelevosMandos.jsx';
 // Jugar con el cuerpo (webcam): girar la cabeza = andar, saltar = saltar. Se carga al activarlo.
 const PanelControlCuerpo = React.lazy(() => import('./cuerpo/PanelControlCuerpo.jsx'));
 const LS_CUERPO = 'pikt_plataformas_cuerpo';
@@ -1176,7 +1177,22 @@ function PantallaResumen({ materia, recurso, levelStats, onMenu }) {
 // ══════════════════════════════════════════════════════════════════════════════
 //  COMPONENTE PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
-export default function QuizPlataformas({ onExit, recursoInicial = null, hojaInicial = null }) {
+// Envoltorio: los mandos micro:bit (relevos) viven fuera del juego para no perder el marcador entre pantallas.
+export default function QuizPlataformas(props) {
+  const mandosApi = useRef(null);
+  const juegoMandos = useRef({});
+  return (
+    <>
+      <QuizPlataformasJuego {...props} mandosApi={mandosApi} juegoMandos={juegoMandos} />
+      <MandosEnJuego clave="PLATAFORMAS" juego="Pikatron 2" tipo="PLATAFORMAS_MANDOS" apiRef={mandosApi}
+        teclas={[{ I: 'ArrowLeft', D: 'ArrowRight', F: 'ArrowUp', A: ' ', S: ' ' }]}
+        onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
+        controles={<>Inclina a los lados para andar. <b>A</b>, agitar o inclinar <b>hacia delante</b> = saltar. En las pantallas de inicio y final, <b>agitar</b> empieza o sigue. Con 🔄 relevos, cada nivel lo juega un mando distinto.</>} />
+    </>
+  );
+}
+
+function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = null, mandosApi, juegoMandos }) {
   const [fase,       setFase]       = useState('MENU');
   const [materia,    setMateria]    = useState(null);
   const [nivelIdx,   setNivelIdx]   = useState(0);
@@ -1924,6 +1940,16 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
   const totalNivelesActuales = recursoActivo && recursoModo==='PANTALLAS'
     ? Math.min((recursoActivo.hojas||[]).length, 4)
     : (recursoActivo ? 1 : 4);
+
+  // Mandos: al acabar cada nivel se anotan puntos y aciertos; agitar avanza en las pantallas sin juego
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(()=>{ if(fase==='FIN') mandosApi?.current?.finPartida([score],{ aciertos:[aciertos], intentos:[totalQ] }); },[fase]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (juegoMandos) juegoMandos.current.onEvento = (i, ev) => {
+    if (ev.accion !== 'S') return;
+    if (fase==='INTRO') iniciar(materia,nivelIdx);
+    else if (fase==='INTRO_REC') setFase('PLAYING');
+    else if (fase==='FIN') { if (nivelIdx+1<totalNivelesActuales) (recursoActivo ? siguienteNivelRecurso() : (setNivelIdx(nivelIdx+1), setFase('INTRO'))); else setFase(recursoActivo?'INTRO_REC':'INTRO'); }
+  };
 
   if(fase==='MENU')    return <PantallaMenu onEligir={m=>{ setMateria(m); setNivelIdx(0); setLevelStats([]); setFase('INTRO'); }} onRecurso={iniciarRecurso} onExit={onExit}/>;
   if(fase==='INTRO')   return <PantallaIntro materia={materia} nivel={nivelIdx+1} total={4} hasEnemigos={nivelIdx>0} onStart={()=>iniciar(materia,nivelIdx)} onBack={()=>setFase('MENU')} cuerpo={controlCuerpo} onCuerpo={alternarCuerpo}/>;

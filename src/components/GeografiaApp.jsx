@@ -1275,7 +1275,7 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive, onAbrirINE }) {
       <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1e3a5f 0%,#1e40af 50%,#0f766e 100%)', padding:16, boxSizing:'border-box' }}>
         <button onClick={() => setPantalla('intro')} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:8, padding:'7px 14px', cursor:'pointer', fontSize:'0.9rem', marginBottom:12 }}>← Salir</button>
         <div style={{ maxWidth:1000, margin:'0 auto', background:'#f1f5f9', borderRadius:20, padding:16 }}>
-          <CompeticionCuerda onSalir={() => setPantalla('intro')}
+          <CompeticionCuerda nombre="Geografía" onSalir={() => setPantalla('intro')}
             configExtra={(
               <>
                 <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>

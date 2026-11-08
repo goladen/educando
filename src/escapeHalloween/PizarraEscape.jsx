@@ -5,6 +5,7 @@ import { DISFRACES, ACCESORIOS } from './avatares3d';
 import Mansion3D, { AvatarPreview3D } from './Mansion3D';
 import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
 import ChipAntena from '../mandos/ChipAntena.jsx';
+import GuardarResultadosMandos from '../mandos/GuardarResultadosMandos.jsx';
 import { descargarPdfEscape } from './FichasEscape';
 import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, mmss, useNarrador, idNarracionFase, Subtitulo } from './comunes';
 import { tr } from './i18n';
@@ -298,6 +299,8 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
         Object.entries(respM).forEach(([id, l]) => { if (Number(id) < 900) feedbackMando(Number(id), LETRAS.indexOf(l) === q.correcta); });
         setJugadores(j => {
             const sig = { ...j };
+            // Para el informe: cada pregunta corregida cuenta para todos los mandos que están jugando
+            Object.keys(sig).forEach(k => { if (sig[k].mando) sig[k] = { ...sig[k], intentos: (sig[k].intentos || 0) + 1 }; });
             acertantes.forEach(id => { const k = `m${id}`; if (sig[k]) sig[k] = { ...sig[k], aciertos: (sig[k].aciertos || 0) + 1, puntos: (sig[k].puntos || 0) + 1 }; });
             return sig;
         });
@@ -566,6 +569,15 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                                 <b>{j.puntos || 0}</b>
                             </div>
                         ))}
+                        <div style={{ marginTop: 12 }}>
+                            <GuardarResultadosMandos
+                                tipo="ESCAPE_MANDOS"
+                                juego="Escape room con mandos"
+                                recursoTitulo={titulo || 'La mansión del zombi'}
+                                config={{ escapado: fase === 'VICTORIA' }}
+                                jugadores={rankingM.map(j => ({ id: j.mando, nombre: j.nombre, aciertos: j.aciertos || 0, intentos: j.intentos || 0, extra: { escapado: fase === 'VICTORIA' } }))}
+                            />
+                        </div>
                     </div>
                 )}
             </>;

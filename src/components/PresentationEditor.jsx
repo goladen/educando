@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { callGeminiProxy, extractText } from '../geminiProxy';
@@ -6,7 +6,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import html2canvas from 'html2canvas';
+import { THEMES } from './presentacion/temas';
+import {
+  BASE_W, BASE_H, PX_X, PX_Y, nid, cargarFuentes, ElementoContenido, estiloCaja, fondoCss,
+  estiloEntrada, estiloBucle, duracionEntradas, KEYFRAMES_CSS, SuperficieEstatica, TRANSICIONES,
+} from './presentacion/render';
+import PanelPropiedades, { CLAVES_ESTILO, ordenarEls } from './presentacion/PanelPropiedades';
+import { PanelElementos, PanelPlantillas, PanelCapas } from './presentacion/paneles';
+import { PLANTILLAS } from './presentacion/plantillas';
+import { ColorPicker, CampoDegradado, Deslizador } from './presentacion/ui';
+import { useHistorial, comprimirImagen, proporcionImagen, clonarDiapositiva } from './presentacion/utilidades';
 
 // ─── VIDEO URL PARSER ────────────────────────────────────────────────────────
 export function parseVideoUrl(url) {
@@ -38,252 +47,12 @@ const TIPO_LABELS = {
   SINTAXIS: 'Sintaxis', ETIQUETAS: 'EtiquetaMe', QUESTION_SENDER: 'Q-Sender',
 };
 
-// ─── FREE CANVAS CONSTANTS ────────────────────────────────────────────────────
-const PALETTE = [
-  '#ffffff','#000000','#ef4444','#f97316','#eab308','#22c55e',
-  '#06b6d4','#3b82f6','#8b5cf6','#ec4899','#10b981','#f59e0b',
-  '#1f2937','#374151','#6b7280','#d1d5db',
-];
-const FONTS = [
-  { label: 'Sans',    value: "'Inter','Segoe UI',sans-serif" },
-  { label: 'Serif',   value: "'Georgia',serif" },
-  { label: 'Mono',    value: "'Courier New',monospace" },
-  { label: 'Display', value: "'Arial Black',Impact,sans-serif" },
-  { label: 'Cursiva', value: "'Comic Sans MS',cursive" },
-];
+// ─── BOTONES DE LA BARRA DE AÑADIR ───────────────────────────────────────────
+// (temas en ./presentacion/temas.js; dibujo de elementos en ./presentacion/render.jsx)
 const FC_BTN = (bg, color, extra = {}) => ({
   background: bg, color, border: 'none', borderRadius: 8,
   padding: '5px 11px', cursor: 'pointer', fontSize: 11, fontWeight: 700, ...extra,
 });
-
-// ─── COLOR PICKER ─────────────────────────────────────────────────────────────
-function ColorPicker({ value, onChange, label, allowNull }) {
-  return (
-    <div style={{ marginBottom: 10 }}>
-      {label && <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', marginBottom: 5, letterSpacing: 0.5 }}>{label}</div>}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-        {allowNull && (
-          <div onClick={() => onChange(null)} title="Auto (tema)"
-            style={{ width: 20, height: 20, borderRadius: 4, cursor: 'pointer', background: 'linear-gradient(135deg,#374151 50%,#9ca3af 50%)', border: value == null ? '2px solid #fff' : '2px solid #374151', boxSizing: 'border-box' }} />
-        )}
-        {PALETTE.map(c => (
-          <div key={c} onClick={() => onChange(c)} style={{
-            width: 20, height: 20, borderRadius: 4, cursor: 'pointer', background: c,
-            border: value === c ? '2px solid #fff' : '2px solid transparent',
-            boxSizing: 'border-box', boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #374151' : 'none',
-          }} />
-        ))}
-        <div title="Personalizado" style={{ width: 20, height: 20, borderRadius: 4, background: 'conic-gradient(red,#ff0,green,cyan,blue,magenta,red)', position: 'relative', overflow: 'hidden', cursor: 'pointer', border: '2px solid #374151', boxSizing: 'border-box' }}>
-          <input type="color" value={value || '#6c63ff'} onChange={e => onChange(e.target.value)}
-            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── ELEMENT PROPERTIES PANEL ─────────────────────────────────────────────────
-function ElementProperties({ el, updateEl, onDelete, onDuplicate, onBringFwd, onSendBck }) {
-  const isText     = el.type === 'text';
-  const isShape    = el.type === 'shape';
-  const isImage    = el.type === 'image';
-  const isYT       = el.type === 'youtube';
-  const isWebview  = el.type === 'webview';
-  const isEquation = el.type === 'equation';
-  const isMusic    = el.type === 'music';
-  const active = (condition) => ({
-    background: condition ? '#6c63ff' : '#374151', color: '#fff',
-    border: 'none', borderRadius: 5, padding: '5px 0', cursor: 'pointer', fontSize: 12, flex: 1,
-  });
-  return (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1 }}>
-          {isText ? '📝 Texto' : isShape ? '⬜ Forma' : isYT ? '▶ YouTube' : isWebview ? '🌐 Web' : isEquation ? '∑ Ecuación' : isMusic ? '🎵 Música' : '🖼️ Imagen'}
-        </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button onClick={onDuplicate} title="Duplicar (Ctrl+D)" style={{ background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 4, padding: '3px 7px', cursor: 'pointer', fontSize: 11 }}>⧉</button>
-          <button onClick={onDelete} title="Eliminar (Del)" style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: 'none', borderRadius: 4, padding: '3px 7px', cursor: 'pointer', fontSize: 11 }}>🗑</button>
-        </div>
-      </div>
-
-      {/* TEXT PROPS */}
-      {isText && <>
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 3 }}>FUENTE</div>
-          <select value={el.fontFamily || FONTS[0].value} onChange={e => updateEl({ fontFamily: e.target.value })}
-            style={{ width: '100%', background: '#111827', border: '1px solid #374151', borderRadius: 6, padding: '5px 8px', color: '#fff', fontSize: 11, outline: 'none' }}>
-            {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <div style={{ fontSize: 10, color: '#9ca3af' }}>TAMAÑO</div>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{el.fontSize || 16}px</div>
-          </div>
-          <input type="range" min={8} max={120} value={el.fontSize || 16} onChange={e => updateEl({ fontSize: +e.target.value })}
-            style={{ width: '100%', accentColor: '#6c63ff' }} />
-        </div>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-          <button style={active(el.fontWeight === 'bold' || el.fontWeight === '900')} onClick={() => updateEl({ fontWeight: (el.fontWeight === 'bold' || el.fontWeight === '900') ? 'normal' : 'bold' })}><strong>B</strong></button>
-          <button style={active(el.fontStyle === 'italic')} onClick={() => updateEl({ fontStyle: el.fontStyle === 'italic' ? 'normal' : 'italic' })}><em>I</em></button>
-          <button style={active(el.textDecoration === 'underline')} onClick={() => updateEl({ textDecoration: el.textDecoration === 'underline' ? 'none' : 'underline' })}><u>U</u></button>
-        </div>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-          {[['◀',   'left'], ['≡', 'center'], ['▶', 'right']].map(([ico, a]) => (
-            <button key={a} style={active((el.textAlign || 'left') === a)} onClick={() => updateEl({ textAlign: a })}>{ico}</button>
-          ))}
-        </div>
-        <ColorPicker label="COLOR TEXTO" value={el.color} onChange={c => updateEl({ color: c })} allowNull />
-      </>}
-
-      {/* SHAPE PROPS */}
-      {isShape && <>
-        <ColorPicker label="COLOR RELLENO" value={el.fill} onChange={c => updateEl({ fill: c })} />
-        <ColorPicker label="COLOR BORDE" value={el.stroke === 'none' ? null : el.stroke} onChange={c => updateEl({ stroke: c || 'none' })} allowNull />
-        {(el.shapeType === 'rect') && (
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <div style={{ fontSize: 10, color: '#9ca3af' }}>REDONDEO</div>
-              <div style={{ fontSize: 10, color: '#6b7280' }}>{el.borderRadius || 0}px</div>
-            </div>
-            <input type="range" min={0} max={50} value={el.borderRadius || 0} onChange={e => updateEl({ borderRadius: +e.target.value })}
-              style={{ width: '100%', accentColor: '#6c63ff' }} />
-          </div>
-        )}
-      </>}
-
-      {/* IMAGE PROPS */}
-      {isImage && <>
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>AJUSTE</div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {['cover','contain','fill'].map(fit => (
-              <button key={fit} style={active((el.objectFit || 'cover') === fit)} onClick={() => updateEl({ objectFit: fit })}>{fit}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <div style={{ fontSize: 10, color: '#9ca3af' }}>REDONDEO</div>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{el.borderRadius || 0}px</div>
-          </div>
-          <input type="range" min={0} max={50} value={el.borderRadius || 0} onChange={e => updateEl({ borderRadius: +e.target.value })}
-            style={{ width: '100%', accentColor: '#6c63ff' }} />
-        </div>
-      </>}
-
-      {/* EQUATION PROPS */}
-      {isEquation && <>
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <div style={{ fontSize: 10, color: '#9ca3af' }}>TAMAÑO</div>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{el.fontSize || 28}px</div>
-          </div>
-          <input type="range" min={10} max={80} value={el.fontSize || 28} onChange={e => updateEl({ fontSize: +e.target.value })}
-            style={{ width: '100%', accentColor: '#6c63ff' }} />
-        </div>
-        <ColorPicker label="COLOR" value={el.color} onChange={c => updateEl({ color: c })} allowNull />
-        <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8, lineHeight: 1.4 }}>
-          Doble clic sobre la ecuación para editarla
-        </div>
-      </>}
-
-      {/* OPACITY — all */}
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-          <div style={{ fontSize: 10, color: '#9ca3af' }}>OPACIDAD</div>
-          <div style={{ fontSize: 10, color: '#6b7280' }}>{Math.round((el.opacity ?? 1) * 100)}%</div>
-        </div>
-        <input type="range" min={0.05} max={1} step={0.05} value={el.opacity ?? 1} onChange={e => updateEl({ opacity: +e.target.value })}
-          style={{ width: '100%', accentColor: '#6c63ff' }} />
-      </div>
-
-      {/* Layer order */}
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button onClick={onBringFwd} style={{ flex: 1, background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 6, padding: '5px 0', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>↑ Al frente</button>
-        <button onClick={onSendBck} style={{ flex: 1, background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 6, padding: '5px 0', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>↓ Al fondo</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── TEMPLATES ────────────────────────────────────────────────────────────────
-const THEMES = {
-  dark: {
-    label: 'Oscuro',
-    bg: 'linear-gradient(135deg, #1a0533 0%, #0d1b4a 50%, #0a0a1a 100%)',
-    accent: '#6c63ff',
-    text: '#ffffff',
-    sub: 'rgba(255,255,255,0.65)',
-    card: 'rgba(255,255,255,0.07)',
-    cardBorder: 'rgba(255,255,255,0.12)',
-    tag: 'rgba(108,99,255,0.25)',
-    tagBorder: 'rgba(108,99,255,0.5)',
-    tagText: '#a78bfa',
-  },
-  purple: {
-    label: 'Morado',
-    bg: 'linear-gradient(135deg, #6c63ff 0%, #a855f7 60%, #ec4899 100%)',
-    accent: '#ffffff',
-    text: '#ffffff',
-    sub: 'rgba(255,255,255,0.8)',
-    card: 'rgba(255,255,255,0.2)',
-    cardBorder: 'rgba(255,255,255,0.3)',
-    tag: 'rgba(255,255,255,0.2)',
-    tagBorder: 'rgba(255,255,255,0.4)',
-    tagText: '#ffffff',
-  },
-  light: {
-    label: 'Claro',
-    bg: '#f0f4ff',
-    accent: '#6c63ff',
-    text: '#1a1a2e',
-    sub: '#555',
-    card: '#ffffff',
-    cardBorder: '#e8e8ff',
-    tag: '#ede9fe',
-    tagBorder: '#c4b5fd',
-    tagText: '#6c63ff',
-  },
-  blue: {
-    label: 'Azul Noche',
-    bg: 'linear-gradient(160deg, #0A0E45 0%, #0d0d2b 100%)',
-    accent: '#a78bfa',
-    text: '#ffffff',
-    sub: 'rgba(255,255,255,0.65)',
-    card: 'rgba(255,255,255,0.08)',
-    cardBorder: 'rgba(255,255,255,0.12)',
-    tag: 'rgba(108,99,255,0.25)',
-    tagBorder: 'rgba(108,99,255,0.5)',
-    tagText: '#a78bfa',
-  },
-  green: {
-    label: 'Verde',
-    bg: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)',
-    accent: '#34d399',
-    text: '#ffffff',
-    sub: 'rgba(255,255,255,0.75)',
-    card: 'rgba(255,255,255,0.1)',
-    cardBorder: 'rgba(52,211,153,0.3)',
-    tag: 'rgba(52,211,153,0.2)',
-    tagBorder: 'rgba(52,211,153,0.5)',
-    tagText: '#6ee7b7',
-  },
-  orange: {
-    label: 'Naranja',
-    bg: 'linear-gradient(135deg, #7c2d12 0%, #431407 100%)',
-    accent: '#fb923c',
-    text: '#ffffff',
-    sub: 'rgba(255,255,255,0.75)',
-    card: 'rgba(255,255,255,0.1)',
-    cardBorder: 'rgba(251,146,60,0.3)',
-    tag: 'rgba(251,146,60,0.2)',
-    tagBorder: 'rgba(251,146,60,0.5)',
-    tagText: '#fdba74',
-  },
-};
 
 // ─── LAYOUTS ──────────────────────────────────────────────────────────────────
 const LAYOUTS = [
@@ -361,50 +130,56 @@ function newSlide(layout = 'title', theme = 'dark') {
 }
 
 // ─── SLIDE PREVIEW (thumbnail) ────────────────────────────────────────────────
-function SlideThumb({ slide, isActive, onClick, index, onDelete, onMoveUp, onMoveDown, total }) {
+function SlideThumb({ slide, isActive, onClick, index, onDelete, onDuplicate, onMoveUp, onMoveDown, total, onDropThumb, ancho = 140 }) {
   const t = THEMES[slide.theme] || THEMES.dark;
+  const [sobre, setSobre] = useState(false);
+  const libre = slide.layout === 'free';
+  const miniBtn = (bg) => ({ background: bg, color: 'white', border: 'none', borderRadius: 4, width: 16, height: 16, fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0 });
   return (
-    <div onClick={onClick} style={{ position: 'relative', cursor: 'pointer', marginBottom: 8 }}>
+    <div onClick={onClick} draggable
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/x-pk-slide', String(index)); }}
+      onDragOver={e => { if ([...e.dataTransfer.types].includes('text/x-pk-slide')) { e.preventDefault(); setSobre(true); } }}
+      onDragLeave={() => setSobre(false)}
+      onDrop={e => { const de = e.dataTransfer.getData('text/x-pk-slide'); setSobre(false); if (de !== '') { e.preventDefault(); onDropThumb?.(+de, index); } }}
+      style={{ position: 'relative', cursor: 'pointer', marginBottom: 8, paddingTop: 3, borderTop: sobre ? '3px solid #6c63ff' : '3px solid transparent' }}>
       <div style={{
-        background: t.bg, borderRadius: 8, padding: '8px 10px', height: 72,
-        border: isActive ? `2px solid ${t.accent}` : '2px solid transparent',
-        overflow: 'hidden', transition: 'border 0.2s',
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        boxShadow: isActive ? `0 0 0 2px ${t.accent}33` : '0 1px 4px rgba(0,0,0,0.3)',
+        borderRadius: 8, overflow: 'hidden', width: ancho, aspectRatio: '16/9',
+        boxShadow: isActive ? `0 0 0 2px #6c63ff, 0 0 0 4px rgba(108,99,255,0.3)` : '0 1px 4px rgba(0,0,0,0.3)',
+        transition: 'box-shadow 0.2s', ...(libre ? {} : fondoCss(slide, t)),
       }}>
-        {slide.layout === 'game'
-          ? <>
-              <div style={{ fontSize: 14, textAlign: 'center', marginBottom: 2 }}>🎮</div>
-              <div style={{ fontSize: 8, fontWeight: 800, color: t.text, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'center' }}>{slide.resourceTitle || 'Sin juego'}</div>
-              <div style={{ fontSize: 6, color: t.accent, marginTop: 2, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>{TIPO_LABELS[slide.resourceType] || 'Juego'}</div>
-            </>
-          : slide.layout === 'video'
-          ? (() => {
-              const parsed = parseVideoUrl(slide.videoUrl);
-              return <>
-                {parsed?.thumb
-                  ? <div style={{ width: '100%', height: 36, backgroundImage: `url(${parsed.thumb})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 4, marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: 14, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}>▶</span>
-                    </div>
-                  : <div style={{ fontSize: 14, textAlign: 'center', marginBottom: 2 }}>▶️</div>
-                }
-                <div style={{ fontSize: 7, fontWeight: 700, color: t.text, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'center' }}>{slide.heading || (parsed ? (parsed.type === 'youtube' ? 'YouTube' : parsed.type === 'vimeo' ? 'Vimeo' : 'Vídeo') : 'Sin vídeo')}</div>
-              </>;
-            })()
-          : <>
-              <div style={{ fontSize: 9, fontWeight: 800, color: t.text, lineClamp: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{slide.heading || 'Sin título'}</div>
-              {slide.subheading && <div style={{ fontSize: 7, color: t.sub, marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{slide.subheading}</div>}
-              <div style={{ fontSize: 6, color: t.accent, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 }}>{LAYOUTS.find(l => l.id === slide.layout)?.icon} {slide.layout}</div>
-            </>
-        }
+        {libre
+          ? <SuperficieEstatica slide={slide} t={t} ancho={ancho} />
+          : <div style={{ padding: '8px 10px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+              {slide.layout === 'game'
+                ? <>
+                    <div style={{ fontSize: 14, textAlign: 'center', marginBottom: 2 }}>🎮</div>
+                    <div style={{ fontSize: 8, fontWeight: 800, color: t.text, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'center' }}>{slide.resourceTitle || 'Sin juego'}</div>
+                    <div style={{ fontSize: 6, color: t.accent, marginTop: 2, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' }}>{TIPO_LABELS[slide.resourceType] || 'Juego'}</div>
+                  </>
+                : slide.layout === 'video'
+                ? (() => {
+                    const parsed = parseVideoUrl(slide.videoUrl);
+                    return <>
+                      {parsed?.thumb
+                        ? <div style={{ width: '100%', height: 36, backgroundImage: `url(${parsed.thumb})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 4, marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 14, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}>▶</span>
+                          </div>
+                        : <div style={{ fontSize: 14, textAlign: 'center', marginBottom: 2 }}>▶️</div>}
+                      <div style={{ fontSize: 7, fontWeight: 700, color: t.text, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'center' }}>{slide.heading || (parsed ? (parsed.type === 'youtube' ? 'YouTube' : parsed.type === 'vimeo' ? 'Vimeo' : 'Vídeo') : 'Sin vídeo')}</div>
+                    </>;
+                  })()
+                : <>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: t.text, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{slide.heading || 'Sin título'}</div>
+                    {slide.subheading && <div style={{ fontSize: 7, color: t.sub, marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{slide.subheading}</div>}
+                    <div style={{ fontSize: 6, color: t.accent, marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 }}>{LAYOUTS.find(l => l.id === slide.layout)?.icon} {slide.layout}</div>
+                  </>}
+            </div>}
       </div>
-      <div style={{ position: 'absolute', top: 2, left: 6, fontSize: 8, color: '#888', fontWeight: 700 }}>{index + 1}</div>
-      <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{
-        position: 'absolute', top: 2, right: 4, background: 'rgba(239,68,68,0.8)', color: 'white',
-        border: 'none', borderRadius: 4, width: 16, height: 16, fontSize: 9, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
-      }}>✕</button>
-      {/* Move up/down */}
+      <div style={{ position: 'absolute', top: 6, left: 4, fontSize: 8, color: '#fff', fontWeight: 800, background: 'rgba(0,0,0,0.55)', borderRadius: 4, padding: '1px 4px' }}>{index + 1}</div>
+      <div style={{ position: 'absolute', top: 6, right: 4, display: 'flex', gap: 2 }}>
+        <button title="Duplicar diapositiva" onClick={e => { e.stopPropagation(); onDuplicate?.(); }} style={miniBtn('rgba(108,99,255,0.85)')}>⧉</button>
+        <button title="Eliminar diapositiva" onClick={e => { e.stopPropagation(); onDelete(); }} style={miniBtn('rgba(239,68,68,0.85)')}>✕</button>
+      </div>
       <div style={{ position: 'absolute', bottom: 2, right: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
         <button onClick={e => { e.stopPropagation(); onMoveUp?.(); }} disabled={index === 0}
           style={{ background: index === 0 ? 'rgba(55,65,81,0.5)' : 'rgba(108,99,255,0.8)', color: index === 0 ? '#555' : '#fff', border: 'none', borderRadius: 3, width: 14, height: 12, fontSize: 8, cursor: index === 0 ? 'default' : 'pointer', lineHeight: 1, padding: 0 }}>↑</button>
@@ -1335,20 +1110,20 @@ function MathEquationModal({ onInsert, onClose, initialLatex = '' }) {
   );
 }
 
-// ─── FREE CANVAS (pure interaction overlay) ───────────────────────────────────
-const FC_HANDLES = ['nw','n','ne','e','se','s','sw','w'];
-const FC_HANDLE_POS = {
-  nw:{ top:0, left:0, cursor:'nw-resize' },
-  n: { top:0, left:'50%', transform:'translateX(-50%)', cursor:'n-resize' },
-  ne:{ top:0, right:0, cursor:'ne-resize' },
-  e: { top:'50%', right:0, transform:'translateY(-50%)', cursor:'e-resize' },
-  se:{ bottom:0, right:0, cursor:'se-resize' },
-  s: { bottom:0, left:'50%', transform:'translateX(-50%)', cursor:'s-resize' },
-  sw:{ bottom:0, left:0, cursor:'sw-resize' },
-  w: { top:'50%', left:0, transform:'translateY(-50%)', cursor:'w-resize' },
-};
+// ─── FREE CANVAS: constantes ──────────────────────────────────────────────────
 const FC_STICKERS = ['⭐','🔥','✅','❌','💡','🎯','👍','📌','⚠️','🏆','🌈','🎨'];
-const FC_SNAP = [0, 25, 33.33, 50, 66.66, 75, 100];
+// Asas de redimensionar: dirección en x e y (-1, 0, 1)
+const HANDLES = { nw: [-1, -1], n: [0, -1], ne: [1, -1], e: [1, 0], se: [1, 1], s: [0, 1], sw: [-1, 1], w: [-1, 0] };
+const CURSOR_ASA = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+const UMBRAL_X = 0.8, UMBRAL_Y = 1.3; // distancia (en %) a la que se "imanta" a una guía
+
+// Elemento imagen centrado que respeta la proporción real de la foto
+function imagenEl(src, ratio = 4 / 3, extra = {}) {
+  let wpx = BASE_W * 0.5, hpx = wpx / ratio;
+  if (hpx > BASE_H * 0.7) { hpx = BASE_H * 0.7; wpx = hpx * ratio; }
+  const w = wpx / PX_X, h = hpx / PX_Y;
+  return { id: nid(), type: 'image', src, x: (100 - w) / 2, y: (100 - h) / 2, w, h, objectFit: 'cover', borderRadius: 0, opacity: 1, ...extra };
+}
 
 // ─── IMAGE SEARCH MODAL (Wikimedia Commons) ───────────────────────────────────
 function ImgSearchModal({ onAdd, onClose }) {
@@ -1447,244 +1222,267 @@ function WebInputModal({ onAdd, onClose }) {
   );
 }
 
-const FreeCanvas = forwardRef(function FreeCanvas({ slide, onChange, onElementSelected, onEquationEdit }, ref) {
-  const t = THEMES[slide.theme] || THEMES.dark;
-  const canvasRef = useRef(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [guides, setGuides] = useState({ x: null, y: null });
-  const dragRef = useRef(null);
+// Lienzo de elementos (controlado: la selección y la edición viven en el editor).
+// Los elementos se dibujan en una superficie fija de 960×540 escalada al tamaño real.
+function FreeCanvas({ slide, t, isFree, selIds, setSelIds, editingId, setEditingId, onChangeEls, onCortar, onEquationEdit, onMarco, onSeleccionCanvas, previewAnim, rejilla }) {
+  const wrapRef = useRef(null);
+  const surfRef = useRef(null);
+  const [k, setK] = useState(1);
+  const [guias, setGuias] = useState([]);
+  const [marquee, setMarquee] = useState(null);
+  const [rotTip, setRotTip] = useState(null);
+  const elements = slide.elements || [];
+  const elsRef = useRef(elements);
+  elsRef.current = elements;
   const isMob = window.innerWidth < 640;
 
-  const elements = slide.elements || [];
-
-  useEffect(() => { onElementSelected?.(selectedId); }, [selectedId]); // eslint-disable-line
-
-  const upd = useCallback((newEls) => onChange({ ...slide, elements: newEls }), [slide, onChange]);
-  const updEl = useCallback((id, updates) => onChange({
-    ...slide, elements: (slide.elements || []).map(e => e.id === id ? { ...e, ...updates } : e),
-  }), [slide, onChange]);
-
-  const sel = (id) => { setSelectedId(id); if (id !== editingId) setEditingId(null); };
-
-  useImperativeHandle(ref, () => ({
-    addEl: (el) => { upd([...(slide.elements||[]), el]); sel(el.id); },
-    selectId: sel,
-    setEditing: (id) => setEditingId(id),
-    deselectAll: () => { setSelectedId(null); setEditingId(null); },
-  }));
-
-  // ── Keyboard ──
-  const handleKeyDown = useCallback((e) => {
-    if (!selectedId || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
-    const el = elements.find(x => x.id === selectedId); if (!el) return;
-    const step = e.shiftKey ? 5 : 1;
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault(); upd(elements.filter(x => x.id !== selectedId)); setSelectedId(null); setEditingId(null);
-    } else if (e.key === 'Escape') { setSelectedId(null); setEditingId(null);
-    } else if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      const newEl = { ...el, id: `el_${Date.now()}`, x: el.x + 3, y: el.y + 3 };
-      upd([...elements, newEl]); sel(newEl.id);
-    } else if (e.key === 'ArrowLeft')  { e.preventDefault(); updEl(el.id, { x: Math.max(0, el.x - step) }); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); updEl(el.id, { x: Math.min(100 - el.w, el.x + step) }); }
-    else if (e.key === 'ArrowUp')    { e.preventDefault(); updEl(el.id, { y: Math.max(0, el.y - step) }); }
-    else if (e.key === 'ArrowDown')  { e.preventDefault(); updEl(el.id, { y: Math.min(100 - el.h, el.y + step) }); }
-  }, [selectedId, elements, upd, updEl]);
-
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    const el = wrapRef.current; if (!el) return;
+    const medir = () => setK((el.clientWidth || BASE_W) / BASE_W);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  // ── Snap ──
-  const applySnap = (nx, ny, nw, nh) => {
-    let gx = null, gy = null;
-    for (const g of FC_SNAP) {
-      const T = 2;
-      if      (Math.abs(nx - g)          < T) { nx = g;           gx = g; }
-      else if (Math.abs(nx + nw - g)     < T) { nx = g - nw;      gx = g; }
-      else if (Math.abs(nx + nw/2 - g)   < T) { nx = g - nw/2;    gx = g; }
-      if      (Math.abs(ny - g)          < T) { ny = g;           gy = g; }
-      else if (Math.abs(ny + nh - g)     < T) { ny = g - nh;      gy = g; }
-      else if (Math.abs(ny + nh/2 - g)   < T) { ny = g - nh/2;    gy = g; }
-    }
-    return { nx, ny, gx, gy };
+  const puntoSup = (e) => {
+    const r = surfRef.current.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * 100, y: (e.clientY - r.top) / r.height * 100 };
   };
-
-  // ── Drag/resize handlers ──
-  const makeHandlers = (el, mode, corner = null) => ({
-    onPointerDown(e) {
-      if (mode === 'move' && editingId === el.id) return;
-      e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId);
-      if (mode === 'move') sel(el.id);
-      const rect = canvasRef.current.getBoundingClientRect();
-      dragRef.current = { mode, corner, id: el.id, startX: e.clientX, startY: e.clientY, startEl: { x: el.x, y: el.y, w: el.w, h: el.h }, rw: rect.width, rh: rect.height };
-    },
-    onPointerMove(e) {
-      const d = dragRef.current;
-      if (!d || d.id !== el.id || d.mode !== mode || d.corner !== corner) return;
-      const dx = (e.clientX - d.startX) / d.rw * 100;
-      const dy = (e.clientY - d.startY) / d.rh * 100;
-      const { x: ox, y: oy, w: ow, h: oh } = d.startEl;
-      let nx = ox, ny = oy, nw = ow, nh = oh;
-      const MW = 5, MH = 4;
-      if (mode === 'move') {
-        nx = Math.max(0, Math.min(100 - ow, ox + dx));
-        ny = Math.max(0, Math.min(100 - oh, oy + dy));
-        const s = applySnap(nx, ny, nw, nh);
-        nx = s.nx; ny = s.ny; setGuides({ x: s.gx, y: s.gy });
-      } else {
-        switch (corner) {
-          case 'se': nw = Math.max(MW, ow + dx); nh = Math.max(MH, oh + dy); break;
-          case 'sw': { const w2=Math.max(MW,ow-dx); nx=ox+ow-w2; nw=w2; nh=Math.max(MH,oh+dy); break; }
-          case 'ne': { nw=Math.max(MW,ow+dx); const h2=Math.max(MH,oh-dy); ny=oy+oh-h2; nh=h2; break; }
-          case 'nw': { const w3=Math.max(MW,ow-dx); const h3=Math.max(MH,oh-dy); nx=ox+ow-w3; ny=oy+oh-h3; nw=w3; nh=h3; break; }
-          case 'n':  { const h4=Math.max(MH,oh-dy); ny=oy+oh-h4; nh=h4; break; }
-          case 's':  { nh=Math.max(MH,oh+dy); break; }
-          case 'e':  { nw=Math.max(MW,ow+dx); break; }
-          case 'w':  { const w4=Math.max(MW,ow-dx); nx=ox+ow-w4; nw=w4; break; }
-        }
-      }
-      onChange({ ...slide, elements: (slide.elements||[]).map(e => e.id===el.id ? {...e,x:nx,y:ny,w:nw,h:nh} : e) });
-    },
-    onPointerUp() { if (dragRef.current?.id === el.id) { dragRef.current = null; setGuides({ x:null, y:null }); } },
-  });
-
-  // ── Text style ──
-  const getTextStyle = (el, isTA) => {
-    const defColor = el.textStyle==='cta' ? t.accent : el.textStyle==='sub' ? t.sub : t.text;
-    const defSize  = el.textStyle==='heading' ? 32 : el.textStyle==='sub' ? 14 : 16;
-    const defWt    = el.textStyle==='heading' ? 'bold' : el.textStyle==='sub' ? '600' : 'normal';
-    return {
-      width:'100%', padding:'4px 6px', boxSizing:'border-box',
-      fontFamily: el.fontFamily || "'Inter','Segoe UI',sans-serif",
-      fontSize: `${el.fontSize || defSize}px`,
-      fontWeight: el.fontWeight || defWt,
-      fontStyle: el.fontStyle || 'normal',
-      textDecoration: el.textDecoration || 'none',
-      textAlign: el.textAlign || 'left',
-      color: el.color || defColor,
-      lineHeight: el.lineHeight || 1.5,
-      letterSpacing: el.textStyle==='sub' ? '0.1em' : 'normal',
-      ...(isTA ? { background:'transparent', border:'none', outline:'none', resize:'none', height:'100%', display:'block' }
-               : { overflow:'hidden', whiteSpace:'pre-wrap', wordBreak:'break-word' }),
+  const arrastrar = (onMove, onUp) => {
+    const mv = ev => onMove(ev);
+    const up = ev => {
+      window.removeEventListener('pointermove', mv);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      onUp?.(ev);
     };
+    window.addEventListener('pointermove', mv);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
-  // ── Render element ──
-  const HS = isMob ? 14 : 10;
-  const renderElement = (el) => {
-    const isSel = el.id === selectedId;
-    const isEdit = el.id === editingId;
-    const moveH = makeHandlers(el, 'move');
-    return (
-      <div key={el.id} {...moveH}
-        onClick={e => { e.stopPropagation(); sel(el.id); }}
-        onDoubleClick={() => {
-          if (el.type === 'text') setEditingId(el.id);
-          else if (el.type === 'equation') onEquationEdit?.(el.id);
-        }}
-        style={{
-          position:'absolute', left:`${el.x}%`, top:`${el.y}%`, width:`${el.w}%`, height:`${el.h}%`,
-          border: isSel ? '2px solid #6c63ff' : '2px solid transparent',
-          borderRadius:4, cursor: isEdit ? 'text' : 'move',
-          boxSizing:'border-box', touchAction:'none', pointerEvents:'auto',
-          userSelect: isEdit ? 'text' : 'none', overflow:'hidden',
-          opacity: el.opacity ?? 1,
-          boxShadow: isSel ? '0 0 0 3px rgba(108,99,255,0.22)' : 'none',
-          zIndex: isSel ? 5 : 1,
-        }}
-      >
-        {el.type === 'text' && (
-          isEdit
-            ? <textarea autoFocus value={el.text||''} onChange={ev => updEl(el.id,{text:ev.target.value})}
-                onBlur={() => setEditingId(null)} onPointerDown={e=>e.stopPropagation()} style={getTextStyle(el,true)} />
-            : <div style={getTextStyle(el,false)}>{el.text||''}</div>
-        )}
-        {el.type === 'image' && (
-          <img src={el.src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:el.objectFit||'cover', display:'block', borderRadius:`${el.borderRadius||0}px` }} />
-        )}
-        {el.type === 'music' && (
-          <div style={{ width:'100%', height:'100%', position:'relative' }}>
-            <img src={el.src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:'contain', display:'block' }} />
-            <div style={{ position:'absolute', bottom:4, right:4, background:'rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.5)', color:'#fff', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, pointerEvents:'none', userSelect:'none' }}>▶</div>
-          </div>
-        )}
-        {el.type === 'youtube' && (
-          <div style={{ width:'100%', height:'100%', position:'relative', background:'#000', overflow:'hidden' }}>
-            {el.thumb && <img src={el.thumb} alt="" draggable={false} style={{width:'100%',height:'100%',objectFit:'cover'}} />}
-            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <div style={{width:44,height:44,background:'rgba(255,0,0,0.9)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 12px rgba(0,0,0,0.6)'}}>
-                <span style={{color:'#fff',fontSize:18,marginLeft:4}}>▶</span>
-              </div>
-            </div>
-            <div style={{position:'absolute',inset:0}} />
-          </div>
-        )}
-        {el.type === 'webview' && (
-          <div style={{ width:'100%', height:'100%', position:'relative', background:'#0f172a', overflow:'hidden' }}>
-            <iframe src={el.src} style={{width:'100%',height:'100%',border:'none'}} title="web" sandbox="allow-scripts allow-same-origin allow-forms" />
-            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
-              {isSel && <div style={{background:'rgba(108,99,255,0.5)',borderRadius:8,padding:'4px 12px',fontSize:11,color:'#fff',fontWeight:700}}>🌐 Visor web</div>}
-            </div>
-            <div style={{position:'absolute',inset:0}} />
-          </div>
-        )}
-        {el.type === 'equation' && (() => {
-          let html = '';
-          try { html = katex.renderToString(el.latex || '', { throwOnError: false, displayMode: true, output: 'html' }); } catch {}
-          return (
-            <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', padding:'2px 6px', boxSizing:'border-box' }}>
-              <div
-                style={{ color: el.color || '#fff', fontSize: `${el.fontSize || 28}px`, lineHeight: 1, userSelect:'none', pointerEvents:'none', maxWidth:'100%', overflow:'hidden' }}
-                dangerouslySetInnerHTML={{ __html: html }}
-              />
-            </div>
-          );
-        })()}
-        {el.type === 'shape' && el.shapeType !== 'triangle' && el.shapeType !== 'line' && (
-          <div style={{ width:'100%', height:'100%', background:el.fill||'#6c63ff', borderRadius: el.shapeType==='circle' ? '50%' : `${el.borderRadius||0}px`, border: el.stroke && el.stroke!=='none' ? `${el.strokeWidth||2}px solid ${el.stroke}` : 'none', boxSizing:'border-box' }} />
-        )}
-        {el.type === 'shape' && el.shapeType === 'triangle' && (
-          <svg viewBox="0 0 100 100" style={{width:'100%',height:'100%'}} preserveAspectRatio="none">
-            <polygon points="50,2 98,98 2,98" fill={el.fill||'#6c63ff'} stroke={el.stroke&&el.stroke!=='none'?el.stroke:'none'} strokeWidth={el.strokeWidth||0} />
-          </svg>
-        )}
-        {el.type === 'shape' && el.shapeType === 'line' && (
-          <svg viewBox="0 0 100 10" style={{width:'100%',height:'100%'}} preserveAspectRatio="none">
-            <line x1="2" y1="5" x2="98" y2="5" stroke={el.fill||t.text} strokeWidth={el.strokeWidth||3} strokeLinecap="round" />
-          </svg>
-        )}
-        {isSel && FC_HANDLES.map(c => {
-          const h = makeHandlers(el, 'resize', c);
-          return <div key={c} {...h} style={{ position:'absolute', width:HS, height:HS, background:'#fff', border:'2px solid #6c63ff', borderRadius:3, ...FC_HANDLE_POS[c], zIndex:10, touchAction:'none', boxSizing:'border-box', boxShadow:'0 1px 4px rgba(0,0,0,0.4)' }} />;
-        })}
-      </div>
-    );
+  // Guías inteligentes: bordes y centros de la página y de los demás elementos
+  const ajustar = (b, otros, sinIman) => {
+    if (sinIman) return { dx: 0, dy: 0, g: [] };
+    const cx = [0, 50, 100], cy = [0, 50, 100];
+    otros.forEach(o => { cx.push(o.x, o.x + o.w / 2, o.x + o.w); cy.push(o.y, o.y + o.h / 2, o.y + o.h); });
+    let mx = null, my = null;
+    for (const m of [b.x0, (b.x0 + b.x1) / 2, b.x1]) for (const c of cx) {
+      const d = c - m; if (Math.abs(d) < UMBRAL_X && (!mx || Math.abs(d) < Math.abs(mx.d))) mx = { d, v: c };
+    }
+    for (const m of [b.y0, (b.y0 + b.y1) / 2, b.y1]) for (const c of cy) {
+      const d = c - m; if (Math.abs(d) < UMBRAL_Y && (!my || Math.abs(d) < Math.abs(my.d))) my = { d, v: c };
+    }
+    const g = [];
+    if (mx) g.push({ eje: 'x', v: mx.v });
+    if (my) g.push({ eje: 'y', v: my.v });
+    return { dx: mx?.d || 0, dy: my?.d || 0, g };
   };
+
+  // ── Mover (uno o varios) ──
+  const onElDown = (e, el) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    if (editingId === el.id) return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      setSelIds(selIds.includes(el.id) ? selIds.filter(i => i !== el.id) : [...selIds, el.id]);
+      onSeleccionCanvas?.();
+      return;
+    }
+    let ids = selIds;
+    if (!selIds.includes(el.id)) { ids = [el.id]; setSelIds(ids); }
+    onSeleccionCanvas?.();
+    if (editingId) setEditingId(null);
+    const mov = elsRef.current.filter(x => ids.includes(x.id) && !x.locked);
+    if (!mov.length) return;
+    const p0 = puntoSup(e);
+    const ini = new Map(mov.map(m => [m.id, { x: m.x, y: m.y, w: m.w, h: m.h }]));
+    const otros = elsRef.current.filter(x => !ids.includes(x.id) && !x.hidden);
+    const b0 = {
+      x0: Math.min(...mov.map(m => m.x)), y0: Math.min(...mov.map(m => m.y)),
+      x1: Math.max(...mov.map(m => m.x + m.w)), y1: Math.max(...mov.map(m => m.y + m.h)),
+    };
+    let movido = false;
+    onCortar?.();
+    arrastrar(ev => {
+      const p = puntoSup(ev);
+      let dx = p.x - p0.x, dy = p.y - p0.y;
+      if (!movido && Math.abs(dx) < 0.3 && Math.abs(dy) < 0.5) return;
+      movido = true;
+      if (ev.shiftKey) { if (Math.abs(dx * PX_X) > Math.abs(dy * PX_Y)) dy = 0; else dx = 0; }
+      const s = ajustar({ x0: b0.x0 + dx, x1: b0.x1 + dx, y0: b0.y0 + dy, y1: b0.y1 + dy }, otros, ev.altKey);
+      dx += s.dx; dy += s.dy;
+      setGuias(s.g);
+      onChangeEls(els => els.map(x => {
+        const o = ini.get(x.id);
+        if (!o) return x;
+        return { ...x, x: Math.min(98, Math.max(2 - o.w, o.x + dx)), y: Math.min(98, Math.max(2 - o.h, o.y + dy)) };
+      }));
+    }, () => setGuias([]));
+  };
+
+  // ── Redimensionar (respeta el giro: el lado contrario queda fijo) ──
+  const onHandleDown = (e, el, h) => {
+    e.stopPropagation(); e.preventDefault();
+    if (el.locked) return;
+    onCortar?.();
+    const [sx, sy] = HANDLES[h];
+    const r = (el.rotation || 0) * Math.PI / 180, cos = Math.cos(r), sin = Math.sin(r);
+    const w0 = el.w * PX_X, h0 = el.h * PX_Y;
+    const c0 = { x: (el.x + el.w / 2) * PX_X, y: (el.y + el.h / 2) * PX_Y };
+    const anc = { x: -sx * w0 / 2, y: -sy * h0 / 2 };
+    const ancW = { x: c0.x + anc.x * cos - anc.y * sin, y: c0.y + anc.x * sin + anc.y * cos };
+    const p0 = puntoSup(e);
+    const ratio = w0 / h0;
+    const f0 = el.fontSize || (el.type === 'equation' ? 28 : 16);
+    const escalaTexto = el.type === 'text' || el.type === 'equation';
+    arrastrar(ev => {
+      const p = puntoSup(ev);
+      const dX = (p.x - p0.x) * PX_X, dY = (p.y - p0.y) * PX_Y;
+      const lx = dX * cos + dY * sin, ly = -dX * sin + dY * cos;
+      let w = sx ? Math.max(10, w0 + sx * lx) : w0;
+      let hh = sy ? Math.max(8, h0 + sy * ly) : h0;
+      const esquina = sx && sy;
+      const mantener = esquina && ((el.type === 'image' || escalaTexto) ? !ev.shiftKey : ev.shiftKey);
+      if (mantener) { if (w / hh > ratio) hh = w / ratio; else w = hh * ratio; }
+      const a2 = { x: -sx * w / 2, y: -sy * hh / 2 };
+      const c = { x: ancW.x - (a2.x * cos - a2.y * sin), y: ancW.y - (a2.x * sin + a2.y * cos) };
+      const upd = { x: (c.x - w / 2) / PX_X, y: (c.y - hh / 2) / PX_Y, w: w / PX_X, h: hh / PX_Y };
+      if (mantener && escalaTexto) upd.fontSize = Math.max(6, Math.round(f0 * w / w0));
+      onChangeEls(els => els.map(x => (x.id === el.id ? { ...x, ...upd } : x)));
+    });
+  };
+
+  // ── Girar ──
+  const onRotDown = (e, el) => {
+    e.stopPropagation(); e.preventDefault();
+    if (el.locked) return;
+    onCortar?.();
+    const r = surfRef.current.getBoundingClientRect();
+    const cx = r.left + (el.x + el.w / 2) / 100 * r.width;
+    const cy = r.top + (el.y + el.h / 2) / 100 * r.height;
+    arrastrar(ev => {
+      let ang = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI - 90;
+      if (ev.shiftKey) ang = Math.round(ang / 15) * 15;
+      else { const s = Math.round(ang / 45) * 45; if (Math.abs(ang - s) < 4) ang = s; }
+      ang = ((ang % 360) + 540) % 360 - 180;
+      setRotTip(Math.round(ang));
+      onChangeEls(els => els.map(x => (x.id === el.id ? { ...x, rotation: Math.round(ang * 10) / 10 } : x)));
+    }, () => setRotTip(null));
+  };
+
+  // ── Fondo: deseleccionar o seleccionar con recuadro ──
+  const onFondoDown = (e) => {
+    if (e.button !== 0) return;
+    if (editingId) setEditingId(null);
+    const p0 = puntoSup(e);
+    const base = e.shiftKey ? selIds : [];
+    let movido = false;
+    arrastrar(ev => {
+      const p = puntoSup(ev);
+      if (!movido && Math.hypot(p.x - p0.x, p.y - p0.y) < 0.8) return;
+      movido = true;
+      setMarquee({ x0: Math.min(p0.x, p.x), y0: Math.min(p0.y, p.y), x1: Math.max(p0.x, p.x), y1: Math.max(p0.y, p.y) });
+    }, ev => {
+      if (!movido) { setSelIds(base); setMarquee(null); return; }
+      const p = puntoSup(ev);
+      const m = { x0: Math.min(p0.x, p.x), y0: Math.min(p0.y, p.y), x1: Math.max(p0.x, p.x), y1: Math.max(p0.y, p.y) };
+      const dentro = elsRef.current.filter(x => !x.hidden && x.x < m.x1 && x.x + x.w > m.x0 && x.y < m.y1 && x.y + x.h > m.y0).map(x => x.id);
+      setSelIds([...new Set([...base, ...dentro])]);
+      if (dentro.length) onSeleccionCanvas?.();
+      setMarquee(null);
+    });
+  };
+
+  const onDoble = (e, el) => {
+    e.stopPropagation();
+    if (el.locked) return;
+    if (el.marco) { onMarco?.(el.id); return; }
+    if (el.type === 'text' || (el.type === 'shape' && el.shapeType !== 'line')) { setSelIds([el.id]); setEditingId(el.id); }
+    else if (el.type === 'equation') onEquationEdit?.(el.id);
+  };
+
+  const sel = elements.filter(e => selIds.includes(e.id));
+  const unico = sel.length === 1 ? sel[0] : null;
+  const ib = 1 / (k || 1);
+  const HS = (isMob ? 16 : 11) * ib;
 
   return (
-    <div ref={canvasRef}
-      style={{ position:'absolute', inset:0, overflow:'hidden', touchAction:'none', zIndex:2, pointerEvents:'none' }}
-    >
-      {selectedId && (
-        <div style={{position:'absolute',inset:0,zIndex:0,pointerEvents:'auto'}}
-          onPointerDown={() => { setSelectedId(null); setEditingId(null); }} />
+    <div ref={wrapRef} onPointerDown={isFree ? onFondoDown : undefined}
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 2, pointerEvents: isFree ? 'auto' : 'none', touchAction: isFree ? 'none' : 'auto' }}>
+      {!isFree && (selIds.length > 0 || editingId) && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }} onPointerDown={() => { setSelIds([]); setEditingId(null); }} />
       )}
-      {guides.x!=null && <div style={{position:'absolute',top:0,bottom:0,left:`${guides.x}%`,width:1,background:'#06b6d4',zIndex:50,pointerEvents:'none',opacity:0.9}} />}
-      {guides.y!=null && <div style={{position:'absolute',left:0,right:0,top:`${guides.y}%`,height:1,background:'#06b6d4',zIndex:50,pointerEvents:'none',opacity:0.9}} />}
-      {elements.map(renderElement)}
+      <div ref={surfRef} style={{ position: 'absolute', left: 0, top: 0, width: BASE_W, height: BASE_H, transform: `scale(${k})`, transformOrigin: '0 0' }}>
+        {rejilla && (
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(148,163,184,0.28) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.28) 1px, transparent 1px)', backgroundSize: '48px 54px' }} />
+        )}
+        {elements.map(el => {
+          const edit = editingId === el.id;
+          const ent = previewAnim ? estiloEntrada(el.anim) : null;
+          const bucle = previewAnim ? estiloBucle(el.anim) : null;
+          return (
+            <div key={el.id} onPointerDown={e => onElDown(e, el)} onDoubleClick={e => onDoble(e, el)}
+              style={{ ...estiloCaja(el), opacity: el.hidden ? 0.25 : (el.opacity ?? 1), pointerEvents: 'auto', touchAction: 'none', cursor: edit ? 'text' : el.locked ? 'default' : 'move', userSelect: edit ? 'text' : 'none' }}>
+              <div key={previewAnim || 0} style={{ width: '100%', height: '100%', ...ent }}>
+                <div style={{ width: '100%', height: '100%', ...bucle }}>
+                  <ElementoContenido el={el} t={t} editando={edit}
+                    onTexto={txt => onChangeEls(els => els.map(x => (x.id === el.id ? { ...x, text: txt } : x)))}
+                    onFinEdicion={() => setEditingId(null)} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Marcos de selección, asas y giro */}
+        {sel.map(el => (
+          <div key={`sel_${el.id}`} style={{ ...estiloCaja(el, false), pointerEvents: 'none', outline: `${2 * ib}px solid ${el.locked ? '#f59e0b' : '#6c63ff'}`, outlineOffset: `${ib}px` }}>
+            {el.locked && <div style={{ position: 'absolute', top: -20 * ib, left: 0, fontSize: 12 * ib, lineHeight: 1 }}>🔒</div>}
+            {unico && !el.locked && editingId !== el.id && <>
+              {Object.keys(HANDLES).map(h => {
+                const [sx, sy] = HANDLES[h];
+                const lateral = !sx || !sy;
+                if (lateral && ((sx && el.h * PX_Y * k < 34) || (sy && el.w * PX_X * k < 34))) return null;
+                return (
+                  <div key={h} onPointerDown={e => onHandleDown(e, el, h)}
+                    style={{
+                      position: 'absolute', width: lateral && sy ? HS * 1.8 : HS, height: lateral && sx ? HS * 1.8 : HS,
+                      left: `calc(${(sx + 1) * 50}% - ${(lateral && sy ? HS * 1.8 : HS) / 2}px)`,
+                      top: `calc(${(sy + 1) * 50}% - ${(lateral && sx ? HS * 1.8 : HS) / 2}px)`,
+                      background: '#fff', border: `${1.5 * ib}px solid #6c63ff`, borderRadius: lateral ? 4 * ib : '50%',
+                      pointerEvents: 'auto', cursor: CURSOR_ASA[h], boxShadow: '0 1px 4px rgba(0,0,0,0.4)', boxSizing: 'border-box', touchAction: 'none',
+                    }} />
+                );
+              })}
+              <div style={{ position: 'absolute', left: '50%', top: `calc(100% + ${4 * ib}px)`, width: 1.5 * ib, height: 14 * ib, background: '#6c63ff', transform: 'translateX(-50%)' }} />
+              <div onPointerDown={e => onRotDown(e, el)} title="Girar (Mayús = de 15° en 15°)"
+                style={{ position: 'absolute', left: '50%', top: `calc(100% + ${16 * ib}px)`, width: 22 * ib, height: 22 * ib, transform: 'translateX(-50%)', background: '#fff', border: `${1.5 * ib}px solid #6c63ff`, borderRadius: '50%', pointerEvents: 'auto', cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 * ib, color: '#6c63ff', touchAction: 'none', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>⟳</div>
+            </>}
+          </div>
+        ))}
+
+        {guias.map((g, i) => (g.eje === 'x'
+          ? <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${g.v}%`, width: ib, background: '#ec4899', pointerEvents: 'none', zIndex: 50 }} />
+          : <div key={i} style={{ position: 'absolute', left: 0, right: 0, top: `${g.v}%`, height: ib, background: '#ec4899', pointerEvents: 'none', zIndex: 50 }} />))}
+        {marquee && (
+          <div style={{ position: 'absolute', left: `${marquee.x0}%`, top: `${marquee.y0}%`, width: `${marquee.x1 - marquee.x0}%`, height: `${marquee.y1 - marquee.y0}%`, background: 'rgba(108,99,255,0.12)', border: `${ib}px solid #6c63ff`, pointerEvents: 'none', zIndex: 50 }} />
+        )}
+      </div>
+      {rotTip != null && (
+        <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(17,24,39,0.9)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '3px 10px', borderRadius: 10, pointerEvents: 'none', zIndex: 60 }}>⟳ {rotTip}°</div>
+      )}
     </div>
   );
-});
+}
 
 // ─── SLIDE CANVAS ─────────────────────────────────────────────────────────────
-function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
+// canvas = props del lienzo (selección, edición, cambios…) que vienen del editor
+function SlideCanvas({ slide, onChange, usuario, canvas, anadirEls, superficieRef, exportando, onAbrirElementos, onArchivos, editEquationId, setEditEquationId }) {
   const t = THEMES[slide.theme] || THEMES.dark;
   const fileRef = useRef();
   const imageFileRef = useRef();
-  const fcRef = useRef(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
   const [showImgSearch, setShowImgSearch] = useState(false);
@@ -1695,85 +1493,60 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
   const [showMusic, setShowMusic] = useState(false);
   const [showGeo, setShowGeo] = useState(false);
   const [showMath, setShowMath] = useState(false);
-  const [editEquationId, setEditEquationId] = useState(null);
 
-  const mkId = () => `el_${Date.now()}`;
   const mkText = (extra = {}) => ({
-    id: mkId(), type: 'text', x: 15, y: 25, w: 70, h: 20,
+    id: nid(), type: 'text', x: 15, y: 25, w: 70, h: 20,
     text: 'Texto aquí', textAlign: 'left',
-    fontSize: 18, fontWeight: 'normal', fontStyle: 'normal',
+    fontSize: 24, fontWeight: 'normal', fontStyle: 'normal',
     textDecoration: 'none', color: null, lineHeight: 1.5, opacity: 1, ...extra,
   });
-  const addHeading = () => {
-    const el = mkText({ text: 'Título', textAlign: 'center', fontSize: 38, fontWeight: 'bold', y: 10, h: 22 });
-    fcRef.current?.addEl(el); setTimeout(() => fcRef.current?.setEditing(el.id), 0);
-  };
-  const addText = () => {
-    const el = mkText();
-    fcRef.current?.addEl(el); setTimeout(() => fcRef.current?.setEditing(el.id), 0);
-  };
-  const addShape = (shapeType) => {
-    const fills = { rect: '#6c63ff', circle: '#a855f7', triangle: '#ec4899', line: t.text };
-    const el = {
-      id: mkId(), type: 'shape', shapeType,
-      x: 25, y: shapeType === 'line' ? 47 : 30,
-      w: 40, h: shapeType === 'line' ? 3 : 26,
-      fill: fills[shapeType] || '#6c63ff', stroke: 'none', strokeWidth: 2,
-      borderRadius: shapeType === 'rect' ? 8 : 0, opacity: 1,
-    };
-    fcRef.current?.addEl(el);
-  };
+  const addHeading = () => anadirEls([mkText({ text: 'Título', textAlign: 'center', fontSize: 48, fontWeight: 'bold', y: 10, h: 22, lineHeight: 1.2 })], true);
+  const addText = () => anadirEls([mkText()], true);
   const addSticker = (emoji) => {
-    const el = mkText({ text: emoji, textAlign: 'center', fontSize: 60, x: 35, y: 30, w: 20, h: 28, lineHeight: 1 });
-    fcRef.current?.addEl(el); setShowStickers(false);
+    anadirEls([mkText({ text: emoji, textAlign: 'center', fontSize: 84, x: 44, y: 39, w: 12, h: 22, lineHeight: 1, vAlign: 'middle' })]);
+    setShowStickers(false);
   };
   const handleImageFile = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const el = { id: mkId(), type: 'image', x: 20, y: 10, w: 60, h: 75, src: ev.target.result, objectFit: 'cover', borderRadius: 0, opacity: 1 };
-      fcRef.current?.addEl(el);
-    };
-    reader.readAsDataURL(file); e.target.value = '';
+    const files = [...(e.target.files || [])];
+    e.target.value = '';
+    if (files.length) onArchivos(files);
   };
   const addYT = (url) => {
     const parsed = parseVideoUrl(url);
     if (!parsed || parsed.type !== 'youtube') { alert('URL de YouTube no reconocida'); return; }
-    const el = { id: mkId(), type: 'youtube', ytId: parsed.id, thumb: parsed.thumb, embed: parsed.embed, x: 15, y: 10, w: 70, h: 70, opacity: 1 };
-    fcRef.current?.addEl(el); setShowYT(false);
+    anadirEls([{ id: nid(), type: 'youtube', ytId: parsed.id, thumb: parsed.thumb, embed: parsed.embed, x: 15, y: 10, w: 70, h: 70, opacity: 1 }]);
+    setShowYT(false);
   };
   const addWeb = (url) => {
-    const el = { id: mkId(), type: 'webview', src: url, x: 5, y: 5, w: 90, h: 85, opacity: 1 };
-    fcRef.current?.addEl(el); setShowWeb(false);
+    anadirEls([{ id: nid(), type: 'webview', src: url, x: 5, y: 5, w: 90, h: 85, opacity: 1 }]);
+    setShowWeb(false);
   };
-  const addFromSearch = (imgUrl) => {
-    const el = { id: mkId(), type: 'image', x: 20, y: 10, w: 60, h: 75, src: imgUrl, objectFit: 'cover', borderRadius: 0, opacity: 1 };
-    fcRef.current?.addEl(el); setShowImgSearch(false);
+  const addFromSearch = async (imgUrl) => {
+    setShowImgSearch(false);
+    const r = await proporcionImagen(imgUrl);
+    anadirEls([imagenEl(imgUrl, r)]);
   };
   const handleInsert3D = (base64) => {
-    const el = { id: mkId(), type: 'image', x: 15, y: 10, w: 55, h: 45, src: base64, objectFit: 'contain', borderRadius: 0, opacity: 1 };
-    fcRef.current?.addEl(el); setShow3D(null);
+    anadirEls([{ id: nid(), type: 'image', x: 15, y: 10, w: 55, h: 45, src: base64, objectFit: 'contain', borderRadius: 0, opacity: 1 }]);
+    setShow3D(null);
   };
   const handleInsertMusic = ({ imageData, items, bpm }) => {
-    const el = { id: mkId(), type: 'music', x: 5, y: 25, w: 88, h: 30, src: imageData, items, bpm, objectFit: 'contain', borderRadius: 0, opacity: 1 };
-    fcRef.current?.addEl(el); setShowMusic(false);
+    anadirEls([{ id: nid(), type: 'music', x: 5, y: 25, w: 88, h: 30, src: imageData, items, bpm, objectFit: 'contain', borderRadius: 0, opacity: 1 }]);
+    setShowMusic(false);
   };
   const handleInsertGeo = (src, wOrType, h) => {
     if (wOrType === 'text') {
-      const el = mkText({ text: src, fontSize: 14, fontWeight: 'bold', x: 10, y: 30, w: 50, h: 12 });
-      fcRef.current?.addEl(el);
+      anadirEls([mkText({ text: src, fontSize: 20, fontWeight: 'bold', x: 10, y: 30, w: 50, h: 12 })]);
     } else {
       const w = typeof wOrType === 'number' ? wOrType : 75;
-      const el = { id: mkId(), type: 'image', x: 5, y: 5, src, w, h: h || 65, objectFit: 'contain', borderRadius: 0, opacity: 1 };
-      fcRef.current?.addEl(el);
+      anadirEls([{ id: nid(), type: 'image', x: 5, y: 5, src, w, h: h || 65, objectFit: 'contain', borderRadius: 0, opacity: 1 }]);
     }
     setShowGeo(false);
   };
   const handleInsertMath = (latex) => {
-    const el = { id: mkId(), type: 'equation', latex, x: 20, y: 30, w: 55, h: 18, fontSize: 28, color: null, opacity: 1 };
-    fcRef.current?.addEl(el); setShowMath(false);
+    anadirEls([{ id: nid(), type: 'equation', latex, x: 20, y: 30, w: 55, h: 18, fontSize: 36, color: null, opacity: 1 }]);
+    setShowMath(false);
   };
-  const handleEquationEdit = (id) => setEditEquationId(id);
   const handleEquationUpdate = (latex) => {
     onChange({ ...slide, elements: (slide.elements || []).map(e => e.id === editEquationId ? { ...e, latex } : e) });
     setEditEquationId(null);
@@ -1781,12 +1554,11 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
 
   const upd = (key, val) => onChange({ ...slide, [key]: val });
 
-  const handleImage = e => {
+  const handleImage = async e => {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => upd('imageBase64', ev.target.result);
-    reader.readAsDataURL(file);
+    upd('imageBase64', await comprimirImagen(file));
   };
 
   const bodyLines = (slide.body || '').split('\n');
@@ -2083,20 +1855,31 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
 
   const isFree = slide.layout === 'free';
 
+  const onDrop = (e) => {
+    const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    onArchivos(files, { x: (e.clientX - r.left) / r.width * 100, y: (e.clientY - r.top) / r.height * 100 });
+  };
+
   return (
     <>
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: slide.bgImage ? undefined : t.bg, backgroundImage: slide.bgImage ? `url(${slide.bgImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
+      <div ref={superficieRef}
+        onDragOver={e => { if ([...e.dataTransfer.types].includes('Files')) e.preventDefault(); }}
+        onDrop={onDrop}
+        style={{ position: 'relative', width: '100%', aspectRatio: '16/9', ...fondoCss(slide, t), borderRadius: exportando ? 0 : 16, overflow: 'hidden', boxShadow: exportando ? 'none' : '0 8px 40px rgba(0,0,0,0.4)' }}>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImage} />
-        <input ref={imageFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFile} />
+        <input ref={imageFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleImageFile} />
         {!isFree && <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>{renderContent()}</div>}
-        {isFree && (slide.elements || []).length === 0 && (
-          <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,pointerEvents:'none',zIndex:1}}>
-            <div style={{fontSize:28}}>✋</div>
-            <div style={{fontWeight:700,fontSize:13,color:t.text}}>Lienzo libre</div>
-            <div style={{fontSize:11,color:t.sub}}>Usa los botones de abajo · Doble clic = editar · Supr = borrar</div>
+        {isFree && (slide.elements || []).length === 0 && !exportando && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, pointerEvents: 'none', zIndex: 1, textAlign: 'center', padding: 20 }}>
+            <div style={{ fontSize: 28 }}>✋</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: t.text }}>Lienzo libre</div>
+            <div style={{ fontSize: 11, color: t.sub, lineHeight: 1.6 }}>Elige un diseño en 🧩 Diseños, añade elementos en ➕ Añadir<br />o arrastra aquí imágenes desde tu ordenador</div>
           </div>
         )}
-        <FreeCanvas ref={fcRef} slide={slide} onChange={onChange} onElementSelected={onElementSelected} onEquationEdit={handleEquationEdit} />
+        <FreeCanvas slide={slide} t={t} isFree={isFree} {...canvas} onEquationEdit={setEditEquationId} />
       </div>
 
       {/* ── Add elements toolbar (all layouts) ── */}
@@ -2107,10 +1890,7 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
         <button onClick={() => setShowImgSearch(true)} style={FC_BTN('#374151','#e5e7eb')}>🔍 Buscar</button>
         <button onClick={() => setShowYT(true)} style={FC_BTN('rgba(239,68,68,0.2)','#f87171',{border:'1px solid rgba(239,68,68,0.3)'})}>▶ YouTube</button>
         <button onClick={() => setShowWeb(true)} style={FC_BTN('#374151','#e5e7eb')}>🌐 Web</button>
-        <button onClick={() => addShape('rect')} style={FC_BTN('#374151','#e5e7eb')}>▭ Rect</button>
-        <button onClick={() => addShape('circle')} style={FC_BTN('#374151','#e5e7eb')}>⬤ Círculo</button>
-        <button onClick={() => addShape('triangle')} style={FC_BTN('#374151','#e5e7eb')}>▲ Triáng</button>
-        <button onClick={() => addShape('line')} style={FC_BTN('#374151','#e5e7eb')}>— Línea</button>
+        <button onClick={onAbrirElementos} style={FC_BTN('rgba(108,99,255,0.2)','#c4b5fd',{border:'1px solid rgba(108,99,255,0.4)'})}>⬟ Formas, textos y más</button>
         <div style={{position:'relative'}}>
           <button onClick={() => setShowStickers(s=>!s)} style={FC_BTN(showStickers ? '#6c63ff' : '#374151','#e5e7eb')}>😀 Sticker</button>
           {showStickers && (
@@ -2125,7 +1905,6 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
 
       {/* ── Subject toolbar ── */}
       <div style={{display:'flex',gap:5,justifyContent:'center',flexWrap:'wrap',padding:'2px 4px 6px',alignItems:'center'}}>
-        {/* Subject selector */}
         <select value={subject} onChange={e=>setSubject(e.target.value)}
           style={{background:'#1f2937',color:'#e5e7eb',border:'1px solid #374151',borderRadius:8,padding:'4px 8px',fontSize:11,fontWeight:700,cursor:'pointer',outline:'none'}}>
           <option value="general">🔬 Ciencias</option>
@@ -2133,9 +1912,8 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
           <option value="geo">🌍 Geografía</option>
         </select>
 
-        {/* General/Science: 3D shapes */}
         {subject === 'general' && <>
-          {[['Cubo','box'],['Prisma','prism'],['Pirámide','pyramid'],['Cilindro','cylinder'],['Cono','cone'],['Esfera','sphere']].map(([label,shape])=>(
+          {[['Cubo','prisma'],['Pirámide','pyramid'],['Cilindro','cylinder'],['Cono','cone'],['Esfera','sphere']].map(([label,shape])=>(
             <button key={shape} onClick={()=>setShow3D(shape)}
               style={FC_BTN('rgba(99,102,241,0.15)','#a5b4fc',{border:'1px solid rgba(99,102,241,0.3)'})}>
               {label}
@@ -2143,21 +1921,18 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
           ))}
         </>}
 
-        {/* Music */}
         {subject === 'musica' && (
           <button onClick={()=>setShowMusic(true)} style={FC_BTN('rgba(168,85,247,0.15)','#c084fc',{border:'1px solid rgba(168,85,247,0.3)'})}>
             🎵 Panel Música
           </button>
         )}
 
-        {/* Geography */}
         {subject === 'geo' && (
           <button onClick={()=>setShowGeo(true)} style={FC_BTN('rgba(34,197,94,0.15)','#86efac',{border:'1px solid rgba(34,197,94,0.3)'})}>
             🌍 Panel Geografía
           </button>
         )}
 
-        {/* Math always visible */}
         <button onClick={()=>setShowMath(true)} style={FC_BTN('rgba(251,191,36,0.15)','#fde68a',{border:'1px solid rgba(251,191,36,0.3)'})}>
           ∑ Ecuación
         </button>
@@ -2298,15 +2073,49 @@ async function generateWithGemini(topic, numSlides, theme) {
 }
 
 // ─── MAIN EDITOR COMPONENT ────────────────────────────────────────────────────
+const TABS_DERECHA = [
+  ['editar', '✏️', 'Editar'], ['elementos', '➕', 'Añadir'], ['plantillas', '🧩', 'Diseños'],
+  ['fondo', '🎨', 'Fondo'], ['capas', '🗂️', 'Capas'], ['ajustes', '⚙️', 'Ajustes'],
+];
+const ETQ = { fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 };
+const BTN_PANEL = { width: '100%', background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700, marginBottom: 6 };
+
+function primeraDiapositiva() {
+  return { ...newSlide('free', 'dark'), elements: PLANTILLAS[0].crear(THEMES.dark) };
+}
+const limpiarParaGuardar = (v) => JSON.parse(JSON.stringify(v)); // Firestore no admite «undefined»
+
 export default function PresentationEditor({ usuario, presentacionInicial, onClose, onSaved }) {
   const bgFileRef = useRef();
+  const imgFileRef = useRef();
+  const accionImgRef = useRef(null); // { tipo: 'nueva' | 'reemplazar' | 'marco', id }
+  const superficieRef = useRef(null);
   const [titulo, setTitulo] = useState(presentacionInicial?.titulo || 'Nueva presentación');
   const [autoPlay, setAutoPlay] = useState(presentacionInicial?.autoPlay !== false);
-  const [slides, setSlides] = useState(presentacionInicial?.slides || [newSlide('title', 'dark')]);
+  const hist = useHistorial(presentacionInicial?.slides?.length ? presentacionInicial.slides : [primeraDiapositiva()]);
+  const slides = hist.valor;
+  const setSlides = hist.set;
+  const { deshacer, rehacer, cortar } = hist;
   const [activeIdx, setActiveIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [presId, setPresId] = useState(presentacionInicial?.id || null);
+  const [estadoGuardado, setEstadoGuardado] = useState(''); // '' | 'pendiente' | 'guardando' | 'ok' | 'error'
+  const [aviso, setAviso] = useState('');
+
+  // Selección en el lienzo
+  const [selIds, setSelIds] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editEquationId, setEditEquationId] = useState(null);
+  const [previewAnim, setPreviewAnim] = useState(0);
+  const [rejilla, setRejilla] = useState(false);
+  const [estiloCopiado, setEstiloCopiado] = useState(null);
+  const [exportando, setExportando] = useState(false);
+  const [showBuscarFondo, setShowBuscarFondo] = useState(false);
+  const [showBuscarPanel, setShowBuscarPanel] = useState(false);
+  const portapapeles = useRef(null);
+  const animTimer = useRef(null);
+  const avisoTimer = useRef(null);
 
   // AI
   const [showAI, setShowAI] = useState(false);
@@ -2323,8 +2132,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
   const [aiCajas, setAiCajas] = useState(true); // importar con cajas de texto movibles (modo libre)
 
   // Right panel
-  const [rightTab, setRightTab] = useState('layout'); // 'layout' | 'theme' | 'settings'
-  const [selectedFreeElId, setSelectedFreeElId] = useState(null);
+  const [rightTab, setRightTab] = useState(presentacionInicial?.slides?.length ? 'editar' : 'plantillas');
 
   // Mobile panels
   const [leftOpen,  setLeftOpen]  = useState(false);
@@ -2352,65 +2160,302 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     return () => ro.disconnect();
   }, [isMobile]);
 
-  const activeSlide = slides[activeIdx] || slides[0];
+  useEffect(() => { cargarFuentes(); }, []);
 
-  // Derived: always fresh from current slide state
-  const selectedFreeEl = selectedFreeElId
-    ? (activeSlide?.elements || []).find(e => e.id === selectedFreeElId) || null
-    : null;
+  const mostrarAviso = (txt) => {
+    setAviso(txt);
+    clearTimeout(avisoTimer.current);
+    avisoTimer.current = setTimeout(() => setAviso(''), 2800);
+  };
 
+  // Si deshacer quita diapositivas, que el índice siga siendo válido
+  useEffect(() => {
+    if (activeIdx > slides.length - 1) setActiveIdx(Math.max(0, slides.length - 1));
+  }, [slides.length, activeIdx]);
+
+  const idx = Math.min(activeIdx, slides.length - 1);
+  const activeSlide = slides[idx] || slides[0];
+  const activeEls = activeSlide?.elements || [];
+
+  // Cambiar la diapositiva activa (objeto completo o función)
   const updateSlide = useCallback((updated) => {
-    setSlides(prev => prev.map((s, i) => i === activeIdx ? updated : s));
-  }, [activeIdx]);
+    setSlides(prev => prev.map((s, i) => (i === idx ? (typeof updated === 'function' ? updated(s) : updated) : s)));
+  }, [idx, setSlides]);
+  // Cambiar los elementos de la diapositiva activa
+  const cambiarEls = useCallback((fn) => {
+    setSlides(prev => prev.map((s, i) => (i === idx ? { ...s, elements: fn(s.elements || []) } : s)));
+  }, [idx, setSlides]);
+  const anadirEls = useCallback((nuevos, editar = false) => {
+    if (!nuevos?.length) return;
+    cortar();
+    cambiarEls(els => [...els, ...nuevos]);
+    setSelIds(nuevos.map(e => e.id));
+    setEditingId(editar ? nuevos[0].id : null);
+  }, [cambiarEls, cortar]);
 
-  const handleBgImageUpload = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => updateSlide({ ...slides[activeIdx], bgImage: ev.target.result });
-    reader.readAsDataURL(file); e.target.value = '';
+  // Al cambiar de diapositiva se quita la selección
+  useEffect(() => { setSelIds([]); setEditingId(null); }, [idx]);
+
+  // ── Imágenes: subir, soltar, pegar, reemplazar, rellenar marcos ──
+  const rellenarMarco = (id, src) => {
+    hist.cortar();
+    cambiarEls(els => els.map(e => (e.id === id
+      ? { id: e.id, type: 'image', src, x: e.x, y: e.y, w: e.w, h: e.h, rotation: e.rotation, objectFit: 'cover', borderRadius: e.borderRadius || 0, mask: e.mask || (e.shapeType === 'circle' ? 'circulo' : undefined), filters: e.filters, opacity: 1, anim: e.anim, shadow: e.shadow }
+      : e)));
+    setSelIds([id]);
+  };
+  const onArchivos = async (files, punto) => {
+    const imgs = (files || []).filter(f => f.type.startsWith('image/'));
+    if (!imgs.length) return;
+    const marco = punto && [...activeEls].reverse().find(e => e.marco && punto.x >= e.x && punto.x <= e.x + e.w && punto.y >= e.y && punto.y <= e.y + e.h);
+    const srcs = await Promise.all(imgs.map(f => comprimirImagen(f)));
+    if (marco) { rellenarMarco(marco.id, srcs[0]); return; }
+    const nuevos = [];
+    for (let i = 0; i < srcs.length; i++) {
+      const el = imagenEl(srcs[i], await proporcionImagen(srcs[i]));
+      if (punto) { el.x = punto.x - el.w / 2; el.y = punto.y - el.h / 2; }
+      el.x += i * 3; el.y += i * 3;
+      nuevos.push(el);
+    }
+    anadirEls(nuevos);
+  };
+  const pedirImagen = (tipo, id) => { accionImgRef.current = { tipo, id }; imgFileRef.current?.click(); };
+  const onImgFile = async (e) => {
+    const files = [...(e.target.files || [])];
+    e.target.value = '';
+    const acc = accionImgRef.current || { tipo: 'nueva' };
+    if (!files.length) return;
+    if (acc.tipo === 'nueva') { onArchivos(files); return; }
+    const src = await comprimirImagen(files[0]);
+    if (acc.tipo === 'marco') rellenarMarco(acc.id, src);
+    else { hist.cortar(); cambiarEls(els => els.map(x => (x.id === acc.id ? { ...x, src } : x))); }
   };
 
-  const addSlide = (layout = 'content') => {
+  // ── Acciones sobre la selección ──
+  const borrarSel = () => {
+    if (!selIds.length) return;
+    hist.cortar();
+    cambiarEls(els => els.filter(e => !selIds.includes(e.id) || e.locked));
+    setSelIds([]); setEditingId(null);
+  };
+  const duplicarSel = () => {
+    const orig = activeEls.filter(e => selIds.includes(e.id));
+    if (!orig.length) return;
+    anadirEls(orig.map(e => ({ ...JSON.parse(JSON.stringify(e)), id: nid(), x: e.x + 2, y: e.y + 3, locked: false })));
+  };
+  const copiarSel = () => {
+    const orig = activeEls.filter(e => selIds.includes(e.id));
+    if (!orig.length) return false;
+    portapapeles.current = JSON.parse(JSON.stringify(orig));
+    return true;
+  };
+  const pegarInterno = () => {
+    const c = portapapeles.current;
+    if (!c?.length) return;
+    const copias = c.map(e => ({ ...JSON.parse(JSON.stringify(e)), id: nid(), x: e.x + 2, y: e.y + 3, locked: false }));
+    portapapeles.current = copias;
+    anadirEls(copias);
+  };
+  const pegarTexto = (txt) => {
+    const yt = parseVideoUrl(txt);
+    if (yt?.type === 'youtube') {
+      anadirEls([{ id: nid(), type: 'youtube', ytId: yt.id, thumb: yt.thumb, embed: yt.embed, x: 15, y: 10, w: 70, h: 70, opacity: 1 }]);
+      return;
+    }
+    anadirEls([{ id: nid(), type: 'text', text: txt.slice(0, 2000), x: 15, y: 30, w: 70, h: 30, fontSize: 22, lineHeight: 1.5, opacity: 1 }]);
+  };
+  const probarAnimaciones = () => {
+    const d = duracionEntradas(activeEls);
+    const hayBucle = activeEls.some(e => e.anim?.bucle);
+    if (!d && !hayBucle) { mostrarAviso('Esta diapositiva no tiene animaciones. Selecciona un elemento → Animación.'); return; }
+    setSelIds([]); setEditingId(null);
+    setPreviewAnim(Date.now());
+    clearTimeout(animTimer.current);
+    animTimer.current = setTimeout(() => setPreviewAnim(0), (d + (hayBucle ? 3 : 0.6)) * 1000);
+  };
+  const onAccionPanel = (accion, id) => {
+    const e = activeEls.find(x => x.id === id);
+    switch (accion) {
+      case 'borrar': borrarSel(); break;
+      case 'duplicar': duplicarSel(); break;
+      case 'copiarEstilo':
+        if (e) { setEstiloCopiado(Object.fromEntries(CLAVES_ESTILO.map(c => [c, e[c]]))); mostrarAviso('🖌 Estilo copiado: selecciona otro elemento y pulsa «Pegar estilo»'); }
+        break;
+      case 'reemplazarImagen': pedirImagen('reemplazar', id); break;
+      case 'comoFondo':
+        if (e) { hist.cortar(); updateSlide(s => ({ ...s, bgImage: e.src, bgColor: null, bgGradient: null, elements: (s.elements || []).filter(x => x.id !== id) })); setSelIds([]); }
+        break;
+      case 'probarAnim': probarAnimaciones(); break;
+      case 'editarEcuacion': setEditEquationId(id); break;
+      default:
+    }
+  };
+
+  // ── Teclado y portapapeles (handlers siempre con el estado más reciente) ──
+  const acciones = useRef({});
+  acciones.current = { borrarSel, duplicarSel, copiarSel, pegarInterno, pegarTexto, onArchivos, guardar: () => handleSave() };
+  const estado = useRef({});
+  estado.current = { selIds, activeEls, showAI, editEquationId };
+
+  useEffect(() => {
+    const escribiendo = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+    const onKey = (e) => {
+      const { selIds: sel, activeEls: els, showAI: ia, editEquationId: eq } = estado.current;
+      if (ia || eq) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      const esc = escribiendo(e.target);
+      if (mod && k === 's') { e.preventDefault(); acciones.current.guardar(); return; }
+      if (esc) return;
+      if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) rehacer(); else deshacer(); return; }
+      if (mod && k === 'y') { e.preventDefault(); rehacer(); return; }
+      if (mod && k === 'a') { e.preventDefault(); setSelIds(els.filter(x => !x.hidden).map(x => x.id)); return; }
+      if (!sel.length) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); acciones.current.borrarSel(); }
+      else if (e.key === 'Escape') { setSelIds([]); setEditingId(null); }
+      else if (mod && k === 'd') { e.preventDefault(); acciones.current.duplicarSel(); }
+      else if (mod && (e.key === ']' || e.key === '[' || e.code === 'BracketRight' || e.code === 'BracketLeft')) {
+        e.preventDefault();
+        const delante = e.key === ']' || e.code === 'BracketRight';
+        const modo = delante ? (e.shiftKey ? 'frente' : 'adelante') : (e.shiftKey ? 'fondo' : 'atras');
+        cambiarEls(lista => ordenarEls(lista, sel, modo));
+      } else if (e.key === 'Enter' && sel.length === 1) {
+        const el = els.find(x => x.id === sel[0]);
+        if (el && !el.locked && (el.type === 'text' || (el.type === 'shape' && el.shapeType !== 'line'))) { e.preventDefault(); setEditingId(el.id); }
+      } else if (e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const px = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -px : e.key === 'ArrowRight' ? px : 0;
+        const dy = e.key === 'ArrowUp' ? -px : e.key === 'ArrowDown' ? px : 0;
+        cambiarEls(lista => lista.map(x => (sel.includes(x.id) && !x.locked ? { ...x, x: x.x + dx / PX_X, y: x.y + dy / PX_Y } : x)));
+      }
+    };
+    const MARCA = '[pikt-elementos]';
+    const onCopy = (e) => {
+      if (escribiendo(e.target) || window.getSelection()?.toString()) return;
+      if (acciones.current.copiarSel()) { e.clipboardData?.setData('text/plain', MARCA); e.preventDefault(); }
+    };
+    const onCut = (e) => {
+      if (escribiendo(e.target) || window.getSelection()?.toString()) return;
+      if (acciones.current.copiarSel()) { e.clipboardData?.setData('text/plain', MARCA); e.preventDefault(); acciones.current.borrarSel(); }
+    };
+    const onPaste = (e) => {
+      if (escribiendo(e.target) || estado.current.showAI) return;
+      const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+      if (files.length) { e.preventDefault(); acciones.current.onArchivos(files); return; }
+      const txt = (e.clipboardData?.getData('text/plain') || '').trim();
+      if (txt === MARCA) { e.preventDefault(); acciones.current.pegarInterno(); return; }
+      if (txt) { e.preventDefault(); acciones.current.pegarTexto(txt); }
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('copy', onCopy);
+    document.addEventListener('cut', onCut);
+    document.addEventListener('paste', onPaste);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('copy', onCopy);
+      document.removeEventListener('cut', onCut);
+      document.removeEventListener('paste', onPaste);
+    };
+  }, [deshacer, rehacer, cambiarEls]);
+
+  // ── Diapositivas ──
+  const addSlide = (layout = 'free') => {
     const s = newSlide(layout, activeSlide?.theme || 'dark');
-    const next = [...slides.slice(0, activeIdx + 1), s, ...slides.slice(activeIdx + 1)];
-    setSlides(next);
-    setActiveIdx(activeIdx + 1);
+    setSlides(prev => [...prev.slice(0, idx + 1), s, ...prev.slice(idx + 1)]);
+    setActiveIdx(idx + 1);
   };
-
-  const deleteSlide = (idx) => {
+  const deleteSlide = (i) => {
     if (slides.length <= 1) return;
-    const next = slides.filter((_, i) => i !== idx);
-    setSlides(next);
-    setActiveIdx(Math.min(activeIdx, next.length - 1));
+    hist.cortar();
+    setSlides(prev => prev.filter((_, j) => j !== i));
+    setActiveIdx(Math.min(idx, slides.length - 2));
   };
-
   const moveSlide = (from, to) => {
-    if (to < 0 || to >= slides.length) return;
-    const next = [...slides];
-    const [item] = next.splice(from, 1);
-    next.splice(to, 0, item);
-    setSlides(next);
+    if (to < 0 || to >= slides.length || from === to) return;
+    hist.cortar();
+    setSlides(prev => { const next = [...prev]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; });
     setActiveIdx(to);
   };
+  const duplicarDiapositiva = (i = idx) => {
+    hist.cortar();
+    const c = clonarDiapositiva(slides[i], nid);
+    setSlides(prev => [...prev.slice(0, i + 1), c, ...prev.slice(i + 1)]);
+    setActiveIdx(i + 1);
+  };
+  const usarPlantilla = (elements) => {
+    hist.cortar();
+    const vacia = activeSlide?.layout === 'free' && !activeEls.length;
+    if (vacia) updateSlide(s => ({ ...s, elements }));
+    else {
+      const s = { ...newSlide('free', activeSlide?.theme || 'dark'), elements };
+      setSlides(prev => [...prev.slice(0, idx + 1), s, ...prev.slice(idx + 1)]);
+      setActiveIdx(idx + 1);
+    }
+    setSelIds([]);
+    if (isMobile) setRightOpen(false);
+  };
 
-  const handleSave = async () => {
-    if (!usuario) return;
-    setSaving(true);
+  const handleBgImageUpload = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const src = await comprimirImagen(file, 1920, 0.82);
+    updateSlide(s => ({ ...s, bgImage: src }));
+  };
+
+  // ── Guardar (manual y automático) ──
+  const guardando = useRef(false);
+  const guardar = async ({ silencioso = false } = {}) => {
+    if (!usuario) return null;
+    if (guardando.current) return presId;
+    guardando.current = true;
+    setEstadoGuardado('guardando');
+    if (!silencioso) setSaving(true);
     try {
-      const data = { titulo, slides, autoPlay, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp() };
-      if (presId) {
-        await updateDoc(doc(db, 'presentations', presId), data);
+      const data = { titulo, slides: limpiarParaGuardar(slides), autoPlay, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp() };
+      let id = presId;
+      if (id) {
+        await updateDoc(doc(db, 'presentations', id), data);
       } else {
         const ref = await addDoc(collection(db, 'presentations'), { ...data, createdAt: serverTimestamp() });
-        setPresId(ref.id);
-        if (onSaved) onSaved(ref.id);
+        id = ref.id;
+        setPresId(id);
+        if (onSaved) onSaved(id);
       }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      setEstadoGuardado('ok');
+      if (!silencioso) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+      return id;
     } catch (e) {
-      alert('Error guardando: ' + e.message);
+      setEstadoGuardado('error');
+      const grande = /exceed|too large|longer than|maximum|1048487|size/i.test(e.message || '');
+      const msg = grande ? 'La presentación pesa demasiado (más de 1 MB). Quita alguna imagen subida o usa imágenes buscadas.' : e.message;
+      if (silencioso) mostrarAviso('⚠️ No se pudo guardar: ' + msg);
+      else alert('Error guardando: ' + msg);
+      return null;
+    } finally {
+      guardando.current = false;
+      if (!silencioso) setSaving(false);
     }
-    setSaving(false);
+  };
+  const handleSave = () => guardar();
+
+  // Guardado automático 4 s después del último cambio (solo si ya existe la presentación)
+  const primerRender = useRef(true);
+  useEffect(() => {
+    if (primerRender.current) { primerRender.current = false; return; }
+    if (!presId || !usuario) { setEstadoGuardado('pendiente'); return; }
+    setEstadoGuardado('pendiente');
+    const tm = setTimeout(() => { guardar({ silencioso: true }); }, 4000);
+    return () => clearTimeout(tm);
+  }, [slides, titulo, autoPlay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cerrar = async () => {
+    if (estadoGuardado === 'pendiente') {
+      if (presId) await guardar({ silencioso: true });
+      else if (!window.confirm('No has guardado esta presentación. ¿Salir sin guardar?')) return;
+    }
+    onClose?.();
   };
 
   const handleGenerate = async () => {
@@ -2446,8 +2491,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     try {
       const { titulo: t, slides: nuevas } = parsearPresentacionIA(aiPegado, aiTheme, { cajas: aiCajas });
       if (modo === 'anadir') {
-        const next = [...slides, ...nuevas];
-        setSlides(next);
+        setSlides(prev => [...prev, ...nuevas]);
         setActiveIdx(slides.length);
       } else {
         setSlides(nuevas);
@@ -2461,20 +2505,31 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     }
   };
 
-  const handlePreview = async () => {
-    let id = presId;
-    if (!id) {
-      setSaving(true);
-      try {
-        const data = { titulo, slides, autoPlay, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp(), createdAt: serverTimestamp() };
-        const ref = await addDoc(collection(db, 'presentations'), data);
-        id = ref.id;
-        setPresId(id);
-        if (onSaved) onSaved(id);
-      } catch (e) { alert('Error al guardar para previsualizar: ' + e.message); setSaving(false); return; }
-      setSaving(false);
+  // Vista previa / presentar / PDF: se guarda antes para que el visor tenga lo último
+  const abrirVisor = async ({ desdeAqui = false, imprimir = false } = {}) => {
+    const w = window.open('about:blank', '_blank');
+    const id = await guardar({ silencioso: true });
+    if (!id) { w?.close(); return; }
+    const url = `/pikt-viewer.html?id=${id}${desdeAqui ? `&s=${idx + 1}` : ''}${imprimir ? '&print=1' : ''}`;
+    if (w) w.location.href = url; else window.open(url, '_blank');
+  };
+
+  const exportarPNG = async () => {
+    setSelIds([]); setEditingId(null); setExportando(true);
+    await new Promise(r => setTimeout(r, 150));
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const nodo = superficieRef.current;
+      const canvas = await html2canvas(nodo, { useCORS: true, backgroundColor: null, scale: 1920 / nodo.offsetWidth, logging: false });
+      const a = document.createElement('a');
+      const base = (titulo || 'presentacion').replace(/[\\/:*?"<>|]+/g, '').trim() || 'presentacion';
+      a.download = `${base} - ${idx + 1}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    } catch (e) {
+      alert('No se pudo exportar la imagen: ' + e.message);
     }
-    window.open(`/pikt-viewer.html?id=${id}`, '_blank');
+    setExportando(false);
   };
 
   const convertToFree = () => {
@@ -2489,60 +2544,53 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     setSlides(slides.map(s => (convertibles.includes(s.layout) && !(s.elements || []).length) ? diapositivaACajas(s) : s));
   };
 
-  // Reset free-canvas selection when switching slides
-  useEffect(() => { setSelectedFreeElId(null); }, [activeIdx]);
-
-  const updateFreeEl = (updates) => {
-    if (!selectedFreeElId || !activeSlide) return;
-    const elements = (activeSlide.elements || []).map(e => e.id === selectedFreeElId ? { ...e, ...updates } : e);
-    updateSlide({ ...activeSlide, elements });
-  };
-  const deleteFreeEl = () => {
-    if (!selectedFreeElId) return;
-    updateSlide({ ...activeSlide, elements: (activeSlide.elements || []).filter(e => e.id !== selectedFreeElId) });
-    setSelectedFreeElId(null);
-  };
-  const duplicateFreeEl = () => {
-    if (!selectedFreeEl) return;
-    const newEl = { ...selectedFreeEl, id: `el_${Date.now()}`, x: selectedFreeEl.x + 3, y: selectedFreeEl.y + 3 };
-    updateSlide({ ...activeSlide, elements: [...(activeSlide.elements || []), newEl] });
-    setSelectedFreeElId(newEl.id);
-  };
-  const bringFwdFreeEl = () => {
-    if (!selectedFreeElId) return;
-    const els = [...(activeSlide.elements || [])];
-    const idx = els.findIndex(e => e.id === selectedFreeElId);
-    if (idx < els.length - 1) { [els[idx], els[idx+1]] = [els[idx+1], els[idx]]; updateSlide({ ...activeSlide, elements: els }); }
-  };
-  const sendBckFreeEl = () => {
-    if (!selectedFreeElId) return;
-    const els = [...(activeSlide.elements || [])];
-    const idx = els.findIndex(e => e.id === selectedFreeElId);
-    if (idx > 0) { [els[idx], els[idx-1]] = [els[idx-1], els[idx]]; updateSlide({ ...activeSlide, elements: els }); }
+  const aplicarFondoATodas = () => {
+    const a = activeSlide;
+    if (a.bgImage?.startsWith('data:') && slides.length > 2 && !window.confirm('La imagen de fondo se copiará en todas las diapositivas y la presentación pesará más. ¿Continuar?')) return;
+    hist.cortar();
+    setSlides(prev => prev.map(s => ({ ...s, theme: a.theme, bgColor: a.bgColor || null, bgGradient: a.bgGradient || null, bgImage: a.bgImage || null, bgOverlay: a.bgOverlay || 0 })));
+    mostrarAviso('🎨 Fondo aplicado a todas las diapositivas');
   };
 
   const theme = THEMES[activeSlide?.theme] || THEMES.dark;
+  const haySeleccion = selIds.length > 0 && activeEls.some(e => selIds.includes(e.id));
+  const pesoKB = rightTab === 'ajustes' ? Math.round(JSON.stringify(slides).length / 1024) : 0;
+  const canvasProps = {
+    selIds, setSelIds, editingId, setEditingId, onChangeEls: cambiarEls, onCortar: hist.cortar,
+    onMarco: id => pedirImagen('marco', id),
+    onSeleccionCanvas: () => setRightTab(tab => (tab === 'capas' ? tab : 'editar')),
+    previewAnim, rejilla,
+  };
+  const estadoTxt = { pendiente: presId ? '● Cambios sin guardar' : '● Sin guardar', guardando: '⏳ Guardando…', ok: '✓ Guardado', error: '⚠️ Error al guardar' }[estadoGuardado] || '';
+  const topBtn = (extra = {}) => ({ background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 8, padding: '7px 11px', cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', ...extra });
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', flexDirection: 'column', background: '#111827', fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: '#fff', overflow: 'hidden' }}>
+      <style>{KEYFRAMES_CSS}</style>
+      <input ref={imgFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onImgFile} />
 
       {/* TOP BAR */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', background: '#1f2937', borderBottom: '1px solid #374151', flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>← Volver</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isMobile ? '8px 10px' : '10px 16px', background: '#1f2937', borderBottom: '1px solid #374151', flexShrink: 0, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+        <button onClick={cerrar} style={topBtn({ color: '#9ca3af' })}>← {isMobile ? '' : 'Volver'}</button>
         <input
           value={titulo} onChange={e => setTitulo(e.target.value)}
-          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 16, fontWeight: 700, minWidth: 0 }}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 16, fontWeight: 700, minWidth: 80 }}
           placeholder="Título de la presentación"
         />
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={() => setShowAI(true)} style={{ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-            🤖 Generar con IA
+        {!isMobile && estadoTxt && <span style={{ fontSize: 11, color: estadoGuardado === 'error' ? '#f87171' : estadoGuardado === 'ok' ? '#34d399' : '#9ca3af', whiteSpace: 'nowrap' }}>{estadoTxt}</span>}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+          <button onClick={hist.deshacer} disabled={!hist.puedeDeshacer} title="Deshacer (Ctrl+Z)" style={topBtn({ opacity: hist.puedeDeshacer ? 1 : 0.4 })}>↶</button>
+          <button onClick={hist.rehacer} disabled={!hist.puedeRehacer} title="Rehacer (Ctrl+Y)" style={topBtn({ opacity: hist.puedeRehacer ? 1 : 0.4 })}>↷</button>
+          <button onClick={() => setRejilla(r => !r)} title="Mostrar cuadrícula" style={topBtn(rejilla ? { background: '#6c63ff', color: '#fff' } : {})}>▦</button>
+          <button onClick={probarAnimaciones} title="Ver las animaciones de esta diapositiva" style={topBtn()}>✨{isMobile ? '' : ' Animar'}</button>
+          <button onClick={() => setShowAI(true)} style={topBtn({ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', color: '#fff' })}>
+            🤖{isMobile ? '' : ' IA'}
           </button>
-          <button onClick={handlePreview} style={{ background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-            👁️ Vista previa
+          <button onClick={() => abrirVisor({ desdeAqui: true })} title="Presentar desde esta diapositiva" style={topBtn({ background: '#059669', color: '#fff' })}>
+            ▶{isMobile ? '' : ' Presentar'}
           </button>
-          <button onClick={handleSave} disabled={saving} style={{ background: saved ? '#10b981' : '#6c63ff', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700, minWidth: 90 }}>
-            {saving ? 'Guardando…' : saved ? '✓ Guardado' : '💾 Guardar'}
+          <button onClick={handleSave} disabled={saving} title="Guardar (Ctrl+S)" style={topBtn({ background: saved ? '#10b981' : '#6c63ff', color: '#fff', minWidth: isMobile ? 0 : 92 })}>
+            {saving ? '⏳' : saved ? '✓' : '💾'}{isMobile ? '' : saving ? ' Guardando…' : saved ? ' Guardado' : ' Guardar'}
           </button>
         </div>
       </div>
@@ -2565,13 +2613,14 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
             {slides.map((s, i) => (
-              <SlideThumb key={s.id} slide={s} index={i} isActive={i === activeIdx} total={slides.length}
-                onClick={() => setActiveIdx(i)} onDelete={() => deleteSlide(i)}
-                onMoveUp={() => moveSlide(i, i - 1)} onMoveDown={() => moveSlide(i, i + 1)} />
+              <SlideThumb key={s.id} slide={s} index={i} isActive={i === idx} total={slides.length} ancho={isMobile ? 182 : 142}
+                onClick={() => { setActiveIdx(i); if (isMobile) setLeftOpen(false); }} onDelete={() => deleteSlide(i)} onDuplicate={() => duplicarDiapositiva(i)}
+                onMoveUp={() => moveSlide(i, i - 1)} onMoveDown={() => moveSlide(i, i + 1)} onDropThumb={moveSlide} />
             ))}
           </div>
-          <div style={{ padding: 8, borderTop: '1px solid #374151' }}>
-            <button onClick={() => addSlide('content')} style={{ width: '100%', background: '#6c63ff', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>+ Añadir</button>
+          <div style={{ padding: 8, borderTop: '1px solid #374151', display: 'flex', gap: 6 }}>
+            <button onClick={() => addSlide('free')} title="Diapositiva en blanco" style={{ flex: 1, background: '#6c63ff', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>+ Añadir</button>
+            <button onClick={() => { setRightTab('plantillas'); if (isMobile) { setRightOpen(true); setLeftOpen(false); } }} title="Añadir un diseño" style={{ background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 8, padding: '8px 9px', cursor: 'pointer', fontSize: 13 }}>🧩</button>
           </div>
         </div>
 
@@ -2587,27 +2636,32 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
               </button>
               <button onClick={() => { setRightOpen(o => !o); setLeftOpen(false); }}
                 style={{ background: rightOpen ? '#6c63ff' : '#374151', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-                {rightOpen ? 'Ocultar' : '⚙️ Opciones'}
+                {rightOpen ? 'Ocultar' : haySeleccion ? '✏️ Editar' : '⚙️ Opciones'}
               </button>
             </div>
           )}
 
           <div style={{ width: '100%', maxWidth: canvasMaxW }}>
-            {activeSlide && <SlideCanvas key={activeSlide.id} slide={activeSlide} onChange={updateSlide} usuario={usuario} onElementSelected={setSelectedFreeElId} />}
+            {activeSlide && (
+              <SlideCanvas key={activeSlide.id} slide={activeSlide} onChange={updateSlide} usuario={usuario}
+                canvas={canvasProps} anadirEls={anadirEls} superficieRef={superficieRef} exportando={exportando}
+                onAbrirElementos={() => { setRightTab('elementos'); if (isMobile) setRightOpen(true); }}
+                onArchivos={onArchivos} editEquationId={editEquationId} setEditEquationId={setEditEquationId} />
+            )}
           </div>
           {/* Slide controls */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => moveSlide(activeIdx, activeIdx - 1)} disabled={activeIdx === 0} style={{ background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>◀</button>
-            <span style={{ fontSize: 12, color: '#6b7280' }}>{activeIdx + 1} / {slides.length}</span>
-            <button onClick={() => moveSlide(activeIdx, activeIdx + 1)} disabled={activeIdx === slides.length - 1} style={{ background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>▶</button>
+            <button onClick={() => setActiveIdx(Math.max(0, idx - 1))} disabled={idx === 0} title="Diapositiva anterior" style={{ background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>◀</button>
+            <span style={{ fontSize: 12, color: '#6b7280' }}>{idx + 1} / {slides.length}</span>
+            <button onClick={() => setActiveIdx(Math.min(slides.length - 1, idx + 1))} disabled={idx === slides.length - 1} title="Diapositiva siguiente" style={{ background: '#1f2937', color: '#9ca3af', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>▶</button>
           </div>
         </div>
 
         {/* RIGHT: PROPERTIES PANEL */}
         <div style={{
-          width: 220, flexShrink: 0,
+          width: 272, flexShrink: 0,
           ...(isMobile ? {
-            position: 'absolute', top: 0, bottom: 0, right: 0, zIndex: 300, width: 250,
+            position: 'absolute', top: 0, bottom: 0, right: 0, zIndex: 300, width: 280,
             transform: rightOpen ? 'translateX(0)' : 'translateX(100%)',
             transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
             boxShadow: rightOpen ? '-6px 0 24px rgba(0,0,0,0.6)' : 'none',
@@ -2616,51 +2670,54 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
         }}>
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '1px solid #374151' }}>
-            {[['layout', '📐'], ['theme', '🎨'], ['settings', '⚙️']].map(([tab, icon]) => (
-              <button key={tab} onClick={() => setRightTab(tab)} style={{
+            {TABS_DERECHA.map(([tab, icon, label]) => (
+              <button key={tab} onClick={() => setRightTab(tab)} title={label} style={{
                 flex: 1, background: rightTab === tab ? '#374151' : 'transparent', color: rightTab === tab ? '#fff' : '#6b7280',
-                border: 'none', padding: '9px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-              }}>{icon}</button>
+                border: 'none', borderBottom: rightTab === tab ? '2px solid #6c63ff' : '2px solid transparent', padding: '6px 0 5px', cursor: 'pointer', fontSize: 13, lineHeight: 1.2,
+              }}>
+                {icon}<div style={{ fontSize: 8, fontWeight: 700, marginTop: 1 }}>{label}</div>
+              </button>
             ))}
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
-            {rightTab === 'layout' && (
+            {rightTab === 'editar' && (
               <div>
-                {selectedFreeEl ? (
+                {haySeleccion ? (
+                  <PanelPropiedades elementos={activeEls} selIds={selIds} t={theme} numSlides={slides.length}
+                    onCambiarEls={cambiarEls} onAccion={onAccionPanel} estiloCopiado={estiloCopiado} />
+                ) : (activeSlide?.layout === 'free' || activeEls.length > 0) ? (
                   <>
-                    <ElementProperties
-                      el={selectedFreeEl}
-                      updateEl={updateFreeEl}
-                      onDelete={deleteFreeEl}
-                      onDuplicate={duplicateFreeEl}
-                      onBringFwd={bringFwdFreeEl}
-                      onSendBck={sendBckFreeEl}
-                    />
-                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #374151' }}>
-                      <button onClick={() => setSelectedFreeElId(null)} style={{ width: '100%', background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 8, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                        ✕ Deseleccionar
+                    <div style={{ ...ETQ, marginBottom: 6 }}>Lienzo libre</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12, lineHeight: 1.7 }}>
+                      Haz clic en un elemento para editarlo. Arrastra sobre el fondo para seleccionar varios.
+                    </div>
+                    <button onClick={() => setRightTab('plantillas')} style={BTN_PANEL}>🧩 Ver diseños</button>
+                    <button onClick={() => setRightTab('elementos')} style={BTN_PANEL}>➕ Añadir textos, formas y emojis</button>
+                    <button onClick={() => setSelIds(activeEls.filter(e => !e.hidden).map(e => e.id))} disabled={!activeEls.length} style={{ ...BTN_PANEL, opacity: activeEls.length ? 1 : 0.5 }}>🔲 Seleccionar todo</button>
+                    <div style={{ background: '#111827', borderRadius: 10, padding: 10, fontSize: 10, color: '#9ca3af', lineHeight: 1.8, margin: '8px 0 14px' }}>
+                      <b style={{ color: '#d1d5db' }}>Atajos</b><br />
+                      Doble clic / Intro = escribir · Supr = borrar<br />
+                      Ctrl+Z / Ctrl+Y = deshacer / rehacer<br />
+                      Ctrl+C / Ctrl+V = copiar / pegar (también entre diapositivas)<br />
+                      Ctrl+D = duplicar · Ctrl+A = todo<br />
+                      Mayús+clic = selección múltiple<br />
+                      Flechas = mover (Mayús = 10 px) · Alt al arrastrar = sin imán<br />
+                      Ctrl+] / Ctrl+[ = adelante / atrás
+                    </div>
+                    {activeSlide?.layout === 'free' && (
+                      <button onClick={() => {
+                        if (!window.confirm('¿Convertir a plantilla? Los elementos libres se convertirán a un diseño "Contenido".')) return;
+                        const textEls = activeEls.filter(e => e.type === 'text');
+                        updateSlide({ ...activeSlide, layout: 'content', elements: undefined, heading: textEls[0]?.text?.split('\n')[0] || '', body: textEls.slice(1).map(e => e.text).join('\n') || '' });
+                      }} style={{ ...BTN_PANEL, color: '#9ca3af' }}>
+                        ↩ Volver a plantilla
                       </button>
-                    </div>
-                  </>
-                ) : (activeSlide?.layout === 'free' || (activeSlide?.elements||[]).length > 0) ? (
-                  <>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Lienzo libre</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 12, lineHeight: 1.6 }}>
-                      Selecciona un elemento para ver sus propiedades aquí.<br/>
-                      <span style={{ color: '#4b5563' }}>Doble clic = editar · Supr = borrar · Ctrl+D = duplicar · Flechas = mover</span>
-                    </div>
-                    <button onClick={() => {
-                      if (!window.confirm('¿Convertir a plantilla? Los elementos libres se convertirán a un diseño "Contenido".')) return;
-                      const textEls = (activeSlide.elements || []).filter(e => e.type === 'text');
-                      updateSlide({ ...activeSlide, layout: 'content', elements: undefined, heading: textEls[0]?.text?.split('\n')[0] || '', body: textEls.slice(1).map(e => e.text).join('\n') || '' });
-                    }} style={{ width: '100%', background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 8, padding: '7px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, marginBottom: 16 }}>
-                      ↩ Volver a plantilla
-                    </button>
+                    )}
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Diseño</div>
+                    <div style={ETQ}>Diseño</div>
                     {LAYOUTS.filter(l => l.id !== 'free').map(l => (
                       <button key={l.id} onClick={() => {
                         if (activeSlide?.layout === l.id) return;
@@ -2682,66 +2739,91 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                     </button>
                   </>
                 )}
-                <div style={{ marginTop: 12, fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Añadir diapositiva</div>
-                {LAYOUTS.map(l => (
-                  <button key={`add-${l.id}`} onClick={() => addSlide(l.id)}
-                    style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginBottom: 3, background: 'transparent', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', cursor: 'pointer', fontSize: 11 }}>
-                    <span>{l.icon}</span><span>+ {l.label}</span>
-                  </button>
-                ))}
+                {!haySeleccion && <>
+                  <div style={{ ...ETQ, marginTop: 12 }}>Añadir diapositiva</div>
+                  {LAYOUTS.map(l => (
+                    <button key={`add-${l.id}`} onClick={() => addSlide(l.id)}
+                      style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginBottom: 3, background: 'transparent', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', cursor: 'pointer', fontSize: 11 }}>
+                      <span>{l.icon}</span><span>+ {l.label}</span>
+                    </button>
+                  ))}
+                </>}
               </div>
             )}
 
-            {rightTab === 'theme' && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Tema de color</div>
-                {Object.entries(THEMES).map(([key, th]) => (
-                  <button key={key} onClick={() => updateSlide({ ...activeSlide, theme: key })}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 6,
-                      background: th.bg, border: `2px solid ${activeSlide?.theme === key ? th.accent : 'transparent'}`,
-                      borderRadius: 10, cursor: 'pointer', color: th.text, fontWeight: 700, fontSize: 12,
-                    }}>
-                    <div style={{ width: 16, height: 16, borderRadius: '50%', background: th.accent, flexShrink: 0 }} />
-                    {th.label}
-                    {activeSlide?.theme === key && <span style={{ marginLeft: 'auto', fontSize: 10 }}>✓</span>}
-                  </button>
-                ))}
-                <div style={{ marginTop: 12 }}>
-                  <button onClick={() => { const t = activeSlide?.theme || 'dark'; setSlides(slides.map(s => ({ ...s, theme: t }))); }}
-                    style={{ width: '100%', background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                    Aplicar a todas
-                  </button>
-                </div>
+            {rightTab === 'elementos' && (
+              <PanelElementos t={theme} onAnadir={anadirEls} onSubirImagen={() => pedirImagen('nueva')} onBuscarImagen={() => setShowBuscarPanel(true)} />
+            )}
 
-                {/* Background image */}
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Imagen de fondo</div>
-                  <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgImageUpload} />
-                  {activeSlide?.bgImage ? (
+            {rightTab === 'plantillas' && (
+              <PanelPlantillas t={theme} theme={activeSlide?.theme || 'dark'} onUsar={usarPlantilla} />
+            )}
+
+            {rightTab === 'capas' && (
+              <PanelCapas elementos={activeEls} selIds={selIds} onCambiarEls={cambiarEls}
+                onSeleccionar={(id, aditivo) => setSelIds(s => (aditivo ? (s.includes(id) ? s.filter(x => x !== id) : [...s, id]) : [id]))} />
+            )}
+
+            {rightTab === 'fondo' && (
+              <div>
+                <div style={ETQ}>Tema de color</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {Object.entries(THEMES).map(([key, th]) => (
+                    <button key={key} onClick={() => updateSlide(s => ({ ...s, theme: key, bgColor: null, bgGradient: null }))}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 8px',
+                        background: th.bg, border: `2px solid ${activeSlide?.theme === key ? '#fff' : 'transparent'}`,
+                        borderRadius: 10, cursor: 'pointer', color: th.text, fontWeight: 700, fontSize: 11,
+                      }}>
+                      <div style={{ width: 12, height: 12, borderRadius: '50%', background: th.accent, flexShrink: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.2)' }} />
+                      {th.label}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => { const t = activeSlide?.theme || 'dark'; hist.cortar(); setSlides(prev => prev.map(s => ({ ...s, theme: t }))); mostrarAviso('Tema aplicado a todas'); }}
+                  style={{ ...BTN_PANEL, marginTop: 8, color: '#9ca3af' }}>
+                  Aplicar tema a todas
+                </button>
+
+                <div style={{ ...ETQ, marginTop: 14 }}>Color de fondo</div>
+                <ColorPicker value={activeSlide?.bgColor || null} allowNull onChange={c => updateSlide(s => ({ ...s, bgColor: c, bgGradient: null }))} />
+
+                <div style={{ ...ETQ, marginTop: 6 }}>Degradado</div>
+                <CampoDegradado valor={activeSlide?.bgGradient || null} onChange={g => updateSlide(s => ({ ...s, bgGradient: g, bgColor: null }))} />
+
+                <div style={{ ...ETQ, marginTop: 10 }}>Imagen de fondo</div>
+                <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgImageUpload} />
+                {activeSlide?.bgImage ? (
+                  <>
                     <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
                       <img src={activeSlide.bgImage} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
-                      <button onClick={() => updateSlide({ ...activeSlide, bgImage: null })}
+                      <button onClick={() => updateSlide(s => ({ ...s, bgImage: null }))}
                         style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(239,68,68,0.85)', color: '#fff', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                         ✕ Quitar
                       </button>
                     </div>
-                  ) : (
-                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>Sin imagen de fondo</div>
-                  )}
-                  <button onClick={() => bgFileRef.current?.click()}
-                    style={{ width: '100%', background: '#374151', color: '#e5e7eb', border: '1px dashed #4b5563', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                    🖼️ Elegir imagen de fondo
-                  </button>
+                    <Deslizador label="Oscurecer (para que se lea el texto)" value={activeSlide.bgOverlay || 0} min={0} max={0.85} step={0.05}
+                      formato={v => `${Math.round(v * 100)}%`} onChange={v => updateSlide(s => ({ ...s, bgOverlay: v }))} />
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>Sin imagen de fondo</div>
+                )}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => bgFileRef.current?.click()} style={{ ...BTN_PANEL, border: '1px dashed #4b5563' }}>🖼️ Subir</button>
+                  <button onClick={() => setShowBuscarFondo(true)} style={BTN_PANEL}>🔍 Buscar</button>
+                </div>
+
+                <div style={{ borderTop: '1px solid #374151', marginTop: 10, paddingTop: 10 }}>
+                  <button onClick={() => updateSlide(s => ({ ...s, bgColor: null, bgGradient: null, bgImage: null, bgOverlay: 0 }))} style={{ ...BTN_PANEL, color: '#9ca3af' }}>↺ Quitar fondo personalizado</button>
+                  <button onClick={aplicarFondoATodas} style={{ ...BTN_PANEL, background: 'rgba(108,99,255,0.2)', color: '#c4b5fd' }}>🎨 Aplicar este fondo a todas</button>
                 </div>
               </div>
             )}
 
-            {rightTab === 'settings' && (
+            {rightTab === 'ajustes' && (
               <div>
-                {/* Auto-play toggle */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Reproducción</div>
+                  <div style={ETQ}>Reproducción</div>
                   <button onClick={() => setAutoPlay(v => !v)}
                     style={{ width: '100%', background: autoPlay ? 'rgba(108,99,255,0.2)' : '#374151', color: autoPlay ? '#a78bfa' : '#9ca3af', border: `1px solid ${autoPlay ? 'rgba(108,99,255,0.4)' : '#4b5563'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 16 }}>{autoPlay ? '▶' : '⏸'}</span>
@@ -2752,24 +2834,46 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                   </div>
                 </div>
 
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Duración de diapositiva</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                  {[3000, 4000, 5000, 7000, 10000].map(d => (
-                    <button key={d} onClick={() => updateSlide({ ...activeSlide, duration: d })}
-                      style={{ background: activeSlide?.duration === d ? '#6c63ff' : '#374151', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                      {d / 1000}s
+                <div style={ETQ}>Duración de esta diapositiva</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 14 }}>
+                  {[3000, 5000, 7000, 10000, 15000, 30000, 60000].map(d => (
+                    <button key={d} onClick={() => updateSlide(s => ({ ...s, duration: d }))}
+                      style={{ background: activeSlide?.duration === d ? '#6c63ff' : '#374151', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                      {d < 60000 ? `${d / 1000}s` : '1 min'}
                     </button>
                   ))}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Acciones</div>
-                <button onClick={() => { const s = newSlide(activeSlide?.layout, activeSlide?.theme); const next = [...slides, s]; setSlides(next); setActiveIdx(next.length - 1); }}
-                  style={{ width: '100%', background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                  + Duplicar diapositiva
+
+                <div style={ETQ}>Transición al entrar</div>
+                <select value={activeSlide?.transition || ''} onChange={e => updateSlide(s => ({ ...s, transition: e.target.value || undefined }))}
+                  style={{ width: '100%', background: '#111827', border: '1px solid #374151', borderRadius: 8, padding: '7px 8px', color: '#fff', fontSize: 12, outline: 'none', marginBottom: 6 }}>
+                  {TRANSICIONES.map(tr => <option key={tr.id} value={tr.id}>{tr.label}</option>)}
+                </select>
+                <button onClick={() => { const tr = activeSlide?.transition; hist.cortar(); setSlides(prev => prev.map(s => ({ ...s, transition: tr || undefined }))); mostrarAviso('Transición aplicada a todas'); }}
+                  style={{ ...BTN_PANEL, color: '#9ca3af', marginBottom: 14 }}>Aplicar transición a todas</button>
+
+                <div style={ETQ}>Notas del profesor</div>
+                <textarea value={activeSlide?.notes || ''} onChange={e => updateSlide(s => ({ ...s, notes: e.target.value }))}
+                  placeholder="Lo que quieres recordar al explicar esta diapositiva (pulsa N al presentar para verlas)"
+                  style={{ width: '100%', minHeight: 80, background: '#111827', border: '1px solid #374151', borderRadius: 8, padding: 8, color: '#fff', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 14, fontFamily: 'inherit' }} />
+
+                <div style={ETQ}>Diapositiva</div>
+                <button onClick={() => duplicarDiapositiva()} style={BTN_PANEL}>⧉ Duplicar diapositiva</button>
+                <button onClick={() => deleteSlide(idx)} disabled={slides.length <= 1}
+                  style={{ ...BTN_PANEL, background: '#7f1d1d', color: '#fca5a5', marginBottom: 14 }}>
+                  🗑️ Eliminar diapositiva
                 </button>
-                <button onClick={() => deleteSlide(activeIdx)} disabled={slides.length <= 1}
-                  style={{ width: '100%', background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                  🗑️ Eliminar
-                </button>
+
+                <div style={ETQ}>Descargar y compartir</div>
+                <button onClick={exportarPNG} disabled={exportando} style={BTN_PANEL}>{exportando ? '⏳ Generando…' : '🖼️ Esta diapositiva como imagen (PNG)'}</button>
+                <button onClick={() => abrirVisor({ imprimir: true })} style={BTN_PANEL}>📄 Toda la presentación en PDF</button>
+                <button onClick={() => abrirVisor()} style={BTN_PANEL}>👁️ Vista previa desde el principio</button>
+                <div style={{ fontSize: 10, color: '#6b7280', lineHeight: 1.5, marginBottom: 12 }}>
+                  En el PDF, elige «Guardar como PDF» en la ventana de impresión y activa «Gráficos de fondo».
+                </div>
+                <div style={{ fontSize: 10, color: pesoKB > 850 ? '#f87171' : '#6b7280' }}>
+                  Tamaño de la presentación: {pesoKB} KB de 1024 KB{pesoKB > 850 ? ' — quita imágenes subidas o usa el buscador' : ''}
+                </div>
               </div>
             )}
           </div>
@@ -2780,6 +2884,14 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
             style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200 }}/>
         )}
       </div>
+
+      {/* Aviso flotante */}
+      {aviso && (
+        <div style={{ position: 'fixed', bottom: 22, left: '50%', transform: 'translateX(-50%)', background: '#111827', border: '1px solid #6c63ff', color: '#e5e7eb', padding: '9px 16px', borderRadius: 12, fontSize: 13, fontWeight: 600, zIndex: 3500, boxShadow: '0 6px 24px rgba(0,0,0,0.5)', maxWidth: '90vw', textAlign: 'center' }}>{aviso}</div>
+      )}
+
+      {showBuscarFondo && <ImgSearchModal onAdd={url => { updateSlide(s => ({ ...s, bgImage: url })); setShowBuscarFondo(false); }} onClose={() => setShowBuscarFondo(false)} />}
+      {showBuscarPanel && <ImgSearchModal onAdd={async url => { setShowBuscarPanel(false); anadirEls([imagenEl(url, await proporcionImagen(url))]); }} onClose={() => setShowBuscarPanel(false)} />}
 
       {/* AI MODAL */}
       {showAI && (

@@ -119,6 +119,13 @@ export const GAMES = [
     nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'invasores', emoji: '👾', color: '#22d3ee',
+    h1: 'Invasión Pi: arcade retro de preguntas',
+    title: 'Invasión Pi: arcade retro de mates y preguntas para 1-4 jugadores | PiKT',
+    desc: 'Arcade retro para la pizarra digital: responde para disparar a los aliens o destruye solo las naves con respuestas falsas. Cálculo, inglés, geografía, biología o tus recursos. De 1 a 4 jugadores, gratis.',
+    nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
+  },
+  {
     slug: 'vanila', emoji: '🔤', color: '#A78BFA',
     h1: 'VaniLa: forma palabras con 9 letras',
     title: 'VaniLa: juego de palabras con tildes (ES, CA, EN, FR) | PiKT',

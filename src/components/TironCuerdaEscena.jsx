@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import pikaSprite from '../assets/pikatron-sprite2.png';
 import pikaSprite1 from '../assets/pikatron-sprite.png';
 import { useMandosCuerda, ProveedorMandos, OpcionesMandos, VotosEquipo, EquipoCuerdaCtx } from './MandosCuerda';
+import GuardarResultadosMandos from '../mandos/GuardarResultadosMandos.jsx';
 
 // ─── Componente COMPARTIDO del tirón de cuerda ─────────────────────────────────
 // Escenario + personajes elegibles por equipo + armazón de competición.
@@ -176,8 +177,10 @@ export function useTironCuerda(metaInicial = 5) {
 }
 
 // Pantalla de ganador (overlay)
-export function PantallaGanador({ ganador, p1, p2, onRevancha, onSalir }) {
+export function PantallaGanador({ ganador, p1, p2, onRevancha, onSalir, mandos = null, nombre = '' }) {
   if (!ganador) return null;
+  // Con mandos: el voto de cada alumno cuenta como su respuesta (aciertos / preguntas votadas)
+  const conMandos = mandos?.activo ? Object.values(mandos.mandos).filter((m) => m.equipo && mandos.resultados[m.id]) : [];
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10002, gap: 14, padding: 20 }}>
       <div style={{ fontSize: '4.5rem' }}>🏆</div>
@@ -187,13 +190,26 @@ export function PantallaGanador({ ganador, p1, p2, onRevancha, onSalir }) {
         <button onClick={onRevancha} style={{ padding: '13px 32px', fontSize: '1rem', fontWeight: 900, border: 'none', borderRadius: 16, background: 'linear-gradient(135deg,#f093fb,#f5576c)', color: 'white', cursor: 'pointer' }}>🔄 Revancha</button>
         {onSalir && <button onClick={onSalir} style={{ padding: '13px 24px', fontSize: '0.9rem', fontWeight: 900, borderRadius: 16, background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '2px solid rgba(255,255,255,0.25)', cursor: 'pointer' }}>← Salir</button>}
       </div>
+      {conMandos.length > 0 && (
+        <GuardarResultadosMandos
+          tipo="CUERDA_MANDOS"
+          juego="Tirón de cuerda con mandos"
+          recursoTitulo={nombre}
+          config={{ ganador: `Equipo ${ganador}`, marcador: `${p1}-${p2}` }}
+          jugadores={conMandos.map((m) => ({
+            id: m.id, nombre: m.nombre, aciertos: mandos.resultados[m.id].aciertos, intentos: mandos.resultados[m.id].intentos,
+            extra: { equipo: `Equipo ${m.equipo}`, ganador: m.equipo === ganador },
+          }))}
+        />
+      )}
     </div>
   );
 }
 
 // Armazón completo: barra (meta + personajes) + cuerda + 2 paneles nativos + ganador.
 // renderPanel(equipo, { aplicar, bloqueado, ronda }) → el panel nativo de cada juego.
-export function CompeticionCuerda({ metaInicial = 5, onSalir, renderPanel, isMobile = false, extraBar = null, configExtra = null }) {
+// nombre: el juego o la materia (sale en el informe de los mandos)
+export function CompeticionCuerda({ metaInicial = 5, onSalir, renderPanel, isMobile = false, extraBar = null, configExtra = null, nombre = '' }) {
   const t = useTironCuerda(metaInicial);
   const [mostrarConfig, setMostrarConfig] = useState(true);
   const mandos = useMandosCuerda(!!t.ganador);
@@ -246,7 +262,7 @@ export function CompeticionCuerda({ metaInicial = 5, onSalir, renderPanel, isMob
         </div>
       </div>
 
-      <PantallaGanador ganador={t.ganador} p1={t.p1} p2={t.p2} onRevancha={t.reiniciar} onSalir={onSalir} />
+      <PantallaGanador ganador={t.ganador} p1={t.p1} p2={t.p2} onRevancha={() => { mandos.borrarResultados(); t.reiniciar(); }} onSalir={onSalir} mandos={mandos} nombre={nombre} />
     </div>
     </ProveedorMandos>
   );

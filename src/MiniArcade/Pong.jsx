@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { pongPaddle, pongWall, pongPoint } from './sounds';
 import FullscreenBtn from './FullscreenBtn';
+import MandosEnJuego from '../mandos/RelevosMandos.jsx';
 
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -25,6 +26,17 @@ export default function Pong({ onExit, contained = false, panelId = null, contai
     });
 
     const [, setTick] = useState(0);
+
+    // Mandos micro:bit: al acabar la partida se anotan los puntos de cada pala (y con relevos, juega otro mando)
+    const mandosApi = useRef(null);
+    const finMandos = useRef(false);
+    useEffect(() => {
+        const s = stateRef.current;
+        if (s.status === 'gameover' && !finMandos.current) {
+            finMandos.current = true;
+            mandosApi.current?.finPartida([s.score1, s.score2], { ganador: s.score1 > s.score2 ? 0 : 1 });
+        } else if (s.status !== 'gameover') finMandos.current = false;
+    });
 
     const resetBall = (server) => {
         const st = stateRef.current;
@@ -201,6 +213,14 @@ export default function Pong({ onExit, contained = false, panelId = null, contai
             fontFamily: '"Segoe UI", sans-serif', color: '#fff', padding: 10, boxSizing: 'border-box',
         }}>
             {/* Back button */}
+            {(!panelId || !window.__arkadePanel) && (
+                <MandosEnJuego clave="PONG" juego="Pong" nJug={st.mode === 'pvp' ? 2 : 1} apiRef={mandosApi}
+                    teclas={[{ F: 'w', T: 's', A: ' ', S: ' ' }, { F: 'ArrowUp', T: 'ArrowDown', A: ' ', S: ' ' }]}
+                    nombresHueco={['Pala izquierda', 'Pala derecha']}
+                    estiloFlot={contained ? { position: 'absolute' } : null}
+                    onEvento={(i, ev) => { const s = stateRef.current; if (s.status === 'gameover' && ev.accion === 'S') startGame(s.mode); }}
+                    controles={<>Inclina el mando <b>hacia delante o hacia atrás</b> para subir y bajar la pala. <b>A</b> o agitar = sacar; al acabar, <b>agitar</b> empieza otra partida. En «2 jugadores» cada mando lleva una pala.</>} />
+            )}
             <button onClick={onExit} style={{
                 position: 'absolute', top: 12, left: 12,
                 background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',

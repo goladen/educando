@@ -16,12 +16,20 @@ const leerNombres = () => { try { return JSON.parse(localStorage.getItem(LS_NOMB
 // señal de que el alumno quiere jugar (soltar un botón o volver a plano no cuentan)
 const esIntencion = (ev) => (ev.accion === 'V' ? !!ev.dir : ev.accion === 'P' || ev.accion === 'S' || ev.on === true);
 
-export function useMandosOvni(activos, nJug) {
+// opciones (las usa Invasión Pi; el Ovni las deja por defecto):
+//   modo:   modo fijo de los mandos (MODOS.*) en vez de volante/fútbol según la versión
+//   acepta: qué eventos cuentan (por defecto solo los de fútbol/volante)
+const aceptaFutbol = (ev) => ev.tipo === 'futbol';
+const esIntencionGeneral = (ev) => (ev.tipo === 'futbol' ? esIntencion(ev) : true);
+
+export function useMandosOvni(activos, nJug, { modo = null, acepta = aceptaFutbol } = {}) {
     const [vistos, setVistos] = useState({}); // id → última señal (ms)
     const vistosRef = useRef({});
     const [nombres, setNombres] = useState(leerNombres);
-    const [pilotos, setPilotosEstado] = useState([null, null]);
-    const pilotosRef = useRef([null, null]);
+    const [pilotos, setPilotosEstado] = useState([null, null, null, null]);
+    const pilotosRef = useRef([null, null, null, null]);
+    const aceptaRef = useRef(acepta);
+    aceptaRef.current = acepta;
     const manejadorRef = useRef(null); // (idx, ev) → lo pone el juego mientras está en marcha
     const nJugRef = useRef(nJug);
     nJugRef.current = nJug;
@@ -65,14 +73,14 @@ export function useMandosOvni(activos, nJug) {
 
     useEffect(() => {
         if (!activos) return undefined;
-        setModoMandos(continuo ? MODOS.VOLANTE : MODOS.FUTBOL);
+        setModoMandos(modo || (continuo ? MODOS.VOLANTE : MODOS.FUTBOL));
         return () => setModoMandos(MODOS.LETRAS);
-    }, [activos, continuo]);
+    }, [activos, continuo, modo]);
 
     useEffect(() => {
         if (!activos) return undefined;
         return escucharMandos((ev) => {
-            if (ev.tipo !== 'futbol') return;
+            if (!aceptaRef.current(ev)) return;
             const ahora = Date.now();
             const antes = vistosRef.current[ev.id];
             vistosRef.current = { ...vistosRef.current, [ev.id]: ahora };
@@ -83,7 +91,7 @@ export function useMandosOvni(activos, nJug) {
             let idx = activas.indexOf(ev.id);
             if (idx < 0) {
                 const hueco = activas.indexOf(null);
-                if (hueco < 0 || !esIntencion(ev)) return;
+                if (hueco < 0 || !esIntencionGeneral(ev)) return;
                 const n = [...pilotosRef.current];
                 n[hueco] = ev.id;
                 setPilotos(n);

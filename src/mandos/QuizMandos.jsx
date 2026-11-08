@@ -19,6 +19,9 @@ import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import ChipAntena from './ChipAntena.jsx';
 import SelectorRecursoMandos, { hojasQuiz, numeroQuiz, MIN_NUM_QUIZ, MAX_NUM_QUIZ } from './SelectorRecursoMandos.jsx';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
+import GuardarResultadosMandos from './GuardarResultadosMandos.jsx';
+
+const NOMBRE_TIPO = { tablas: 'Tablas de multiplicar', sumas: 'Sumas y restas', mates: 'Math World', propias: 'Preguntas propias' };
 // Los generadores de Math World pesan: solo se cargan al elegirlos
 const SelectorMatesMandos = lazy(() => import('./SelectorMatesMandos.jsx'));
 
@@ -639,7 +642,15 @@ export default function QuizMandos({ onExit, soloMates = false }) {
                 <b>{j.puntos}</b>
               </div>
             ))}
-            <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <div style={{ textAlign: 'center', marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <GuardarResultadosMandos
+                tipo={soloMates ? 'MATES_MANDOS' : 'QUIZ_MANDOS'}
+                juego={soloMates ? 'Mates con mandos' : 'Quiz con mandos'}
+                recursoTitulo={tipo === 'recurso' ? recurso?.titulo || 'Recurso' : NOMBRE_TIPO[tipo] || ''}
+                hoja={tipo === 'recurso' && hojaSel >= 0 ? hojasRecurso[hojaSel]?.nombre || '' : ''}
+                config={{ preguntas: preguntas.length, segundos: tiempo, respuesta: numerico ? 'número' : 'letras' }}
+                jugadores={ranking.map((j) => ({ id: j.id, nombre: nombre(j.id), aciertos: j.aciertos, intentos: preguntas.length, puntos: j.puntos }))}
+              />
               <button style={st.btnGrande} onClick={() => setFase('config')}>
                 Jugar otra vez
               </button>

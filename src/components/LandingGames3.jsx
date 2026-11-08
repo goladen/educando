@@ -34,6 +34,7 @@ const EnigmicLogic = lazy(() => import('../EnigmicLogic'));
 const SixSeven = lazy(() => import('../SixSeven'));
 const VaniLa = lazy(() => import('../vanila/VaniLa'));
 const OvniAbduccion = lazy(() => import('../OvniAbduccion'));
+const InvasoresArcade = lazy(() => import('../invasores/InvasoresArcade'));
 const Visor3D = lazy(() => import('../Visor3D'));
 const Esculpir3D = lazy(() => import('../Esculpir3D'));
 const TextWordleGame = lazy(() => import('../TextWordleGame'));
@@ -56,6 +57,7 @@ const GeometriaAnalitica = lazy(() => import('../Funciones2'));
 const PerimetroArea = lazy(() => import('../PerimetroArea'));
 const Visor3dPoliedrosEuler = lazy(() => import('../Visor3dPoliedrosEuler'));
 const GranjaInteractiva = lazy(() => import('../GranjaInteractiva'));
+const ContabilidadSuper = lazy(() => import('../situaciones/ContabilidadSuper'));
 const Plataformas = lazy(() => import('../Plataformas2'));
 const StoryCubes = lazy(() => import('../StoryCubes'));
 const FutbolQuizz = lazy(() => import('../FutbolQuizz'));
@@ -100,6 +102,7 @@ const HerramientasClase = lazy(() => import('../GestionAula'));
 const PizarraApp = lazy(() => import('../GestionAula').then(m => ({ default: m.PizarraApp })));
 const QuizManos = lazy(() => import('../manos/QuizManos.jsx'));
 const AvatarCuerpo = lazy(() => import('../cuerpo/AvatarCuerpo.jsx'));
+const Orientacion = lazy(() => import('../orientacion/Orientacion.jsx'));
 const AlgebraApp = lazy(() => import('../Algebra'));
 const VistasDidricas = lazy(() => import('../VistasDidricas'));
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
@@ -592,6 +595,18 @@ export const APPS = [
         shareUrl: `${window.location.origin}/ovni`
     },
     {
+        // Arcade retro de 1 a 4 jugadores; sale en Juegos y también en Math World (alsoMath)
+        id: 'INVASORES',
+        name: 'Invasión Pi',
+        desc: 'Arcade retro de 1 a 4 jugadores: responde para disparar a los aliens o destruye solo las naves con respuestas falsas.',
+        color: '#22d3ee',
+        emoji: '👾',
+        isSpecial: true,
+        alsoMath: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/invasores`
+    },
+    {
         id: 'VANILA',
         name: 'VaniLa',
         desc: 'Forma palabras con 9 letras, ¡con su tilde! Solo, en duelo escalando la montaña o en tablero con amigos. ES · CA · EN · FR.',
@@ -892,6 +907,14 @@ export const GAME_INFO = {
         tipoPreguntas: 'Clasificación en categorías: cada ronda pide una categoría y los animales llevan palabras de esa y de otras. Bancos integrados por materia, por ejemplo: categorías gramaticales, géneros literarios, países por continentes, etapas de la historia, estados de la materia, fuentes de energía, vertebrados e invertebrados, huesos y músculos, aparatos del cuerpo, familias de instrumentos, materiales, colores y técnicas artísticas, verbos regulares e irregulares, play/go/do con deportes, vocabulario en inglés y francés, tipos de deportes, capacidades físicas, emociones y hábitos saludables. Además, un bloque de Números que genera rondas nuevas cada vez (Primaria o ESO): primos, compuestos, divisores de un número, múltiplos de un número, fracciones irreducibles, potencias de 2 y de 3, y mayores o menores que un número (en ESO con decimales y negativos); cada número equivocado explica por qué (por ejemplo, 21 = 3 × 7). Al final se muestra qué palabras se confundieron y a qué categoría pertenecían.',
         biblioteca: 'No necesita recursos: 35 bancos de categorías agrupados por las materias de la portada (Matemáticas, Lengua, Geo e Historia, Física y Química, Biología, Música, Tecnología, Plástica, Idiomas, Educación Física y Tutoría), un generador de rondas de números y una opción «Mis categorías» para escribir las propias (una categoría por línea).',
         multiplayer: 'Individual (3 vidas) o duelo de 2 jugadores en pantalla dividida: dos ovnis en la misma granja con el mismo enunciado, acierto +1 y error −1 (J1 WASD + Espacio, J2 flechas + Enter, o un joystick y un botón por mitad en pantalla táctil). Al acabar se envía el informe al profesor con la configuración y la explicación de cada error. Incluye una ficha en PDF del mismo contenido (con tabla de clasificar y soluciones) para trabajarlo antes de jugar en clase.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    INVASORES: {
+        descripcion: 'Arcade retro con estética de recreativa (fondo estrellado, colores neón y letras pixeladas) y botones grandes pensados para la pizarra digital y la tablet. Dos modos. «Dispara al responder»: un alien baja con una pregunta y hay que teclear la respuesta en el teclado virtual (o elegir A-D) y pulsar FUEGO antes de que toque el suelo; si se falla, se puede volver a intentar. «Filtro de respuestas»: bajan hasta 4 naves, cada una con una respuesta; se pilota la nave y hay que destruir solo las falsas y dejar pasar la correcta (si se destruye la buena, se pierde una vida). Cada 5 aciertos se sube de nivel y los aliens bajan más rápido.',
+        tipoPreguntas: 'Matemáticas: cálculo rápido generado al azar (sumas, restas, tablas, divisiones exactas y enteros, en 3 dificultades) o los ejercicios de todas las apps de Math World. Otras materias: bancos propios de Inglés, Geografía, Biología y Física y Química, o cualquier recurso del profesor (opción múltiple, respuesta corta o rellenar hueco; en «Dispara al responder» también se puede escribir la respuesta con un teclado de letras).',
+        biblioteca: 'No necesita recursos: el cálculo se genera solo y trae bancos de varias materias. También admite los recursos públicos del profesor (buscador) o uno concreto por su código.',
+        multiplayer: 'De 1 a 4 jugadores a la vez en la misma pantalla, cada uno con su zona y sus controles (en el móvil 1 jugador, en tablet o portátil hasta 2 y en un PC grande o pizarra hasta 4). Modo competitivo (todos reciben las mismas preguntas y gana quien más puntos suma) o cooperativo (vidas compartidas). Con teclado: J1 fila de números o A/D/W y J2 teclado numérico o flechas. Partida libre o de 2, 3 o 5 minutos. También con mandos micro:bit y la antena USB, sin reprogramarlos (como en el Ovni): en «Dispara al responder» se elige la letra A-D o se marca el número, y en «Filtro» se inclina para mover y se agita para disparar; el primer mando que se mueve coge una zona libre, ⏭ pasa el mando al siguiente alumno y con «Turnos» rota solo tras cada pregunta, así juega toda la clase. Al acabar, cada jugador puede enviar su informe al profesor con las preguntas falladas, y con mandos se guarda un informe con los resultados de cada mando.',
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO'],
     },
@@ -1224,6 +1247,14 @@ export const GAME_INFO = {
         materias: ['Historia', 'Geografía', 'Ciencias Sociales'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    ORIENTACION: {
+        descripcion: 'Carreras de orientación al aire libre con el GPS del móvil. El profesor coloca la salida y las balizas en el patio o en el parque (de pie en cada sitio con «Baliza donde estoy», o tocando el mapa satélite) y elige cómo se juega: 🧭 sin mapa con indicaciones de Norte/Sur/Este/Oeste y metros, 📐 sin mapa con rumbos en grados y la brújula del móvil, o 🗺️ con las balizas en el mapa (satélite, callejero o topográfico, en orden o libre). La baliza se valida sola por GPS o con el código impreso, y puede llevar una pregunta. Genera imprimibles: mapa, mapa mudo, hojas de ruta por cardinales y por rumbos, tarjeta de control, balizas para colgar y solucionario.',
+        tipoPreguntas: 'Orientación espacial (puntos cardinales, rumbos, distancias, escala) y, opcionalmente, una pregunta de respuesta corta en cada baliza.',
+        biblioteca: 'No: cada profesor crea sus carreras en su centro. Se comparten con un código de 6 letras o un QR.',
+        multiplayer: 'Individual o por equipos, cada uno con su móvil. Resultado (balizas, tiempo, preguntas) al profesor y en «Mis registros».',
+        materias: ['Educación Física', 'Geografía', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     AVATAR_CUERPO: {
         descripcion: 'Avatares 3D que copian en tiempo real los movimientos del cuerpo que ve la webcam (brazos, codos, piernas, tronco y cabeza), como un espejo. Modos: «Espejo» (libre, 1 o 2 personas), «Imita la postura» (colocarse como una silueta), «Imita a tu compañero» (por turnos, el líder hace una postura y el otro la copia) y «Coreografía» (seguir pasos al ritmo de la música, tipo Just Dance: ¡PERFECTO!, ¡GENIAL!, BIEN o FALLO y rachas). Lateralidad, esquema corporal, expresión corporal y Educación Física. El reconocimiento del cuerpo (MediaPipe) se hace en el propio navegador: no se envía ninguna imagen.',
         tipoPreguntas: 'Sin preguntas: posturas corporales (brazos en cruz, letra Y, mano derecha/izquierda arriba, robot… y, con el cuerpo entero, estrella, rodilla arriba y sentadilla) y coreografías generadas al azar (tranquila o movida).',
@@ -1455,7 +1486,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI', 'INVASORES'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1465,17 +1496,17 @@ export const MATERIAS_CONFIG = [
     {
         id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
         keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria', 'imperio', 'imperios', 'edad antigua', 'edad media'],
-        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'LINEA_TIEMPO', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI'],
+        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'ORIENTACION', 'LINEA_TIEMPO', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI', 'INVASORES'],
     },
     {
         id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828',
         keywords: ['fisica', 'quimica', 'ciencias', 'energia', 'fuerza', 'reaccion', 'elemento', 'atomo', 'molecula', 'electricidad', 'movimiento', 'calor', 'luz', 'ondas'],
-        specificIds: ['SIMULADORES_FISICA', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI'],
+        specificIds: ['SIMULADORES_FISICA', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI', 'INVASORES'],
     },
     {
         id: 'BIOLOGIA', label: 'Biología', emoji: '🔬', color: '#2E7D32',
         keywords: ['biologia', 'ciencias naturales', 'naturaleza', 'animal', 'planta', 'celula', 'ecosistema', 'anatomia', 'cuerpo', 'organismo', 'evolucion', 'genetica'],
-        specificIds: ['BIOLOGIA', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI'],
+        specificIds: ['BIOLOGIA', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI', 'INVASORES'],
     },
     {
         id: 'MUSICA', label: 'Música', emoji: '🎵', color: '#5E35B1',
@@ -1495,12 +1526,12 @@ export const MATERIAS_CONFIG = [
     {
         id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
-        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA', 'OVNI'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA', 'OVNI', 'INVASORES'],
     },
     {
         id: 'ED_FISICA', label: 'Educación Física', emoji: '🏃', color: '#15803d',
         keywords: ['educacion fisica', 'deporte', 'deportes', 'futbol', 'baloncesto', 'atletismo', 'escalada', 'climbing', 'juegos motores', 'olimpiadas'],
-        specificIds: ['FUTBOLQUIZZ', 'CLIMBING', 'OVNI'],
+        specificIds: ['FUTBOLQUIZZ', 'CLIMBING', 'ORIENTACION', 'OVNI'],
     },
     {
         id: 'TUTORIA', label: 'Tutoría y aula', emoji: '🍎', color: '#c2410c',
@@ -1551,6 +1582,7 @@ const EXTRA_TOOLS = {
     MUSICA:             { id: 'MUSICA',             name: 'Música',           emoji: '🎵', color: '#8b5cf6' },
     GEOGRAFIA:          { id: 'GEOGRAFIA',          name: 'Geografía',        emoji: '🌍', color: '#0d9488' },
     IMPERIOS:           { id: 'IMPERIOS',           name: 'Imperios',         emoji: '🏛️', color: '#b45309' },
+    ORIENTACION:        { id: 'ORIENTACION',        name: 'Orientación',      emoji: '🚩', color: '#c026d3' },
     BIOLOGIA:           { id: 'BIOLOGIA',           name: 'Biología',         emoji: '🔬', color: '#16a34a' },
     GESTION_AULA:       { id: 'GESTION_AULA',       name: 'Gestión Aula',     emoji: '🏫', color: '#e67e22' },
     VISTAS_DIDRICAS:    { id: 'VISTAS_DIDRICAS',    name: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed' },
@@ -1873,6 +1905,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 if (juegoParam.toLowerCase() === 'sintaxis' || juegoParam.toLowerCase() === 'lengua') { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
+                if (juegoParam.toLowerCase() === 'contabilidad') { setSituacionesAprendizaje(true); setSituacionActiva('CONTABILIDAD'); return; }
                 if (juegoParam.toLowerCase() === 'linea_tiempo')    { setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }); return; }
                 let tourConfig = null;
                 const tcParam = params.get('tourconfig');
@@ -1974,6 +2007,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
             } else if (path === 'ovni') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
+            } else if (path === 'invasores') {
+                setJuegoActivo({ tipoJuego: 'INVASORES' });
             } else if (path === 'vanila') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'VANILA' });
             } else if (path === 'labmicrobit') {
@@ -2077,6 +2112,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [pizarraApp,          setPizarraApp]          = useState(false);
     const [quizManosApp,        setQuizManosApp]        = useState(false);
     const [avatarCuerpoApp,     setAvatarCuerpoApp]     = useState(false);
+    const [orientacionApp,      setOrientacionApp]      = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
     const [esculpirApp,         setEsculpirApp]         = useState(false);
@@ -2117,6 +2153,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     useEffect(() => { if (!esculpirApp) refrescarRegistros(); }, [esculpirApp]);
     useEffect(() => { if (!quizManosApp) refrescarRegistros(); }, [quizManosApp]);
     useEffect(() => { if (!avatarCuerpoApp) refrescarRegistros(); }, [avatarCuerpoApp]);
+    useEffect(() => { if (!orientacionApp) refrescarRegistros(); }, [orientacionApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
@@ -2402,6 +2439,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
             return;
         }
 
+        if (appId === 'INVASORES') {
+            window.history.pushState({}, '', '/invasores');
+            setJuegoActivo({ tipoJuego: 'INVASORES', desdeMath: zonaActiva === 'MATH' });
+            return;
+        }
+
         if (appId === 'OVNI') {
             window.history.pushState({}, '', '/ovni');
             setJuegoActivo({ tipoJuego: 'OVNI' });
@@ -2565,6 +2608,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             PIZARRA_TEMATICA:   () => setPizarraApp(true),
             QUIZ_MANOS:         () => setQuizManosApp(true),
             AVATAR_CUERPO:      () => setAvatarCuerpoApp(true),
+            ORIENTACION:        () => { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); },
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
             VISTAS_DIDRICAS:    () => setVistasDidricas(true),
@@ -2766,6 +2810,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         <QuienEsQuienHistorico onExit={() => { setQuienHistoricoApp(false); window.history.pushState({}, '', '/'); }} />
     );
     if (quizManosApp) return <Suspense fallback={null}><QuizManos onExit={() => { setQuizManosApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
+    if (orientacionApp) return <Suspense fallback={null}><Orientacion onExit={() => { setOrientacionApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (avatarCuerpoApp) return <Suspense fallback={null}><AvatarCuerpo onExit={() => { setAvatarCuerpoApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (pizarraApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}>
@@ -2800,6 +2845,11 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 <GranjaInteractiva />
             </div>
         );
+        if (situacionActiva === 'CONTABILIDAD') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflowY: 'auto' }}>
+                <ContabilidadSuper onBack={() => setSituacionActiva(null)} />
+            </div>
+        );
         return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f4fbf4', overflowY: 'auto' }}>
                 <button onClick={() => setSituacionesAprendizaje(false)} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#15803d', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
@@ -2819,6 +2869,16 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                             <div style={{ fontSize: 50, marginBottom: 15 }}>🚜</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#2E7D32', fontSize: '1.4rem' }}>Granja Interactiva</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Resuelve retos de matemáticas, ciencias y proporcionalidad gestionando una granja.</p>
+                        </div>
+                        <div
+                            onClick={() => setSituacionActiva('CONTABILIDAD')}
+                            style={{ background: '#E0F2F1', borderRadius: 20, padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #0f766e' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: 50, marginBottom: 15 }}>🏪📒</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#0f766e', fontSize: '1.4rem' }}>Contabilidad del supermercado</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Lleva las cuentas de un mes: asientos en el Debe y el Haber, IVA del 4, 10 y 21 %, luz, alquiler y la nómina del empleado.</p>
                         </div>
                     </div>
                 </div>
@@ -3040,6 +3100,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'INVASORES') return <InvasoresArcade recurso={juegoActivo.recurso || null} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'OVNI') return <OvniAbduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'LAB_MICROBIT') return <LabMicrobit onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
@@ -4021,6 +4082,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'QUIEN_HISTORICO',     label: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad', action: () => { setQuienHistoricoApp(true); window.history.pushState({}, '', '/quienhistorico'); }, shareable: true, shareUrl: `${window.location.origin}/quienhistorico` },
                     { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },
                     { id: 'QUIZ_MANOS',          label: 'Quiz con los dedos',   emoji: '✋', color: '#7c3aed', action: () => { setQuizManosApp(true); window.history.pushState({}, '', '/manos'); }, shareable: true, shareUrl: `${window.location.origin}/manos` },
+                    { id: 'ORIENTACION',         label: 'Orientación',          emoji: '🚩', color: '#c026d3', action: () => { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); }, shareable: true, shareUrl: `${window.location.origin}/orientacion` },
                     { id: 'AVATAR_CUERPO',       label: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2', action: () => { setAvatarCuerpoApp(true); window.history.pushState({}, '', '/avatar'); }, shareable: true, shareUrl: `${window.location.origin}/avatar` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${basePublica()}?gestion=menu` },

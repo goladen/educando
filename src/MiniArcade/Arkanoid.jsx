@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { arkanoidStart, arkanoidPaddle, arkanoidBrick, arkanoidBallLost } from './sounds';
 import SaveForm from './SaveForm';
 import FullscreenBtn from './FullscreenBtn';
+import MandosEnJuego from '../mandos/RelevosMandos.jsx';
 
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -151,6 +152,16 @@ export default function Arkanoid({ onExit, contained = false, panelId = null }) 
         requestRef.current = requestAnimationFrame(update);
     };
 
+    // Mandos micro:bit: puntos al mando que jugaba cuando se acaba la partida
+    const mandosApi = useRef(null);
+    const finMandos = useRef(false);
+    useEffect(() => {
+        const s = stateRef.current;
+        const fin = s.status === 'gameover' || s.status === 'won';
+        if (fin && !finMandos.current) { finMandos.current = true; mandosApi.current?.finPartida([s.score], { ganador: s.status === 'won' ? 0 : null }); }
+        else if (!fin && s.status !== 'paused') finMandos.current = false;
+    });
+
     const initGame = () => {
         const st = stateRef.current;
         st.paddleX = WIDTH / 2 - PADDLE_W / 2;
@@ -193,6 +204,13 @@ export default function Arkanoid({ onExit, contained = false, panelId = null }) 
             alignItems: 'center', justifyContent: 'center',
             fontFamily: '"Segoe UI", sans-serif', color: '#fff', padding: 10, boxSizing: 'border-box',
         }}>
+            {(!panelId || !window.__arkadePanel) && (
+                <MandosEnJuego clave="ARKANOID" juego="Arkanoid" apiRef={mandosApi}
+                    teclas={[{ I: 'ArrowLeft', D: 'ArrowRight', A: ' ', S: ' ' }]}
+                    estiloFlot={contained ? { position: 'absolute' } : null}
+                    onEvento={(i, ev) => { const s = stateRef.current; if (['idle', 'gameover', 'won'].includes(s.status) && ev.accion === 'S') initGame(); }}
+                    controles={<>Inclina a los lados para mover la pala. <b>A</b> o agitar = lanzar la bola. Agita para empezar otra partida.</>} />
+            )}
             {/* Back */}
             <button onClick={onExit} style={{
                 position: 'absolute', top: 12, left: 12,

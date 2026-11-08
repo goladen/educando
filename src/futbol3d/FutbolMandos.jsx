@@ -14,6 +14,7 @@ import {
 } from '../mandos/mandosMicrobit.js';
 import { GENERADORES, barajar } from '../mandos/QuizMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz, ElegirHoja, preguntasDeHoja } from '../mandos/SelectorRecursoMandos.jsx';
+import GuardarResultadosMandos from '../mandos/GuardarResultadosMandos.jsx';
 import { despertarAudio } from '../utils/sonidosFeedback';
 // Los mismos sonidos y la misma celebración final que la pizarra 2D de Fútbol Quizz
 import { sonidoAcierto, sonidoFallo, sonidoGol, pitido, pitidoTriple, FondoCampeones, VideoCampeones } from './efectosFutbol';
@@ -176,6 +177,15 @@ export default function FutbolMandos({ onExit }) {
         const d = dueloRef.current;
         if (!d || d.cerrado) return;
         Object.entries(d.resp).forEach(([id, l]) => { if (Number(id) < 900) feedbackMando(Number(id), LETRAS.indexOf(l) === d.q.correcta); });
+        // Para el informe: cada duelo cuenta como una pregunta para los dos jugadores
+        setStats(s => {
+            const sig = { ...s };
+            [d.a, d.b].forEach(id => {
+                const ok = LETRAS.indexOf(d.resp[id]) === d.q.correcta;
+                sig[id] = { ...(sig[id] || {}), jugados: (sig[id]?.jugados || 0) + 1, aciertos: (sig[id]?.aciertos || 0) + (ok ? 1 : 0) };
+            });
+            return sig;
+        });
         if (ganador) { sonidoAcierto(); setStats(s => ({ ...s, [ganador]: { ...(s[ganador] || {}), duelos: (s[ganador]?.duelos || 0) + 1 } })); }
         else sonidoFallo();
         setDuelo({ ...d, ganador, cerrado: true });
@@ -444,6 +454,17 @@ export default function FutbolMandos({ onExit }) {
                         ))}
                     </div>
                     <div style={{ ...st.fila, justifyContent: 'center', marginTop: 16 }}>
+                        <GuardarResultadosMandos
+                            tipo="FUTBOL_MANDOS"
+                            juego="Fútbol 3D con mandos"
+                            recursoTitulo={fuente === 'recurso' ? recurso?.titulo || 'Recurso' : fuente === 'sumas' ? 'Sumas y restas' : 'Tablas de multiplicar'}
+                            hoja={fuente === 'recurso' && hojaSel >= 0 ? hojasRecurso[hojaSel]?.nombre || '' : ''}
+                            config={{ marcador: `${marcador.red}-${marcador.blue}` }}
+                            jugadores={filas.map(j => ({
+                                id: j.id, nombre: j.nombre, aciertos: stats[j.id]?.aciertos || 0, intentos: stats[j.id]?.jugados || 0,
+                                extra: { goles: j.goles, duelosGanados: j.duelos, equipo: nombreEquipo[j.team] || j.team },
+                            }))}
+                        />
                         <button style={st.btnGrande} onClick={() => setFase('EQUIPOS')}>🔁 Otro partido</button>
                         <button style={st.btnSec} onClick={onExit}>← Salir</button>
                     </div>

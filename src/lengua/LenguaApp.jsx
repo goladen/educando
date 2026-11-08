@@ -465,7 +465,7 @@ function ModoCompeticionLengua({ tema, ej, cfg, onVolver }) {
         <div style={S.pagina}>
             <Barra titulo={`🪢 ${ej.nombre}`} onVolver={onVolver} />
             <div style={{ maxWidth: 1080, margin: '0 auto', padding: '12px 12px 30px' }}>
-                <CompeticionCuerda onSalir={onVolver} isMobile={movil}
+                <CompeticionCuerda nombre="Lengua" onSalir={onVolver} isMobile={movil}
                     renderPanel={(equipo, api) => <PanelEquipo key={api.key} equipo={equipo} ej={ej} cfg={cfg} color={tema.color} aplicar={api.aplicar} bloqueado={api.bloqueado} />} />
             </div>
         </div>

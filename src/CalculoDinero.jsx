@@ -10,6 +10,7 @@ import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import sndAcierto from './assets/correct.mp3';
 import sndFallo from './assets/sonidomonedamal.mp3';
 import { leerNumeroEs } from './generadorProblemasNumeros';
+import { ITEMS, PRODUCTOS } from './utils/productosSuper';
 
 // Fichas imprimibles (editor + PDF + pizarra + enlace público): se cargan solo al abrirlas
 const FichasDinero = React.lazy(() => import('./FichasDinero'));
@@ -40,53 +41,8 @@ const DENOMINACIONES = [
     { val: 1,     label: '1 cént',   tipo: 'moneda',  file: '1cent.png',   bg: '#d35400' },
 ];
 
-// ─── Contexto: productos (con su tipo de IVA y precio unidad orientativo) ──────
-// iva: 4 (básicos/libros) · 10 (otros alimentos) · 21 (general)
-const ITEMS = [
-    { sing: 'barra de pan',   plural: 'barras de pan',   emoji: '🥖', iva: 4,  pmin: 0.6,  pmax: 1.4 },
-    { sing: 'litro de leche', plural: 'litros de leche', emoji: '🥛', iva: 4,  pmin: 0.8,  pmax: 1.6 },
-    { sing: 'huevo',          plural: 'huevos',          emoji: '🥚', iva: 4,  pmin: 0.2,  pmax: 0.4 },
-    { sing: 'manzana',        plural: 'manzanas',        emoji: '🍎', iva: 4,  pmin: 0.3,  pmax: 0.8 },
-    { sing: 'plátano',        plural: 'plátanos',        emoji: '🍌', iva: 4,  pmin: 0.2,  pmax: 0.6 },
-    { sing: 'naranja',        plural: 'naranjas',        emoji: '🍊', iva: 4,  pmin: 0.3,  pmax: 0.7 },
-    { sing: 'yogur',          plural: 'yogures',         emoji: '🍦', iva: 4,  pmin: 0.4,  pmax: 0.9 },
-    { sing: 'libro',          plural: 'libros',          emoji: '📚', iva: 4,  pmin: 8,    pmax: 22 },
-    { sing: 'paquete de pasta', plural: 'paquetes de pasta', emoji: '🍝', iva: 10, pmin: 0.9, pmax: 2 },
-    { sing: 'zumo',           plural: 'zumos',           emoji: '🧃', iva: 10, pmin: 1,    pmax: 2.5 },
-    { sing: 'pizza',          plural: 'pizzas',          emoji: '🍕', iva: 10, pmin: 3,    pmax: 7 },
-    { sing: 'helado',         plural: 'helados',         emoji: '🍨', iva: 10, pmin: 1.5,  pmax: 3.5 },
-    { sing: 'cuaderno',       plural: 'cuadernos',       emoji: '📓', iva: 21, pmin: 1.5,  pmax: 4 },
-    { sing: 'lápiz',          plural: 'lápices',         emoji: '✏️', iva: 21, pmin: 0.4,  pmax: 1.2 },
-    { sing: 'camiseta',       plural: 'camisetas',       emoji: '👕', iva: 21, pmin: 6,    pmax: 18 },
-    { sing: 'balón',          plural: 'balones',         emoji: '⚽', iva: 21, pmin: 8,    pmax: 20 },
-    { sing: 'mochila',        plural: 'mochilas',        emoji: '🎒', iva: 21, pmin: 10,   pmax: 30 },
-    { sing: 'juguete',        plural: 'juguetes',        emoji: '🧸', iva: 21, pmin: 5,    pmax: 25 },
-];
-
-// ─── Lista de precios del supermercado (precio en CÉNTIMOS) ────────────────────
-// Se usa en el modo "Lista de la compra". Precios cerrados y realistas.
-const PRODUCTOS = [
-    { nombre: 'Pan',       emoji: '🥖', precio: 90 },
-    { nombre: 'Leche',     emoji: '🥛', precio: 120 },
-    { nombre: 'Huevos',    emoji: '🥚', precio: 250 },
-    { nombre: 'Yogures',   emoji: '🍦', precio: 175 },
-    { nombre: 'Queso',     emoji: '🧀', precio: 320 },
-    { nombre: 'Manzanas',  emoji: '🍎', precio: 180 },
-    { nombre: 'Plátanos',  emoji: '🍌', precio: 150 },
-    { nombre: 'Naranjas',  emoji: '🍊', precio: 140 },
-    { nombre: 'Tomates',   emoji: '🍅', precio: 160 },
-    { nombre: 'Lechuga',   emoji: '🥬', precio: 80 },
-    { nombre: 'Arroz',     emoji: '🍚', precio: 110 },
-    { nombre: 'Pasta',     emoji: '🍝', precio: 95 },
-    { nombre: 'Aceite',    emoji: '🫒', precio: 450 },
-    { nombre: 'Zumo',      emoji: '🧃', precio: 130 },
-    { nombre: 'Pizza',     emoji: '🍕', precio: 350 },
-    { nombre: 'Galletas',  emoji: '🍪', precio: 145 },
-    { nombre: 'Chocolate', emoji: '🍫', precio: 160 },
-    { nombre: 'Agua',      emoji: '💧', precio: 190 },
-    { nombre: 'Pollo',     emoji: '🍗', precio: 390 },
-    { nombre: 'Pescado',   emoji: '🐟', precio: 480 },
-];
+// ─── Productos (tipo de IVA + precios) → compartidos en utils/productosSuper.js ──
+// (también los usa la situación de aprendizaje «Contabilidad del supermercado»)
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
 export const DEFAULT_CONFIG = {

@@ -122,6 +122,48 @@ export const problemasCientifica = (n) => {
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  Problemas de áreas y volúmenes (2.º-3.º ESO):
+//  · potencia: elevar al cuadrado/cubo para hallar áreas y volúmenes
+//  · raiz: raíz cuadrada/cúbica para hallar el lado, la arista o el radio
+//  Cada plantilla → { emoji, enun, op, v, unidad } (op: la operación, en texto con ² ³ √ ∛).
+//  Con círculos se usa π = 3,14 y el resultado lleva como mucho 2 decimales.
+// ═════════════════════════════════════════════════════════════════════════════
+const r2 = (x) => Math.round(x * 100) / 100;
+const dec = (x) => String(r2(x)).replace('.', ',');
+export const PROBLEMAS_MEDIDAS = {
+  potencia: [
+    () => { const l = rInt(15, 60); return { emoji: '⬜', enun: `Una baldosa cuadrada mide ${l} cm de lado. ¿Cuál es su área?`, op: `A = ${l}² = ${l * l}`, v: l * l, unidad: 'cm²' }; },
+    () => { const l = rInt(5, 25); return { emoji: '🌱', enun: `Un huerto cuadrado tiene ${l} m de lado. ¿Cuántos metros cuadrados de tierra hay para plantar?`, op: `A = ${l}² = ${l * l}`, v: l * l, unidad: 'm²' }; },
+    () => { const c = rInt(3, 6), l = 8 * c; return { emoji: '♟️', enun: `Un tablero de ajedrez tiene 8 × 8 casillas cuadradas de ${c} cm de lado. ¿Cuál es el área del tablero?`, op: `Lado = 8 · ${c} = ${l} cm → A = ${l}² = ${l * l}`, v: l * l, unidad: 'cm²' }; },
+    () => { const l = rInt(3, 9); return { emoji: '🏠', enun: `Queremos poner parqué en una habitación cuadrada de ${l} m de lado. ¿Cuántos m² de parqué necesitamos?`, op: `A = ${l}² = ${l * l}`, v: l * l, unidad: 'm²' }; },
+    () => { const r = rInt(10, 20); return { emoji: '🍕', enun: `Una pizza redonda tiene ${r} cm de radio. ¿Cuál es su área? (usa π = 3,14)`, op: `A = π · r² = 3,14 · ${r}² = 3,14 · ${r * r} = ${dec(3.14 * r * r)}`, v: r2(3.14 * r * r), unidad: 'cm²' }; },
+    () => { const r = rInt(2, 9); return { emoji: '⛲', enun: `Una fuente circular tiene ${r} m de radio. ¿Qué superficie ocupa? (usa π = 3,14)`, op: `A = π · r² = 3,14 · ${r}² = 3,14 · ${r * r} = ${dec(3.14 * r * r)}`, v: r2(3.14 * r * r), unidad: 'm²' }; },
+    () => { const a = rInt(2, 12); return { emoji: '🎲', enun: `Un cubo tiene ${a} cm de arista. ¿Cuál es su volumen?`, op: `V = ${a}³ = ${a} · ${a} · ${a} = ${a ** 3}`, v: a ** 3, unidad: 'cm³' }; },
+    () => { const a = rInt(2, 9); return { emoji: '📦', enun: `Un depósito con forma de cubo mide ${a} dm de arista. ¿Cuántos litros de agua caben? (1 dm³ = 1 litro)`, op: `V = ${a}³ = ${a ** 3} dm³ = ${a ** 3} litros`, v: a ** 3, unidad: 'litros' }; },
+    () => { const a = rInt(3, 10); return { emoji: '🧊', enun: `¿Cuántos cubitos de 1 cm de arista caben en una caja cúbica de ${a} cm de arista?`, op: `${a}³ = ${a} · ${a} · ${a} = ${a ** 3}`, v: a ** 3, unidad: 'cubitos' }; },
+    () => { const a = rInt(2, 10); return { emoji: '🎁', enun: `Queremos envolver con papel un regalo con forma de cubo de ${a} dm de arista. ¿Cuánto papel necesitamos como mínimo? (el cubo tiene 6 caras)`, op: `Una cara: ${a}² = ${a * a} → 6 · ${a * a} = ${6 * a * a}`, v: 6 * a * a, unidad: 'dm²' }; },
+  ],
+  raiz: [
+    () => { const l = rInt(12, 40); return { emoji: '🏞️', enun: `Una plaza cuadrada tiene un área de ${l * l} m². ¿Cuánto mide su lado?`, op: `l = √${l * l} = ${l}`, v: l, unidad: 'm' }; },
+    () => { const l = rInt(5, 20); return { emoji: '🌱', enun: `Un huerto cuadrado ocupa ${l * l} m². ¿Cuántos metros de valla hacen falta para rodearlo?`, op: `l = √${l * l} = ${l} m → perímetro = 4 · ${l} = ${4 * l}`, v: 4 * l, unidad: 'm' }; },
+    () => { const l = rInt(20, 80); return { emoji: '🖼️', enun: `Un cuadro cuadrado tiene una superficie de ${l * l} cm². ¿Cuánto mide cada lado?`, op: `l = √${l * l} = ${l}`, v: l, unidad: 'cm' }; },
+    () => { const r = rInt(2, 12); const A = r2(3.14 * r * r); return { emoji: '⭕', enun: `Un círculo tiene un área de ${dec(A)} cm². ¿Cuánto mide su radio? (usa π = 3,14)`, op: `r² = ${dec(A)} : 3,14 = ${r * r} → r = √${r * r} = ${r}`, v: r, unidad: 'cm' }; },
+    () => { const r = rInt(3, 15); const A = r2(3.14 * r * r); return { emoji: '🎪', enun: `La pista circular de un circo ocupa ${dec(A)} m². ¿Cuál es su radio? (usa π = 3,14)`, op: `r² = ${dec(A)} : 3,14 = ${r * r} → r = √${r * r} = ${r}`, v: r, unidad: 'm' }; },
+    () => { const a = rInt(2, 12); return { emoji: '🎲', enun: `Un cubo tiene un volumen de ${a ** 3} cm³. ¿Cuánto mide su arista?`, op: `a = ∛${a ** 3} = ${a}`, v: a, unidad: 'cm' }; },
+    () => { const a = rInt(2, 10); return { emoji: '💧', enun: `En un depósito con forma de cubo caben ${a ** 3} litros de agua. ¿Cuánto mide su arista en dm? (1 litro = 1 dm³)`, op: `a = ∛${a ** 3} = ${a}`, v: a, unidad: 'dm' }; },
+    () => { const a = rInt(3, 9); return { emoji: '🧊', enun: `Con ${a ** 3} cubitos de 1 cm de arista se ha construido un cubo grande y macizo. ¿Cuántos cubitos hay en cada arista?`, op: `∛${a ** 3} = ${a}`, v: a, unidad: 'cubitos' }; },
+    () => { const a = rInt(2, 10); return { emoji: '📦', enun: `Una caja cúbica tiene un volumen de ${a ** 3} dm³. ¿Cuál es el área de una de sus caras?`, op: `a = ∛${a ** 3} = ${a} dm → A = ${a}² = ${a * a}`, v: a * a, unidad: 'dm²' }; },
+    () => { const a = rInt(2, 9); return { emoji: '🎁', enun: `Para forrar un cubo entero se han usado ${6 * a * a} cm² de papel. ¿Cuánto mide su arista? (el cubo tiene 6 caras)`, op: `Una cara: ${6 * a * a} : 6 = ${a * a} → a = √${a * a} = ${a}`, v: a, unidad: 'cm' }; },
+  ],
+};
+// n problemas distintos de la clase pedida ('potencia' | 'raiz')
+export const problemasMedidas = (n, clase = 'potencia') => {
+  const lista = PROBLEMAS_MEDIDAS[clase];
+  const orden = shuffle(lista.map((_, i) => i));
+  return Array.from({ length: n }, (_, i) => lista[orden[i % orden.length]]());
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  Radicales
 // ═════════════════════════════════════════════════════════════════════════════
 // Ej. 6: ⁿ√aᵐ (o 1/ⁿ√aᵐ si inv) → a^(±m/n)

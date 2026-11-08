@@ -54,9 +54,9 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { LENGUA:'📖 Lengua', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico' };
-const TIPO_ICON   = { LENGUA:'📖', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' };
-const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
+const TIPO_LABEL  = { LENGUA:'📖 Lengua', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
+const TIPO_ICON   = { LENGUA:'📖', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
+const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE', 'QUIZ_MANDOS', 'MATES_MANDOS', 'PISTA_ROBOTS', 'ARCADE_MANDOS', 'PLATAFORMAS_MANDOS', 'PIKATRON_MANDOS', 'BUNKER_MANDOS', 'BURBUJAS_MANDOS', 'AHORCADO_MANDOS', 'SIXSEVEN_MANDOS', 'MONEYBOARD_MANDOS', 'TRIVIAL_MANDOS']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
 
@@ -642,6 +642,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'CONTABILIDAD_SUPER') return (
+                                    <ContabilidadSuperCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'MUSIC_GAMES') return (
                                     <MusicGamesCard
                                         key={inf.id} inf={inf}
@@ -728,6 +740,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                 );
                                 if (tipo === 'OVNI') return (
                                     <OvniCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
+                                if (tipo === 'INVASORES') return (
+                                    <InvasoresCard
                                         key={inf.id} inf={inf}
                                         onBorrar={()=>borrar(inf.id)}
                                         borrando={borrando===inf.id}
@@ -1598,6 +1622,88 @@ const CalamarCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
                 <div style={{ borderTop:'1px solid #eee', padding:'11px 15px', background:'#fafafa' }}>
                     {bloque('✓ Preguntas acertadas', acertadas, '#27ae60', '#eefaf0')}
                     {bloque('✗ Preguntas falladas', falladas, '#e74c3c', '#fdecea')}
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// Invasión Pi (arcade 1-4 jugadores): un informe por jugador, con puntos, nivel y preguntas falladas.
+const InvasoresCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const intentos = j.intentos ?? ((j.aciertos ?? 0) + (j.fallos ?? 0));
+    const pct = j.porcentaje ?? (intentos > 0 ? Math.round(((j.aciertos ?? 0) / intentos) * 100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const acertadas = j.acertadas || [];
+    const falladas = j.falladas || [];
+    const hayDetalle = acertadas.length > 0 || falladas.length > 0;
+    const variante = j.variante === 'FILTRO' ? '🛸 Filtro de respuestas' : '⌨️ Dispara al responder';
+    const chip = (txt, color = '#7f8c8d', bg = '#f3f4f6') => <span style={{ padding:'2px 8px', borderRadius:20, background:bg, fontSize:'0.76rem', color, fontWeight:700 }}>{txt}</span>;
+
+    const bloque = (titulo, items, color, bg) => items.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.78rem', color, marginBottom: 4 }}>{titulo} ({items.length})</div>
+            {items.map((r, i) => (
+                <div key={i} style={{ background: bg, borderRadius: 7, padding: '6px 9px', marginBottom: 4 }}>
+                    <div style={{ fontSize: '0.82rem', color: '#2c3e50', fontWeight: 600 }}>{r.enunciado}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#7f8c8d' }}>
+                        Respondió: <b style={{ color }}>{r.dada || '—'}</b>
+                        {r.correcta && <> · Correcta: <b style={{ color: '#27ae60' }}>{r.correcta}</b></>}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>}
+                <span style={{ fontSize:'1.4rem' }}>👾</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        {inf.recursoTitulo || 'Invasión Pi'}
+                        {inf.modalidad && <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.78rem' }}>{inf.modalidad}</span>}
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    {chip(`✓ ${j.aciertos ?? 0}`, '#27ae60', '#e8f5e9')}
+                    {chip(`✗ ${j.fallos ?? 0}`, '#e74c3c', '#fdecea')}
+                    {chip(`${pct}%`, pctColor(pct))}
+                    {j.puntos != null && chip(`${j.puntos} pts`, '#0e7490', '#e0f7fa')}
+                    {j.nivel != null && chip(`Nivel ${j.nivel}`, '#7c3aed', '#f3e8ff')}
+                    {j.posicion && chip(`${j.posicion}º puesto`, '#b45309', '#fef3c7')}
+                    {chip(variante)}
+                </div>
+                {hayDetalle && !modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setAbierto(a=>!a);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', color:'#7f8c8d', flexShrink:0 }} title="Ver preguntas">
+                        {abierto ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                    </button>
+                )}
+                {!modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }} title="Eliminar informe"><Trash2 size={13}/></button>
+                )}
+            </div>
+            {abierto && hayDetalle && (
+                <div style={{ borderTop:'1px solid #eee', padding:'11px 15px', background:'#fafafa' }}>
+                    {bloque('✗ Preguntas falladas', falladas, '#e74c3c', '#fdecea')}
+                    {bloque('✓ Preguntas acertadas', acertadas, '#27ae60', '#eefaf0')}
                 </div>
             )}
             {confirmar && (
@@ -2526,6 +2632,70 @@ const VaniLaCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecci
                     <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
                         {palabras.map((p, k) => <span key={k} style={{ padding:'2px 8px', borderRadius:12, background:'#f5f3ff', color:'#5b21b6', fontWeight:600 }}>{p}</span>)}
                         {!palabras.length && <span style={{ color:'#aaa' }}>Sin palabras</span>}
+                    </div>
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// ─── Contabilidad del supermercado (situación de aprendizaje) ──────────────────
+const ContabilidadSuperCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const pct = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos/j.intentos)*100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const icono = e => e === 'ok' ? '✅' : e === 'revelado' ? '👁️' : '⏳';
+    const fmtE = v => (v ?? 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion?onSeleccionar:()=>setAbierto(a=>!a)} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:'pointer' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>🏪</span>
+                <div style={{ flex:1, minWidth:160 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Contabilidad del supermercado{j.empresa ? ` · ${j.empresa}` : ' · Primeros pasos'}</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                        {j.modo && <span style={{ marginLeft:5 }}>· {j.modo === 'reto' ? '🎯 Reto' : '🧭 Con ayuda'}</span>}
+                    </div>
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                <span title="Asientos correctos sin ver la solución" style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.78rem', color:'#27ae60' }}>✓ {j.aciertos??0}/{j.intentos??0}</span>
+                {j.completado && <span style={{ padding:'2px 8px', borderRadius:20, background:j.resultado>=0?'#e8f5e9':'#fdecea', fontWeight:700, fontSize:'0.78rem', color:j.resultado>=0?'#27ae60':'#e74c3c' }}>{j.resultado>=0?'Beneficio':'Pérdida'} {fmtE(Math.abs(j.resultado))}</span>}
+                {abierto ? <ChevronUp size={16} color="#95a5a6"/> : <ChevronDown size={16} color="#95a5a6"/>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            {abierto && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'10px 15px', fontSize:'0.82rem', color:'#2c3e50' }}>
+                    <div style={{ display:'flex', gap:14, flexWrap:'wrap', marginBottom:8, color:'#7f8c8d' }}>
+                        <span>Mes: <b>{j.mes || '—'}</b></span>
+                        <span>Comprobaciones: <b>{j.comprobaciones ?? 0}</b></span>
+                        <span>Pistas: <b>{j.pistas ?? 0}</b></span>
+                        <span>Soluciones vistas: <b>{j.revelados ?? 0}</b></span>
+                        {j.quiz != null && <span>¿Debe o Haber?: <b>{j.quiz}/10</b></span>}
+                    </div>
+                    {(j.pasos || []).length > 0 && (
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                            <b style={{ color:'#7f8c8d' }}>🐣 Primeros pasos:</b>
+                            {j.pasos.map(p => <span key={p.n} title={p.titulo} style={{ padding:'1px 8px', borderRadius:20, background:p.superado?'#e8f5e9':p.mejor!=null?'#fff4e5':'#f3f4f6', color:p.superado?'#27ae60':p.mejor!=null?'#e67e22':'#aaa', fontWeight:700 }}>{p.n}. {p.superado?'✅':''} {p.mejor!=null?`${p.mejor}/${p.total}`:'—'}</span>)}
+                        </div>
+                    )}
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(230px, 1fr))', gap:4 }}>
+                        {(j.asientos || []).map((a, i) => (
+                            <div key={i}>{icono(a.estado)} <b>{i+1}.</b> {a.titulo} <span style={{ color:'#aaa' }}>({a.intentos} int.{a.pistas ? `, ${a.pistas} pista${a.pistas>1?'s':''}` : ''})</span></div>
+                        ))}
                     </div>
                 </div>
             )}

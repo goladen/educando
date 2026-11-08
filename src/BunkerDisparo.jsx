@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import MandosEnJuego from './mandos/RelevosMandos.jsx';
 import * as THREE from 'three';
 import { X, Play, Trophy, Search, RefreshCw, Save, Target, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import sndAplausos from './assets/applause-small-audience-97257.mp3';
@@ -1589,7 +1590,22 @@ const HUD_CSS = `
 // =====================================================================
 //  COMPONENTE PRINCIPAL
 // =====================================================================
-export default function BunkerDisparo({ recurso = null, onExit, usuario, autoStart = false }) {
+// Envoltorio: los mandos micro:bit (relevos) viven fuera del juego para no perder el marcador entre pantallas.
+export default function BunkerDisparo(props) {
+    const mandosApi = useRef(null);
+    const juegoMandos = useRef({});
+    return (
+        <>
+            <BunkerDisparoJuego {...props} mandosApi={mandosApi} juegoMandos={juegoMandos} />
+            <MandosEnJuego clave="BUNKER" juego="Bunker" tipo="BUNKER_MANDOS" apiRef={mandosApi}
+                teclas={[{ I: 'ArrowLeft', D: 'ArrowRight', F: 'ArrowUp', T: 'ArrowDown', A: ' ', S: ' ', B: 'r' }]}
+                onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
+                controles={<>Inclina a los lados para <b>girar</b> y hacia delante / atrás para <b>avanzar o retroceder</b>. <b>A</b> o agitar = disparar a la respuesta correcta, <b>B</b> = recargar. Al acabar, <b>agita</b> para jugar otra vez (con 🔄 relevos, le toca al siguiente mando).</>} />
+        </>
+    );
+}
+
+function BunkerDisparoJuego({ recurso = null, onExit, usuario, autoStart = false, mandosApi, juegoMandos }) {
     const [gameState, setGameState] = useState('MENU'); // MENU | PLAYING | WIN | GAMEOVER
     const [score, setScore] = useState(0);
     const [resultado, setResultado] = useState({ win: false, alcanzada: 0, total: 0, acertadas: 0, falladas: 0 });
@@ -1649,6 +1665,7 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
             xrSession: xrSesionRef.current,
             onScore: (s) => setScore(s),
             onEnd: ({ win, score: sc, alcanzada, total, acertadas, falladas }) => {
+                mandosApi?.current?.finPartida([sc], { aciertos: [acertadas || 0], intentos: [(acertadas || 0) + (falladas || 0)] });
                 setScore(sc);
                 setResultado({ win, alcanzada, total, acertadas, falladas });
                 setGameState(win ? 'WIN' : 'GAMEOVER');
@@ -1661,6 +1678,7 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
 
     const reiniciar = () => { if (ultimoInicioRef.current) empezar(ultimoInicioRef.current, true); };
     const volverMenu = () => { setGameState('MENU'); setScore(0); };
+    if (juegoMandos) juegoMandos.current.onEvento = (i, ev) => { if ((gameState === 'WIN' || gameState === 'GAMEOVER') && ev.accion === 'S') reiniciar(); };
 
     // --- Guardar puntuación en ranking ---
     const guardarPuntuacion = async () => {

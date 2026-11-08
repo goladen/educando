@@ -1394,7 +1394,7 @@ function DificultadSelector({ value, onChange }) {
 // ─── Tirón de cuerda por EQUIPOS (componente compartido: escenario, metas, personajes y mandos) ───
 function CompeticionDual({ isMobile, onSalir }) {
   return (
-    <CompeticionCuerda metaInicial={7} isMobile={isMobile} onSalir={onSalir}
+    <CompeticionCuerda nombre="Sistemas de ecuaciones" metaInicial={7} isMobile={isMobile} onSalir={onSalir}
       renderPanel={(equipo, { key, aplicar, bloqueado }) => (
         <DualColumn key={key} isMobile={isMobile} initialMode="2x2" panelLabel={equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}
           panelColor={equipo === 1 ? '#3498db' : '#e74c3c'} competitivo onResultado={aplicar} bloqueado={bloqueado} />

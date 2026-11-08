@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import SaveForm from './SaveForm';
 import FullscreenBtn from './FullscreenBtn';
+import MandosEnJuego from '../mandos/RelevosMandos.jsx';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const COLS = 15, ROWS = 13, T = 32;
@@ -754,12 +755,22 @@ export default function Bomberman({ onExit }) {
 
     const ACC = '#ffdd00';
 
+    // Mandos micro:bit: puntos al mando que jugaba cuando se acaba la partida
+    const mandosApi = useRef(null);
+    useEffect(() => {
+        if (ui.status === 'gameover' || ui.status === 'won') mandosApi.current?.finPartida([ui.score], { ganador: ui.status === 'won' ? 0 : null });
+    }, [ui.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
     return (
         <div style={{
             position: 'fixed', inset: 0, zIndex: 9999, background: '#080814',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             fontFamily: "'Courier New', monospace", color: '#fff',
         }}>
+            <MandosEnJuego clave="BOMBERMAN" juego="Bomberman" apiRef={mandosApi}
+                teclas={[{ I: 'ArrowLeft', D: 'ArrowRight', F: 'ArrowUp', T: 'ArrowDown', A: ' ', S: ' ' }]}
+                onEvento={(i, ev) => { if (['idle', 'gameover', 'won'].includes(gRef.current?.status || ui.status) && ev.accion === 'S') startGame(); }}
+                controles={<>Inclina el mando para andar (delante = arriba). <b>A</b> o agitar = poner una bomba. Agita para empezar otra partida.</>} />
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 520, padding: '4px 8px', boxSizing: 'border-box' }}>
                 <button onClick={onExit} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: '0.8rem' }}>← Arkade</button>

@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
-
-const THEME_COLORS = {
-  dark:   { bg: 'linear-gradient(135deg,#1a0533,#0d1b4a)', accent: '#6c63ff', text: '#fff' },
-  purple: { bg: 'linear-gradient(135deg,#6c63ff,#a855f7,#ec4899)', accent: '#fff', text: '#fff' },
-  light:  { bg: '#f0f4ff', accent: '#6c63ff', text: '#1a1a2e' },
-  blue:   { bg: 'linear-gradient(160deg,#0A0E45,#0d0d2b)', accent: '#a78bfa', text: '#fff' },
-  green:  { bg: 'linear-gradient(135deg,#064e3b,#065f46)', accent: '#34d399', text: '#fff' },
-  orange: { bg: 'linear-gradient(135deg,#7c2d12,#431407)', accent: '#fb923c', text: '#fff' },
-};
+import { THEMES as THEME_COLORS } from './presentacion/temas';
 
 function PresentationCard({ pres, onEdit, onPreview, onDelete, deleting }) {
   const [copied, setCopied] = useState(false);

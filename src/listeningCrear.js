@@ -14,26 +14,37 @@
 
 export const TIPO_LISTENING_RECURSO = 'LISTENING_RECURSO';
 
+// Voces Kokoro (se generan en el navegador, utils/kokoroTTS.js): id 'kokoro:<voz>'.
+// Las de Edge (…Neural) se generan en api/listening-tts.js.
+const kokoro = (...vs) => vs.map(([v, label]) => ({ id: 'kokoro:' + v, label, motor: 'kokoro' }));
+export const motorDeVoz = (id) => (String(id || '').startsWith('kokoro:') ? 'kokoro' : 'edge');
+
 export const IDIOMAS_CREAR = {
     en: { flag: '🇬🇧', nombre: 'inglés',    label: 'English',   lang: 'en-GB', voces: [
+        ...kokoro(['bf_emma', 'Emma · UK'], ['bm_george', 'George · UK'], ['bf_isabella', 'Isabella · UK'], ['bm_fable', 'Fable · UK'],
+            ['af_heart', 'Heart · US'], ['am_michael', 'Michael · US'], ['af_bella', 'Bella · US'], ['am_fenrir', 'Fenrir · US']),
         { id: 'en-GB-SoniaNeural', label: 'Sonia · UK' }, { id: 'en-GB-RyanNeural', label: 'Ryan · UK' },
         { id: 'en-US-JennyNeural', label: 'Jenny · US' }, { id: 'en-US-GuyNeural', label: 'Guy · US' },
     ] },
     fr: { flag: '🇫🇷', nombre: 'francés',   label: 'Français',  lang: 'fr-FR', voces: [
         { id: 'fr-FR-DeniseNeural', label: 'Denise' }, { id: 'fr-FR-HenriNeural', label: 'Henri' },
+        ...kokoro(['ff_siwis', 'Siwis']),
     ] },
     de: { flag: '🇩🇪', nombre: 'alemán',    label: 'Deutsch',   lang: 'de-DE', voces: [
         { id: 'de-DE-KatjaNeural', label: 'Katja' }, { id: 'de-DE-ConradNeural', label: 'Conrad' },
     ] },
     it: { flag: '🇮🇹', nombre: 'italiano',  label: 'Italiano',  lang: 'it-IT', voces: [
         { id: 'it-IT-ElsaNeural', label: 'Elsa' }, { id: 'it-IT-DiegoNeural', label: 'Diego' },
+        ...kokoro(['if_sara', 'Sara'], ['im_nicola', 'Nicola']),
     ] },
     pt: { flag: '🇵🇹', nombre: 'portugués', label: 'Português', lang: 'pt-PT', voces: [
         { id: 'pt-PT-RaquelNeural', label: 'Raquel · PT' }, { id: 'pt-PT-DuarteNeural', label: 'Duarte · PT' },
         { id: 'pt-BR-FranciscaNeural', label: 'Francisca · BR' }, { id: 'pt-BR-AntonioNeural', label: 'Antonio · BR' },
+        ...kokoro(['pf_dora', 'Dora · BR'], ['pm_alex', 'Alex · BR']),
     ] },
     es: { flag: '🇪🇸', nombre: 'español',   label: 'Español',   lang: 'es-ES', voces: [
         { id: 'es-ES-ElviraNeural', label: 'Elvira' }, { id: 'es-ES-AlvaroNeural', label: 'Álvaro' },
+        ...kokoro(['ef_dora', 'Dora'], ['em_alex', 'Alex']),
     ] },
     ca: { flag: '🏴', nombre: 'catalán',   label: 'Català',    lang: 'ca-ES', voces: [
         { id: 'ca-ES-JoanaNeural', label: 'Joana' }, { id: 'ca-ES-EnricNeural', label: 'Enric' },

@@ -16,6 +16,7 @@ import wrongSoundSrc   from './assets/wrong.mp3';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego from './mandos/RelevosMandos.jsx';
 // Jugar con el cuerpo (webcam): girar la cabeza = andar, saltar = saltar. Se carga al activarlo.
 const PanelControlCuerpo = React.lazy(() => import('./cuerpo/PanelControlCuerpo.jsx'));
@@ -815,11 +816,14 @@ function PantallaMenu({ onEligir, onRecurso, onExit }) {
 
   if (recursoSeleccionado) {
     return (
-      <PantallaSelectorHoja
-        recurso={recursoSeleccionado}
-        onJugar={onRecurso}
-        onBack={()=>setRecursoSeleccionado(null)}
-      />
+      <>
+        <PantallaSelectorHoja
+          recurso={recursoSeleccionado}
+          onJugar={onRecurso}
+          onBack={()=>setRecursoSeleccionado(null)}
+        />
+        <FichaFlotante recurso={recursoSeleccionado} />
+      </>
     );
   }
 

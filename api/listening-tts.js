@@ -12,6 +12,11 @@
 //   · destino: 'tour' → carpeta tour-solar/<uid> (voces del tour del Sistema Solar).
 // → { url, publicId, bytes, duracion }
 //
+// Voces Kokoro (src/utils/kokoroTTS.js): el mp3 se genera en el navegador y
+// aquí solo se usan dos acciones auxiliares:
+//   POST { accion:'firmarSubida' } → { cloud, apiKey, folder, timestamp, signature }
+//   POST { accion:'borrar', publicId } → borra un audio de listening/<uid>
+//
 // Exige sesión de Firebase (cualquier usuario, no solo el admin): la
 // subida va a la carpeta listening/<uid> para poder borrar solo lo propio.
 //
@@ -39,6 +44,18 @@ MsEdgeTTS.getSynthUrl = async function () {
     const url = await urlOriginal.call(this);
     return conexiones++ % 3 === 2 ? url : url.replace(WSS_ANTIGUO, WSS_NUEVO);
 };
+
+// Borra un mp3 (resource_type "video") de Cloudinary; si falla queda un huérfano
+async function borrarVideo(cloud, apiKey, secret, publicId) {
+    try {
+        const q = new URLSearchParams();
+        q.append('public_ids[]', publicId);
+        await fetch(`https://api.cloudinary.com/v1_1/${cloud}/resources/video/upload?${q}`, {
+            method: 'DELETE',
+            headers: { Authorization: 'Basic ' + Buffer.from(`${apiKey}:${secret}`).toString('base64') },
+        });
+    } catch { /* no es crítico */ }
+}
 
 function firmar(params, secret) {
     const cadena = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('&');
@@ -202,6 +219,20 @@ export default async function handler(req, res) {
     if (!creds && !soloAudio) return res.status(500).json({ error: 'Cloudinary no está configurado en el servidor.' });
     const { cloud, apiKey, secret } = creds || {};
 
+    // ── voz Kokoro: el audio se genera en el navegador (src/utils/kokoroTTS.js)
+    //    y aquí solo se firma la subida a listening/<uid> y se borra el anterior
+    if (req.body?.accion === 'firmarSubida') {
+        const folder = `listening/${usuario.uid}`;
+        const timestamp = Math.round(Date.now() / 1000);
+        return res.status(200).json({ cloud, apiKey, folder, timestamp, signature: firmar({ folder, timestamp }, secret) });
+    }
+    if (req.body?.accion === 'borrar') {
+        const publicId = String(req.body.publicId || '');
+        if (!publicId.startsWith(`listening/${usuario.uid}/`)) return res.status(403).json({ error: 'Ese audio no es tuyo.' });
+        await borrarVideo(cloud, apiKey, secret, publicId);
+        return res.status(200).json({ ok: true });
+    }
+
     // ── parámetros ──────────────────────────────────────────────────────────
     const { texto = '', voz = 'en-GB-SoniaNeural', voz2 = null, dialogo = false, rate = '-10%', anterior = null, destino = null } = req.body || {};
     const limpio = String(texto).replace(/[ \t]+/g, ' ').trim();
@@ -249,14 +280,7 @@ export default async function handler(req, res) {
 
     // ── borrar el audio anterior (solo si es de este usuario) ──────────────
     if (anterior && String(anterior).startsWith(`${carpeta}/`) && anterior !== subida.public_id) {
-        try {
-            const q = new URLSearchParams();
-            q.append('public_ids[]', anterior);
-            await fetch(`https://api.cloudinary.com/v1_1/${cloud}/resources/video/upload?${q}`, {
-                method: 'DELETE',
-                headers: { Authorization: 'Basic ' + Buffer.from(`${apiKey}:${secret}`).toString('base64') },
-            });
-        } catch { /* no es crítico: queda un archivo huérfano */ }
+        await borrarVideo(cloud, apiKey, secret, anterior);
     }
 
     return res.status(200).json({

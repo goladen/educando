@@ -54,8 +54,11 @@ export const PixelSprite = memo(function PixelSprite({ grid, color, blanco = '#f
   );
 });
 
+// Índice siempre válido: con t negativo (cuenta atrás) o NaN, `x % n` daba -1/NaN → sprite undefined.
+const idx = (v, n) => { const k = Math.trunc(Number(v)) || 0; return ((k % n) + n) % n; };
+
 export const AlienSVG = ({ sprite = 0, frame = 0, color, className, style }) => (
-  <PixelSprite grid={ALIENS[sprite % ALIENS.length][frame % 2]} color={color} className={className} style={style} />
+  <PixelSprite grid={ALIENS[idx(sprite, ALIENS.length)][idx(frame, 2)]} color={color} className={className} style={style} />
 );
 
 export const NaveSVG = ({ color, className, style }) => (

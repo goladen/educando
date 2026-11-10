@@ -107,6 +107,7 @@ function opcionesFalsas(q, correcta, pool) {
 
 /** Ejercicio de una ficha → pregunta del quiz, o null si no se puede jugar en ese modo. */
 function aPregunta(fuente, ap, { numerico, maxNum, pool = [] }) {
+  if (ap.noJuego) return null; // p. ej. «une con flechas»: solo para papel y pizarra
   const q = elegirRespuesta(fuente, ap);
   if (!q) return null;
   const base = {

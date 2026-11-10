@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import CargandoChunk from './CargandoChunk';
 import BotonPdfRecurso from './BotonPdfRecurso';
+import FichaFlotante from './FichaFlotante';
 import { TOUR_PLANETAS } from '../Simuladores física/sistemaSolarTour';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -3024,20 +3025,20 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 </Suspense>
             </div>
         );
-        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <><Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="GEOMETRIX" /></>;
-        if (juegoActivo.tipoJuego === 'CALCULO') return <><CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="CALCULO" /></>;
-        if (juegoActivo.tipoJuego === 'DINERO') return <><CalculoDinero usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} /><BotonCalculadora app="DINERO" /></>;
-        if (juegoActivo.tipoJuego === 'FRACCIONES') return <><Fracciones usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} /><BotonCalculadora app="FRACCIONES" /></>;
+        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <><Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="GEOMETRIX" /><FichaFlotante tema="geometria" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'CALCULO') return <><CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="CALCULO" /><FichaFlotante tema="calculo" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'DINERO') return <><CalculoDinero usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} /><BotonCalculadora app="DINERO" /><FichaFlotante tema="dinero" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'FRACCIONES') return <><Fracciones usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} /><BotonCalculadora app="FRACCIONES" /><FichaFlotante tema="fracciones" alAbrir="usar" /></>;
         if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'ECUACIONES') return <><Ecuaciones usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="ECUACIONES" /></>;
-        if (juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="POTENCIAS_RAICES" /></>;
-        if (juegoActivo.tipoJuego === 'FUNCIONES') return <><Funciones onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="FUNCIONES" /></>;
-        if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /></>;
-        if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <><AlgebraApp      usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="POLINOMIOS" /></>;
-        if (juegoActivo.tipoJuego === 'ESTADISTICA') return <><EstadisticaApp  usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="ESTADISTICA" /></>;
-        if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'ECUACIONES') return <><Ecuaciones usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="ECUACIONES" /><FichaFlotante tema="ecuaciones" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <><EcuacionSistemas onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><FichaFlotante tema="sistemas" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="POTENCIAS_RAICES" /><FichaFlotante tema="potencias" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'FUNCIONES') return <><Funciones onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="FUNCIONES" /><FichaFlotante tema="funciones" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /><FichaFlotante tema="geoAnalitica" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <><AlgebraApp      usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="POLINOMIOS" /><FichaFlotante tema="polinomios" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'ESTADISTICA') return <><EstadisticaApp  usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="ESTADISTICA" /><FichaFlotante tema="estadistica" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <><SimuladorDados onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><FichaFlotante tema="probabilidad" alAbrir="usar" /></>;
         if (juegoActivo.tipoJuego === 'CALCULADORA') return <UsoCalculadora key={`${juegoActivo.bloque}-${juegoActivo.item}`} bloqueInicial={juegoActivo.bloque} itemInicial={juegoActivo.item} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_OAOA') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflow: 'hidden' }}>
@@ -3054,12 +3055,14 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F3E5F5', overflowY: 'auto' }}>
                 <button onClick={() => { window.history.pushState({}, '', '/primaria'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#7B1FA2', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
                 <JuegoDivisibilidad />
+                <FichaFlotante tema="divisibilidad" alAbrir="usar" />
             </div>
         );
         if (juegoActivo.tipoJuego === 'GEO_PERIMETRO_AREA') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#ecf0f1', overflowY: 'auto' }}>
                 <button onClick={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#2E7D32', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
                 <PerimetroArea />
+                <FichaFlotante tema="geometria" alAbrir="usar" arriba={12} />
             </div>
         );
         if (juegoActivo.tipoJuego === 'GEO_VISOR_POLIEDROS') return (
@@ -3105,11 +3108,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'LAB_MICROBIT') return <LabMicrobit onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_MANDOS') return <QuizMandos soloMates onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'MONEYBOARD') return <MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'SIXSEVEN') return <><SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} /><FichaFlotante tema="calculo" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'BUNKER') return <><BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} /><FichaFlotante recurso={juegoActivo.recurso} /></>;
+        if (juegoActivo.tipoJuego === 'MONEYBOARD') return <><MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} /><FichaFlotante recurso={juegoActivo.recurso} /></>;
         if (juegoActivo.tipoJuego === 'ESCAPE_HALLOWEEN') return <EscapeHalloween usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'CALAMAR') return <JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'CALAMAR') return <><JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} /><FichaFlotante recurso={juegoActivo.recurso} /></>;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
             const salirTrivial = () => {
                 window.history.pushState({}, '', window.location.pathname);
@@ -3123,17 +3126,17 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                 onBuscar={() => setJuegoActivo(prev => ({ ...prev, usarBuscador: true }))}
             />;
         }
-        if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
-        if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PIKATRON') return <><PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
+        if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <><Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} /><FichaFlotante recurso={juegoActivo} /></>;
+        if (juegoActivo.tipoJuego === 'RULETA') return <><RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
 
         if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <Ahorcado recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <><TextWordleGame recursoInicial={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo.juegoLibre ? null : juegoActivo} /></>;
+        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <><SopaDeLetrasGame recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo.juegoLibre ? null : juegoActivo} /></>;
+        if (juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <><Ahorcado recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo.juegoLibre ? null : juegoActivo} /></>;
+        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <><PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
 
-        return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        return <><GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
     }
 
     // --- PANTALLA EXCLUSIVA MATH WORLD ---
@@ -4526,18 +4529,18 @@ const [entrando, setEntrando] = useState(false);
 
     if (juegoActivo) {
         // Usa handleExitGame en lugar de setJuegoActivo(null)
-        if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <><Geometrix usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRIX" /></>;
-        if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <><CalculoMental usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="CALCULO" /></>;
-        if (appData.id === 'DINERO' || juegoActivo.tipoJuego === 'DINERO') return <><CalculoDinero usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="DINERO" /></>;
-        if (appData.id === 'FRACCIONES' || juegoActivo.tipoJuego === 'FRACCIONES') return <><Fracciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FRACCIONES" /></>;
-        if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <><Ecuaciones onExit={handleExitGame} /><BotonCalculadora app="ECUACIONES" /></>;
-        if (appData.id === 'ECUACION_SISTEMAS' || juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={handleExitGame} />;
-        if (appData.id === 'POTENCIAS_RAICES' || juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={handleExitGame} /><BotonCalculadora app="POTENCIAS_RAICES" /></>;
-        if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <><Funciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FUNCIONES" /></>;
-        if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /></>;
-        if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <><AlgebraApp     usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="POLINOMIOS" /></>;
-        if (appData.id === 'ESTADISTICA'  || juegoActivo.tipoJuego === 'ESTADISTICA')  return <><EstadisticaApp  usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="ESTADISTICA" /></>;
-        if (appData.id === 'PROBABILIDAD' || juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados                    onExit={handleExitGame} />;
+        if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <><Geometrix usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRIX" /><FichaFlotante tema="geometria" alAbrir="usar" /></>;
+        if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <><CalculoMental usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="CALCULO" /><FichaFlotante tema="calculo" alAbrir="usar" /></>;
+        if (appData.id === 'DINERO' || juegoActivo.tipoJuego === 'DINERO') return <><CalculoDinero usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="DINERO" /><FichaFlotante tema="dinero" alAbrir="usar" /></>;
+        if (appData.id === 'FRACCIONES' || juegoActivo.tipoJuego === 'FRACCIONES') return <><Fracciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FRACCIONES" /><FichaFlotante tema="fracciones" alAbrir="usar" /></>;
+        if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <><Ecuaciones onExit={handleExitGame} /><BotonCalculadora app="ECUACIONES" /><FichaFlotante tema="ecuaciones" alAbrir="usar" /></>;
+        if (appData.id === 'ECUACION_SISTEMAS' || juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <><EcuacionSistemas onExit={handleExitGame} /><FichaFlotante tema="sistemas" alAbrir="usar" /></>;
+        if (appData.id === 'POTENCIAS_RAICES' || juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={handleExitGame} /><BotonCalculadora app="POTENCIAS_RAICES" /><FichaFlotante tema="potencias" alAbrir="usar" /></>;
+        if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <><Funciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FUNCIONES" /><FichaFlotante tema="funciones" alAbrir="usar" /></>;
+        if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /><FichaFlotante tema="geoAnalitica" alAbrir="usar" /></>;
+        if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <><AlgebraApp     usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="POLINOMIOS" /><FichaFlotante tema="polinomios" alAbrir="usar" /></>;
+        if (appData.id === 'ESTADISTICA'  || juegoActivo.tipoJuego === 'ESTADISTICA')  return <><EstadisticaApp  usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="ESTADISTICA" /><FichaFlotante tema="estadistica" alAbrir="usar" /></>;
+        if (appData.id === 'PROBABILIDAD' || juegoActivo.tipoJuego === 'PROBABILIDAD') return <><SimuladorDados onExit={handleExitGame} /><FichaFlotante tema="probabilidad" alAbrir="usar" /></>;
         if (appData.id === 'RETOS'        || juegoActivo.tipoJuego === 'RETOS')        return <RetosApp usuario={usuario}        onExit={handleExitGame} />;
 
     }
@@ -4556,16 +4559,16 @@ if (appData.id === 'LISTENING') return <Listening usuario={usuario} onExit={onHo
 
 if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={onHome} />;
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
-    if (appData.id === 'GEOMETRIX') return <><Geometrix usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRIX" /></>;
-    if (appData.id === 'CALCULO') return <><CalculoMental usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="CALCULO" /></>;
-    if (appData.id === 'DINERO') return <><CalculoDinero usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="DINERO" /></>;
-    if (appData.id === 'FRACCIONES') return <><Fracciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FRACCIONES" /></>;
-    if (appData.id === 'ECUACIONES') return <><Ecuaciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="ECUACIONES" /></>;
-    if (appData.id === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={handleExitGame} />;
-    if (appData.id === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={handleExitGame} /><BotonCalculadora app="POTENCIAS_RAICES" /></>;
+    if (appData.id === 'GEOMETRIX') return <><Geometrix usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRIX" /><FichaFlotante tema="geometria" alAbrir="usar" /></>;
+    if (appData.id === 'CALCULO') return <><CalculoMental usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="CALCULO" /><FichaFlotante tema="calculo" alAbrir="usar" /></>;
+    if (appData.id === 'DINERO') return <><CalculoDinero usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="DINERO" /><FichaFlotante tema="dinero" alAbrir="usar" /></>;
+    if (appData.id === 'FRACCIONES') return <><Fracciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FRACCIONES" /><FichaFlotante tema="fracciones" alAbrir="usar" /></>;
+    if (appData.id === 'ECUACIONES') return <><Ecuaciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="ECUACIONES" /><FichaFlotante tema="ecuaciones" alAbrir="usar" /></>;
+    if (appData.id === 'ECUACION_SISTEMAS') return <><EcuacionSistemas onExit={handleExitGame} /><FichaFlotante tema="sistemas" alAbrir="usar" /></>;
+    if (appData.id === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={handleExitGame} /><BotonCalculadora app="POTENCIAS_RAICES" /><FichaFlotante tema="potencias" alAbrir="usar" /></>;
     if (appData.id === 'CALCULADORA') return <UsoCalculadora onExit={handleExitGame} />;
-    if (appData.id === 'FUNCIONES') return <><Funciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FUNCIONES" /></>;
-    if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /></>;
+    if (appData.id === 'FUNCIONES') return <><Funciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FUNCIONES" /><FichaFlotante tema="funciones" alAbrir="usar" /></>;
+    if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /><FichaFlotante tema="geoAnalitica" alAbrir="usar" /></>;
 
     // ------------------------// ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---
@@ -4721,15 +4724,15 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
     }
 
     if (juegoActivo) {
-        if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <><PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
+        if (appData.id === 'RULETA') return <><RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
         // --- AÑADIDO: Distinguir Wordle y Sopa ---
-        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'AHORCADO' || juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <Ahorcado recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <><TextWordleGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
+        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <><SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
+        if (appData.id === 'AHORCADO' || juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <><Ahorcado recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
         if (appData.id === 'ETIQUETAS' || juegoActivo.tipoJuego === 'ETIQUETAS')     return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
-        return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <><PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
+        return <><GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
     }
 
     return (

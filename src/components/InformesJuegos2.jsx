@@ -1201,6 +1201,51 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             )}
                         </>);
                     })()}
+                    {/* Problemas de Álgebra: fórmulas de otras materias + áreas/perímetros con polinomios */}
+                    {tipo === 'ALGEBRA' && jugs[0]?.problemasAlgebra && (() => {
+                        const { formulas: FO, geometria: GE } = jugs[0].problemasAlgebra;
+                        const caja = { marginTop:12, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, border:'1px solid #ecf0f1' };
+                        const tit = { fontSize:'0.72rem', color:'#7f8c8d', fontWeight:700, letterSpacing:.5, marginBottom:8 };
+                        const chip = (bg, col) => ({ padding:'1px 7px', borderRadius:10, background:bg, color:col, fontSize:'0.72rem', fontWeight:700, whiteSpace:'nowrap' });
+                        return (<>
+                            {FO && (
+                                <div style={caja}>
+                                    <div style={tit}>🧪 FÓRMULAS — {FO.aciertos}/{FO.ejercicios} CORRECTAS{FO.pistas ? ` · ${FO.pistas} con pista` : ''}</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:8 }}>
+                                        {Object.entries(FO.porMateria || {}).map(([m, d]) => <span key={m} style={chip('#eaf2f8', '#2471a3')}>{m}: {d.aciertos}/{d.ejercicios}</span>)}
+                                    </div>
+                                    <div style={{ maxHeight:260, overflowY:'auto' }}>
+                                        {(FO.detalle || []).map((e, i) => (
+                                            <div key={i} style={{ padding:'4px 0', borderBottom:'1px solid #ecf0f1', fontSize:'0.78rem' }}>
+                                                <span style={{ fontWeight:700, color: e.ok ? '#27ae60' : '#e74c3c' }}>{e.ok ? '✓' : '✗'}</span>{' '}
+                                                <b style={{ color:'#2c3e50' }}>{e.formula}</b> <span style={{ color:'#95a5a6' }}>({e.materia}{e.despejar ? ' · despejar' : ''}{e.pista ? ' · 💡 pista' : ''})</span>
+                                                <div style={{ color:'#7f8c8d', paddingLeft:16, fontFamily:'Georgia,serif' }}>{e.pregunta} → respondió {e.respuesta}{!e.ok ? ` · correcto: ${e.correcta}` : ''}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {GE && (
+                                <div style={caja}>
+                                    <div style={tit}>📐 ÁREAS Y PERÍMETROS CON POLINOMIOS — {GE.aciertos}/{GE.total} RESPUESTAS · {GE.perfectos}/{GE.ejercicios} FIGURAS PERFECTAS</div>
+                                    <div style={{ maxHeight:280, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
+                                        {(GE.detalle || []).map((e, i) => (
+                                            <div key={i} style={{ background:'white', border:'1px solid #ecf0f1', borderLeft:`4px solid ${e.ok ? '#27ae60' : '#e67e22'}`, borderRadius:8, padding:'6px 9px', fontSize:'0.78rem' }}>
+                                                <div style={{ display:'flex', justifyContent:'space-between', gap:8 }}>
+                                                    <b style={{ color:'#2c3e50' }}>{e.figura}</b>
+                                                    <span style={chip('#f4f6f7', e.ok ? '#27ae60' : '#e67e22')}>{e.aciertos}/{e.total}</span>
+                                                </div>
+                                                <div style={{ color:'#7f8c8d', fontFamily:'Georgia,serif' }}>{e.lados}</div>
+                                                {(e.preguntas || []).filter(q => !q.ok).map((q, j) => (
+                                                    <div key={j} style={{ color:'#c0392b', fontFamily:'Georgia,serif' }}>✗ {q.p} respondió {q.resp} · correcto: {q.correcta}</div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </>);
+                    })()}
                     {/* Detalle ampliado: Geometrix y Perímetro y Área (máximo feedback) */}
                     {(tipo === 'GEOMETRIX' || tipo === 'GEOMETRIX_COMPUESTO' || tipo === 'PERIMETRO_AREA') && (() => {
                         const j0 = jugs[0] || {};

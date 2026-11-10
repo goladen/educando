@@ -10,6 +10,7 @@ import { cargarPalabrasWordle } from './utils/diccionarios';
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto } from './utils/sonidosFeedback';
 import { T, FUENTE, ESTILOS_CSS, CapaLetras, lanzarLetras, sonidoFicha, sonidoPalabra, sonidoTic, Boton, Opciones, Reloj, BotonSonido, Pantalla, Cabecera, Tarjeta, useWindowSize } from './vanila/comun';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 
 // --- CONFIGURACIÓN DE IDIOMAS ---
 const LANGUAGES = {
@@ -178,6 +179,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
     // --- ESTADOS DE PROFE / BÚSQUEDA ---
     const [customCode, setCustomCode] = useState('');
     const [isCustomGame, setIsCustomGame] = useState(false);
+    const [recursoPdf, setRecursoPdf] = useState(null); // recurso en juego → botón «Ficha PDF»
     const [ranking, setRanking] = useState([]);
     const [loadingRanking, setLoadingRanking] = useState(false);
     const [playerName, setPlayerName] = useState(usuario?.displayName || '');
@@ -404,6 +406,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
 
     // --- HELPERS ---
     const procesarRecurso = (data, forceStart = false, intento = 0) => {
+        if (data?.hojas || data?.preguntas) setRecursoPdf(data);
         let palabrasCandidatas = [];
         if (data.hojas) {
             data.hojas.forEach(h => {
@@ -553,6 +556,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
             <style>{ESTILOS_CSS + WORDLE_CSS}</style>
             {contenido}
             <CapaLetras />
+            {isCustomGame && recursoPdf && screen !== 'GAME' && <FichaFlotante recurso={recursoPdf} />}
         </>
     );
 

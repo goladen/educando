@@ -1,4 +1,4 @@
-// Algebra.jsx — 7-module interactive algebra practice for ESO
+// Algebra.jsx — 10-module interactive algebra practice for ESO
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -9,6 +9,10 @@ import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { M_FactorComun, M_Factorizacion, PASOS_NOMBRE } from './algebra/Factorizacion';
 import BotonFichas from './components/BotonFichas';
+import { M_Formulas, M_AreasPolinomios } from './algebra/ProblemasAlgebra';
+import { TermPolinomios, TraduccionAlgebraica } from './algebra/Terminologia';
+import PolyInput from './algebra/PolyInput';
+import { genCombMonomios, genCombPolinomios } from './algebra/generadoresAlgebra';
 
 // ─── Math utilities ───────────────────────────────────────────────────────────
 const SUP = { 0:'', 1:'', 2:'²', 3:'³', 4:'⁴', 5:'⁵' };
@@ -58,55 +62,7 @@ const toDesc = c => normPoly(c).reverse();
 const toAsc  = c => [...c].reverse();
 
 
-// ─── PolyInput component ──────────────────────────────────────────────────────
-function PolyInput({ value, onChange, maxDeg=4 }) {
-    const ensure = d => { const a=[...value]; while(a.length<=d) a.push(0); return a; };
-    const bump = (d, delta) => { onChange(prev => { const a=[...prev]; while(a.length<=d) a.push(0); a[d]=a[d]+delta; return a; }); };
-    const reset = () => onChange(Array(maxDeg+1).fill(0));
-
-    const holdRef = useRef(null);
-    const startHold = (d, delta) => {
-        bump(d, delta);
-        holdRef.current = setTimeout(() => {
-            holdRef.current = setInterval(() => bump(d, delta), 60);
-        }, 350);
-    };
-    const stopHold = () => {
-        clearTimeout(holdRef.current);
-        clearInterval(holdRef.current);
-        holdRef.current = null;
-    };
-
-    const btnS = bg => ({ padding:'5px 9px', borderRadius:7, border:'none', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', minWidth:40, background:bg, userSelect:'none', touchAction:'none' });
-    const holdProps = (d, delta) => ({
-        onPointerDown: (e) => { e.currentTarget.setPointerCapture(e.pointerId); startHold(d, delta); },
-        onPointerUp: stopHold,
-        onPointerLeave: stopHold,
-        onPointerCancel: stopHold,
-    });
-
-    return (
-        <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'center'}}>
-            <div style={{background:'#0d1117',borderRadius:10,padding:'9px 22px',fontWeight:700,fontSize:'1.15rem',color:'#f39c12',minWidth:200,textAlign:'center',border:'2px solid rgba(243,156,18,0.3)',minHeight:42,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {polyStr(value)}
-            </div>
-            <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}}>
-                {Array.from({length:maxDeg+1},(_,d)=>{
-                    const lbl=d===0?'1':d===1?'x':`x${SUP[d]||`^${d}`}`;
-                    return (
-                        <div key={d} style={{display:'flex',flexDirection:'column',gap:3}}>
-                            <button style={btnS('#27ae60')} {...holdProps(d, 1)}>+{lbl}</button>
-                            <button style={btnS('#c0392b')} {...holdProps(d,-1)}>−{lbl}</button>
-                        </div>
-                    );
-                })}
-                <div style={{display:'flex',alignItems:'center'}}>
-                    <button style={btnS('#566573')} onClick={reset}>Reset</button>
-                </div>
-            </div>
-        </div>
-    );
-}
+// PolyInput (botones +/− por grado): ./algebra/PolyInput.jsx
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 const CARD = { background:'#161b22', borderRadius:14, padding:20, border:'1px solid #30363d' };
@@ -131,7 +87,7 @@ function FeedbackBlock({ result, onNext, label='Siguiente →' }) {
 }
 
 // ─── Module colors ────────────────────────────────────────────────────────────
-const MOD_COLORS = ['#9b59b6','#3498db','#27ae60','#f39c12','#e74c3c','#1abc9c','#c39bd3','#e67e22'];
+const MOD_COLORS = ['#9b59b6','#3498db','#27ae60','#f39c12','#e74c3c','#1abc9c','#c39bd3','#e67e22','#3498db','#2ecc71'];
 const MODULES = [
     { id:'terminologia',  label:'1. Terminología',        short:'1.' },
     { id:'valores',       label:'2. Valores Numéricos',   short:'2.' },
@@ -141,6 +97,8 @@ const MODULES = [
     { id:'identidades',   label:'6. Identidades Notables',short:'6.' },
     { id:'factorcomun',   label:'7. Factor común',        short:'7.' },
     { id:'factorizacion', label:'8. Factorización',       short:'8.' },
+    { id:'formulas',      label:'9. Fórmulas',            short:'9.' },
+    { id:'geopoli',       label:'10. Áreas y perímetros', short:'10.' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -151,7 +109,28 @@ function genMono() {
     const coef = rInt(-9,9,0);
     return { coef, deg };
 }
+// Módulo 1 con tres apartados: monomios, polinomios y traducción al lenguaje algebraico
+const SUBTERM = [
+    { id:'mono', lbl:'Monomios' },
+    { id:'poli', lbl:'Polinomios' },
+    { id:'trad', lbl:'🔗 Lenguaje algebraico' },
+];
 function M1_Terminologia({ onScore }) {
+    const [sub, setSub] = useState('mono');
+    return (
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {SUBTERM.map(s=>(
+                    <button key={s.id} onClick={()=>setSub(s.id)} style={{padding:'6px 14px',borderRadius:8,border:`2px solid ${sub===s.id?'#9b59b6':'#30363d'}`,background:sub===s.id?'#2a1338':'transparent',color:'white',cursor:'pointer',fontWeight:sub===s.id?700:400}}>{s.lbl}</button>
+                ))}
+            </div>
+            {sub==='mono' && <M1_TermMonomios onScore={onScore}/>}
+            {sub==='poli' && <TermPolinomios onScore={onScore}/>}
+            {sub==='trad' && <TraduccionAlgebraica onScore={onScore}/>}
+        </div>
+    );
+}
+function M1_TermMonomios({ onScore }) {
     const genEj = () => Array.from({length:5}, genMono);
     const [monos, setMonos] = useState(genEj);
     const [resp, setResp] = useState(Array.from({length:5},()=>({coef:'',lit:'',grado:''})));
@@ -293,6 +272,12 @@ function M2_Valores({ onScore }) {
     );
 }
 
+const PasosComb = ({ pasos }) => (
+    <div style={{textAlign:'left',lineHeight:1.8,fontFamily:'Georgia,serif',color:'#c9d1d9'}}>
+        {pasos.map((p,i)=><div key={i}><b style={{color:'#8b949e'}}>{i+1}.</b> {p}</div>)}
+    </div>
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MODULE 3 — Operaciones con monomios
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -301,7 +286,8 @@ function M3_Monomios({ onScore }) {
     const [score, setScore] = useState({ok:0,total:0});
 
     const genEj = useCallback((mode) => {
-        const m = mode==='COMBINADO' ? rItem(['SUMA','RESTA','MULT']) : mode;
+        if(mode==='COMBINADO') return genCombMonomios();
+        const m = mode;
         if(m==='SUMA' || m==='RESTA') {
             const deg=rInt(1,4); const c1=rInt(-9,9,0); const c2=rInt(-9,9,0);
             const ans=Array(deg+1).fill(0); ans[deg]=m==='SUMA'?c1+c2:c1-c2;
@@ -323,7 +309,7 @@ function M3_Monomios({ onScore }) {
 
     const comprobar = () => {
         const ok = polyEq(normPoly(resp), normPoly(ej.ans));
-        setResult({ok, msg: ok?'¡Correcto!':'Incorrecto. La respuesta es: '+polyStr(ej.ans)});
+        setResult({ok, msg: ok?'¡Correcto!':'Incorrecto. La respuesta es: '+polyStr(ej.ans), explanation: ej.pasos ? <PasosComb pasos={ej.pasos}/> : undefined});
         setScore(s=>({ok:s.ok+(ok?1:0),total:s.total+1}));
         onScore(ok?1:0,1);
     };
@@ -334,7 +320,7 @@ function M3_Monomios({ onScore }) {
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 {MODOS.map(m=>(
                     <button key={m} onClick={()=>cambiarModo(m)} style={{padding:'6px 14px',borderRadius:8,border:`2px solid ${opMode===m?'#27ae60':'#30363d'}`,background:opMode===m?'#0d3321':'transparent',color:'white',cursor:'pointer',fontWeight:opMode===m?700:400}}>
-                        {m==='SUMA'?'Suma':m==='RESTA'?'Resta':m==='MULT'?'Multiplicación':'Combinado'}
+                        {m==='SUMA'?'Suma':m==='RESTA'?'Resta':m==='MULT'?'Multiplicación':'Operaciones combinadas'}
                     </button>
                 ))}
             </div>
@@ -367,7 +353,8 @@ function M4_Polinomios({ onScore }) {
     };
 
     const genEj = useCallback((mode) => {
-        const m = mode==='COMBINADO' ? rItem(['SUMA','RESTA','MULT']) : mode;
+        if(mode==='COMBINADO') return genCombPolinomios();
+        const m = mode;
         const p=genPoly(2); const q=genPoly(m==='MULT'?1:2);
         let ans, expr;
         if(m==='SUMA')  { ans=addPoly(p,q); expr=`(${polyStr(p)}) + (${polyStr(q)})`; }
@@ -384,7 +371,7 @@ function M4_Polinomios({ onScore }) {
     const nuevo = () => { setEj(genEj(opMode)); setResp([0,0,0,0,0,0]); setResult(null); };
     const comprobar = () => {
         const ok = polyEq(normPoly(resp), ej.ans);
-        setResult({ok, msg: ok?'¡Correcto!':'Incorrecto. La respuesta es: '+polyStr(ej.ans)});
+        setResult({ok, msg: ok?'¡Correcto!':'Incorrecto. La respuesta es: '+polyStr(ej.ans), explanation: ej.pasos ? <PasosComb pasos={ej.pasos}/> : undefined});
         setScore(s=>({ok:s.ok+(ok?1:0),total:s.total+1}));
         onScore(ok?1:0,1);
     };
@@ -395,7 +382,7 @@ function M4_Polinomios({ onScore }) {
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                 {MODOS.map(m=>(
                     <button key={m} onClick={()=>cambiarModo(m)} style={{padding:'6px 14px',borderRadius:8,border:`2px solid ${opMode===m?'#f39c12':'#30363d'}`,background:opMode===m?'#2d1e00':'transparent',color:'white',cursor:'pointer',fontWeight:opMode===m?700:400}}>
-                        {m==='SUMA'?'Suma':m==='RESTA'?'Resta':m==='MULT'?'Multiplicación':'Combinado'}
+                        {m==='SUMA'?'Suma':m==='RESTA'?'Resta':m==='MULT'?'Multiplicación':'Operaciones combinadas'}
                     </button>
                 ))}
             </div>
@@ -644,9 +631,13 @@ export const resumenAlgebra = (c) => {
     return [...cfg.modulos.map(id => MODULES.find(m => m.id === id)?.label.replace(/^\d+\.\s*/, '')).filter(Boolean), `🎯 ${cfg.n} ejercicios`];
 };
 
-export default function AlgebraApp({ onExit, usuario }) {
+/**
+ * La app completa. En pantalla dual (embebido) hay dos, una en cada mitad: cada lado elige su
+ * apartado y lleva su propio marcador y su propio «Enviar al profesor» (sin retos por enlace).
+ */
+function AlgebraPanel({ onExit, usuario, embebido = false, lado = '', onDual = null, onPantallaCompleta = null }) {
     // Reto por enlace: módulos fijos y objetivo de ejercicios
-    const [reto, setReto] = useState(() => leerRetoUrl());
+    const [reto, setReto] = useState(() => (embebido ? null : leerRetoUrl()));
     const cfgReto = reto ? { ...DEFAULT_RETO_ALG, ...(reto.config || {}) } : null;
     const esRetoCompeticion = !!(reto?.compId && reto?.catId);
     const [retoIniciado, setRetoIniciado] = useState(false);
@@ -672,6 +663,7 @@ export default function AlgebraApp({ onExit, usuario }) {
     }, []);
 
     const toggleFullscreen = () => {
+        if(onPantallaCompleta) { onPantallaCompleta(); return; }
         if(!document.fullscreenElement) {
             appRef.current?.requestFullscreen?.();
         } else {
@@ -720,6 +712,21 @@ export default function AlgebraApp({ onExit, usuario }) {
             })),
         };
     })();
+    // Problemas: fórmulas de otras materias y áreas/perímetros con polinomios
+    const ejForm = detalles.filter(d => d.modulo === 'formulas');
+    const ejGeo  = detalles.filter(d => d.modulo === 'geopoli');
+    const resumenProblemas = (ejForm.length || ejGeo.length) ? {
+        ...(ejForm.length ? { formulas: {
+            ejercicios: ejForm.length, aciertos: ejForm.filter(e => e.ok).length, pistas: ejForm.filter(e => e.pista).length,
+            porMateria: ejForm.reduce((acc, e) => { const m = acc[e.materia] || { aciertos: 0, ejercicios: 0 }; acc[e.materia] = { aciertos: m.aciertos + (e.ok ? 1 : 0), ejercicios: m.ejercicios + 1 }; return acc; }, {}),
+            detalle: ejForm.slice(-30).map(({ modulo, ...e }) => e),
+        } } : {}),
+        ...(ejGeo.length ? { geometria: {
+            ejercicios: ejGeo.length, perfectos: ejGeo.filter(e => e.ok).length,
+            aciertos: ejGeo.reduce((s, e) => s + e.aciertos, 0), total: ejGeo.reduce((s, e) => s + e.total, 0),
+            detalle: ejGeo.slice(-30).map(({ modulo, ...e }) => e),
+        } } : {}),
+    } : null;
     const resumenFC = ejFC.length ? {
         ejercicios: ejFC.length, aciertos: ejFC.filter(e => e.ok).length,
         detalle: ejFC.slice(-30).map(({ modulo, ...e }) => e),
@@ -757,6 +764,7 @@ export default function AlgebraApp({ onExit, usuario }) {
                     })),
                     ...(resumenFact ? { factorizacion: resumenFact, puntos: resumenFact.puntos } : {}),
                     ...(resumenFC ? { factorComun: resumenFC } : {}),
+                    ...(resumenProblemas ? { problemasAlgebra: resumenProblemas } : {}),
                 }],
             });
             guardarRegistroLocal('ALGEBRA', {
@@ -798,21 +806,26 @@ export default function AlgebraApp({ onExit, usuario }) {
         <M6_Identidades   onScore={handleScore(5)}/>,
         <M_FactorComun    onScore={handleScore(6)}/>,
         <M_Factorizacion  onScore={handleScore(7)}/>,
+        <M_Formulas       onScore={handleScore(8)}/>,
+        <M_AreasPolinomios onScore={handleScore(9)}/>,
     ];
 
     return (
-        <div ref={appRef} style={{minHeight:'100vh',background:'#0d1117',color:'#e6edf3',fontFamily:"'Segoe UI',sans-serif",display:'flex',flexDirection:'column'}}>
+        <div ref={appRef} style={{minHeight:embebido?'100%':'100vh',background:'#0d1117',color:'#e6edf3',fontFamily:"'Segoe UI',sans-serif",display:'flex',flexDirection:'column'}}>
             {/* Header */}
             <div style={{padding:'12px 16px',background:'#161b22',borderBottom:'1px solid #30363d',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                    <button onClick={onExit} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 12px',borderRadius:7,cursor:'pointer'}}>← Salir</button>
-                    <span style={{fontWeight:700,fontSize:'1.1rem'}}>✖️ Álgebra</span>
+                    <button onClick={onExit} title={embebido?'Volver a una sola pantalla (se cierran las dos mitades)':''} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 12px',borderRadius:7,cursor:'pointer'}}>{embebido?'⇤ 1 pantalla':'← Salir'}</button>
+                    <span style={{fontWeight:700,fontSize:'1.1rem'}}>✖️ Álgebra{lado && <span style={{marginLeft:6,fontSize:'0.75rem',color:'#c39bd3'}}>· {lado}</span>}</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:'0.85rem',color:'#8b949e'}}>Total: {totalOk}/{totalTotal}</span>
-                    <button onClick={compartir} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+                    {onDual && !reto && typeof window!=='undefined' && window.innerWidth>=1000 && (
+                        <button onClick={onDual} title='Divide la pantalla en dos: cada lado elige su apartado (para monitores interactivos)' style={{background:'transparent',border:'1px solid #9b59b6',color:'#c39bd3',padding:'6px 10px',borderRadius:7,cursor:'pointer',fontWeight:700}}>◧◨ Pantalla dual</button>
+                    )}
+                    {!embebido && <button onClick={compartir} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
                         <Share2 size={14}/> Compartir
-                    </button>
+                    </button>}
                     <button onClick={toggleFullscreen} title={isFullscreen?'Salir de pantalla completa':'Pantalla completa'} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
                         {isFullscreen ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}
                     </button>
@@ -849,20 +862,33 @@ export default function AlgebraApp({ onExit, usuario }) {
                 <div style={{...CARD,borderColor:color+'44',marginBottom:16}}>
                     <div style={{fontWeight:700,fontSize:'1rem',color:color,marginBottom:4}}>{MODULES[modIdx].label}</div>
                     <div style={{fontSize:'0.8rem',color:'#8b949e'}}>
-                        {['Identifica los componentes de un monomio: coeficiente, parte literal y grado.',
+                        {['Partes de monomios y polinomios (coeficiente, grado, término independiente…) y traducción del lenguaje cotidiano al algebraico.',
                           'Sustituye x por un valor numérico y evalúa la expresión.',
-                          'Suma, resta y multiplica monomios semejantes.',
-                          'Opera con polinomios de dos o tres términos.',
+                          'Suma, resta y multiplica monomios, y resuelve operaciones combinadas respetando la jerarquía.',
+                          'Opera con polinomios: suma, resta, multiplicación y operaciones combinadas (potencias → productos → sumas y restas).',
                           'Divide un polinomio por (x±a) usando el esquema de Ruffini.',
                           'Aplica las tres identidades notables para desarrollar expresiones cuadráticas.',
                           'Saca factor común: el MCD de los coeficientes y la menor potencia de x.',
-                          'Factoriza paso a paso: factor común, identidades notables, Ruffini y ecuación de 2.º grado. Puedes ver la gráfica o escribir tu propio polinomio.'][modIdx]}
+                          'Factoriza paso a paso: factor común, identidades notables, Ruffini y ecuación de 2.º grado. Puedes ver la gráfica o escribir tu propio polinomio.',
+                          'Valor numérico con fórmulas de Física, Química, Tecnología, Economía, Biología, Geografía y Matemáticas (MRU, MRUA, energía, ley de Ohm, densidad, interés…). También puedes despejar un dato.',
+                          'Perímetros y áreas de rectángulos, cuadrados y triángulos cuyos lados son polinomios, y su valor numérico para un valor de x.'][modIdx]}
                     </div>
                 </div>
                 {MODS_JSX[modIdx]}
-                {!cfgReto && (
-                    <div style={{marginTop:20}}>
+                {!cfgReto && !embebido && (
+                    <div style={{marginTop:20,display:'flex',flexDirection:'column',gap:10}}>
+                        <div style={{fontSize:'0.8rem',color:'#8b949e'}}>📄 → 👾 Trabaja primero en papel con las fichas y después jugad a Invasión Pi con los mismos contenidos (dentro del juego, «🖨️ Ficha PDF» imprime las mismas preguntas de la partida).</div>
+                        <BotonFichas tema="expresiones" color="#9b59b6" texto="Fichas de expresiones algebraicas" subtexto="Lenguaje algebraico, terminología, combinadas, fórmulas y áreas con polinomios · PDF y pizarra" />
                         <BotonFichas tema="polinomios" color="#8e44ad" texto="Fichas de polinomios para imprimir" subtexto="Operaciones, identidades y factorización por método (con gráfica) · PDF y pizarra" />
+                        <button onClick={()=>window.open('/invasores?mates=expresiones,polinomios','_blank')}
+                            style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderRadius:16,border:'2px solid #22d3ee',background:'#0b1220',color:'#e6edf3',cursor:'pointer',textAlign:'left',fontFamily:'inherit',width:'100%'}}>
+                            <span style={{background:'#22d3ee',color:'#0b1220',borderRadius:12,width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',flexShrink:0}}>👾</span>
+                            <span style={{flex:1}}>
+                                <span style={{display:'block',fontWeight:900,fontSize:'0.98rem'}}>Jugar a Invasión Pi con este contenido</span>
+                                <span style={{display:'block',fontSize:'0.78rem',color:'#8b949e',fontWeight:600}}>Se abre con «Expresiones algebraicas» y «Polinomios» ya elegidos (puedes quitar tipos de ejercicio)</span>
+                            </span>
+                            <span style={{color:'#22d3ee',fontSize:'1.3rem',fontWeight:900}}>›</span>
+                        </button>
                     </div>
                 )}
             </div>
@@ -937,6 +963,41 @@ export default function AlgebraApp({ onExit, usuario }) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+/**
+ * Álgebra con modo «pantalla dual» para monitores interactivos: dos apps independientes,
+ * una en cada mitad. El transform de cada mitad hace que sus modales (position: fixed)
+ * se queden dentro de ella en vez de tapar toda la pantalla.
+ */
+export default function AlgebraApp({ onExit, usuario }) {
+    const [dual, setDual] = useState(false);
+    const dualRef = useRef(null);
+    const pantallaCompleta = () => {
+        try {
+            if(document.fullscreenElement) document.exitFullscreen?.();
+            else dualRef.current?.requestFullscreen?.();
+        } catch { /* sin soporte */ }
+    };
+    const salirDual = () => {
+        try { if(document.fullscreenElement) document.exitFullscreen?.(); } catch { /* nada */ }
+        setDual(false);
+    };
+
+    if(!dual) return <AlgebraPanel onExit={onExit} usuario={usuario} onDual={()=>setDual(true)}/>;
+
+    return (
+        <div ref={dualRef} style={{position:'fixed',inset:0,zIndex:5000,display:'flex',background:'#0d1117'}}>
+            {['Izquierda','Derecha'].map((lado, i) => (
+                <React.Fragment key={lado}>
+                    {i===1 && <div aria-hidden='true' style={{width:6,flexShrink:0,background:'linear-gradient(#9b59b6,#3498db,#9b59b6)'}}/>}
+                    <div style={{flex:1,minWidth:0,overflowY:'auto',overflowX:'hidden',position:'relative',transform:'translateZ(0)'}}>
+                        <AlgebraPanel embebido lado={lado} usuario={null} onExit={salirDual} onPantallaCompleta={pantallaCompleta}/>
+                    </div>
+                </React.Fragment>
+            ))}
         </div>
     );
 }

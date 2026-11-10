@@ -5,7 +5,7 @@ import { AlienSVG } from '../ui/Sprites';
 
 const CANTIDADES = [10, 16, 24, 30];
 
-export default function ModalPdf({ maxPreguntas = null, onGenerar, onCerrar }) {
+export default function ModalPdf({ maxPreguntas = null, vinculada = false, onGenerar, onCerrar }) {
   const [n, setN] = useState(16);
   const [oscuro, setOscuro] = useState(false);
   const [soluciones, setSoluciones] = useState(true);
@@ -29,11 +29,15 @@ export default function ModalPdf({ maxPreguntas = null, onGenerar, onCerrar }) {
           <h3 className="font-arcade text-xs text-fuchsia-300 sm:text-sm">🖨️ FICHA PDF DE LA MISIÓN</h3>
         </div>
         <p className="font-pixel text-xl leading-tight text-slate-300">
-          Las preguntas de esta partida en papel, con aliens numerados, casillas para responder, marcador de estrellas
-          y un QR para terminar jugando en pikt.es.
+          Las preguntas de esta partida en papel, con aliens numerados, casillas para responder y marcador de estrellas.
+        </p>
+        <p className="rounded-md border-2 border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-2 font-pixel text-xl leading-tight text-fuchsia-100">
+          {vinculada
+            ? `🔗 La partida ya está vinculada a una ficha: se vuelve a imprimir la misma (${maxPreguntas} preguntas, mismo QR).`
+            : '🔗 La ficha queda VINCULADA al juego: al jugar (aquí o escaneando su QR en cualquier ordenador) salen las mismas preguntas en el mismo orden.'}
         </p>
 
-        <div className="flex flex-col gap-2">
+        {!vinculada && <div className="flex flex-col gap-2">
           <span className="font-arcade text-[9px] text-slate-400">ALIENS (PREGUNTAS)</span>
           <div className="flex flex-wrap gap-2">
             {CANTIDADES.map((k) => (
@@ -44,7 +48,7 @@ export default function ModalPdf({ maxPreguntas = null, onGenerar, onCerrar }) {
           {maxPreguntas != null && maxPreguntas < n && (
             <span className="font-pixel text-lg text-amber-300">Este contenido tiene {maxPreguntas} preguntas: saldrán todas.</span>
           )}
-        </div>
+        </div>}
 
         <div className="flex flex-col gap-2">
           <span className="font-arcade text-[9px] text-slate-400">FONDO</span>

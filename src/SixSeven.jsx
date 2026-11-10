@@ -1737,8 +1737,8 @@ export default function SixSeven({ onExit, usuario = null }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: theme.bg, overflowY: 'auto', overflowX: 'hidden' }}>
       {pantalla}
-      {mode === 'arcade' && nivel && (
-        <MandosEnJuego clave="SIXSEVEN" juego="Six Seven · Speed Run" tipo="SIXSEVEN_MANDOS" maxJug={4} apiRef={mandosApi}
+      {(mode === 'menu' || mode === 'arcade') && ( // también en el menú y al elegir nivel, para conectar los mandos antes de jugar
+        <MandosEnJuego clave="SIXSEVEN" juego="Six Seven · Speed Run" tipo="SIXSEVEN_MANDOS" maxJug={4} apiRef={mandosApi} pausado={mode !== 'arcade' || !nivel}
           modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras"
           onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
           controles={<>Las 4 opciones son <b>A, B, C y D</b> (en orden de lectura). En el mando, <b>A</b> cambia la letra y <b>B</b> o agitar la envía. Con <b>1</b> jugador cada partida la juega un mando (relevos); con <b>2 a 4</b> es una carrera: el primero que acierta se lleva los puntos y quien falla queda fuera de esa pregunta.</>} />

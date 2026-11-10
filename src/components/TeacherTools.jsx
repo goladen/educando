@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor, Mail } from 'lucide-react';
 import VideoTimelineEditor from '../VideoTimelineEditor';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
@@ -14,6 +14,8 @@ import PresentationList from './PresentationList';
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
 const PresentationEditor = lazy(() => import('./PresentationEditor'));
 const GestionInformatica = lazy(() => import('./GestionInformatica'));
+const PapelInteractivo = lazy(() => import('./PapelInteractivo'));
+const DocumentosPersonalizados = lazy(() => import('./DocumentosPersonalizados'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -70,6 +72,18 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
     if (herramientaActiva === 'GESTION_INFORMATICA') return (
         <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando…</div>}>
             <GestionInformatica onBack={() => setHerramientaActiva(null)} />
+        </Suspense>
+    );
+
+    if (herramientaActiva === 'PAPEL_OMNI') return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando…</div>}>
+            <PapelInteractivo usuario={usuario} onBack={() => setHerramientaActiva(null)} onOpenEditorOmni={onOpenEditorOmni} />
+        </Suspense>
+    );
+
+    if (herramientaActiva === 'DOCS_PERSONALIZADOS') return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando…</div>}>
+            <DocumentosPersonalizados onBack={() => setHerramientaActiva(null)} />
         </Suspense>
     );
 
@@ -158,13 +172,24 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                 </div>
 
                 {/* ── Foto → Recurso Omni (Omninteractive) ── */}
-                <div onClick={() => setShowFotoOmni(true)} style={{ ...cardStyle, borderLeft: '4px solid #6D28D9' }}>
+                <div onClick={() => setHerramientaActiva('PAPEL_OMNI')} style={{ ...cardStyle, borderLeft: '4px solid #6D28D9' }}>
                     <div style={{ background: '#EDE9FE', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
                         <BookOpen size={32} color="#6D28D9" />
                     </div>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#6D28D9' }}>Foto → Recurso Omni</h3>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#6D28D9' }}>Ficha en papel ↔ Hoja interactiva</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
-                        Fotografía una ficha de ejercicios y la IA la convierte en un recurso Omninteractive editable.
+                        Con tu propia IA: convierte un PDF o foto de una ficha en una hoja interactiva, imprímela y corrige los exámenes en papel con fotos o un vídeo.
+                    </p>
+                </div>
+
+                {/* ── Documentos personalizados (combinar correspondencia) ── */}
+                <div onClick={() => setHerramientaActiva('DOCS_PERSONALIZADOS')} style={{ ...cardStyle, borderLeft: '4px solid #0E7490' }}>
+                    <div style={{ background: '#CFFAFE', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Mail size={32} color="#0E7490" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#0E7490' }}>Documentos personalizados</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Escribe un texto con campos y rellena una tabla: un documento por fila (cartas, informes, diplomas…) en PDF o texto, juntos o por separado.
                     </p>
                 </div>
 

@@ -750,6 +750,10 @@ export default function VisorCuerpo({ onExit }) {
     const [quiz, setQuiz] = useState(null);
     const [aviso, setAviso] = useState(null);
     const [ancho, setAncho] = useState(() => window.innerWidth);
+    // Móvil: la cabecera crece hacia abajo y el modelo empieza debajo de ella
+    const cabRef = useRef(null);
+    const [altoCab, setAltoCab] = useState(0);
+    const [verFiltros, setVerFiltros] = useState(false);
     const quizRef = useRef(null);
     quizRef.current = quiz;
     const modoRef = useRef(modo);
@@ -759,6 +763,16 @@ export default function VisorCuerpo({ onExit }) {
         const r = () => setAncho(window.innerWidth);
         window.addEventListener('resize', r);
         return () => window.removeEventListener('resize', r);
+    }, []);
+
+    useEffect(() => {
+        const el = cabRef.current;
+        if (!el) return;
+        const medir = () => setAltoCab(el.offsetHeight);
+        medir();
+        const ro = new ResizeObserver(medir);
+        ro.observe(el);
+        return () => ro.disconnect();
     }, []);
 
     useEffect(() => {
@@ -959,9 +973,62 @@ export default function VisorCuerpo({ onExit }) {
     const estrecho = ancho < 820;
     const separada = sel && separadas.has(sel.id);
 
+    // Fila deslizable de lado (móvil): los botones no saltan de línea
+    const filaDeslizable = { display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', paddingBottom: 2 };
+    const nFiltros = (zonas?.size || 0) + (aparatos?.size || 0);
+
+    const botonesZonas = datos && (
+        <>
+            <button onClick={() => setZonas(null)} style={boton(zonas === null, '#a5b4fc')}>Todo</button>
+            {datos.zonas.map(z => (
+                <button key={z.id} onClick={() => alternarZona(z.id)} style={boton(zonas !== null && zonas.has(z.id), '#a5b4fc')}>{z.nombre}</button>
+            ))}
+        </>
+    );
+    const conAparatos = datos && capas.organos?.visible && datos.aparatos.length > 0;
+    const botonesAparatos = conAparatos && datos.aparatos.map(g => (
+        <button key={g} onClick={() => alternarAparato(g)} style={boton(aparatos !== null && aparatos.has(g), '#fbbf24')}>{g}</button>
+    ));
+    const etiquetaAparatos = <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 800, whiteSpace: 'nowrap', alignSelf: 'center' }}>🫀 Aparatos:</span>;
+
+    const contenidoPregunta = modo === 'quiz' && datos && (
+        !quiz ? (
+            <>
+                <div style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: 8 }}>¿Qué quieres buscar?</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button onClick={() => empezarQuiz('esqueleto')} style={boton(true, '#fbbf24')}>🦴 Huesos</button>
+                    <button onClick={() => empezarQuiz('musculos')} style={boton(true, '#fb7185')}>💪 Músculos</button>
+                    <button onClick={() => empezarQuiz('organos')} style={boton(true, '#38bdf8')}>🫀 Órganos</button>
+                </div>
+            </>
+        ) : quiz.fin ? (
+            <>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fbbf24' }}>🏁 {quiz.aciertos} de {quiz.preguntas.length}</div>
+                <div style={{ fontSize: '0.85rem', color: '#cbd5e1', margin: '4px 0 8px' }}>{quiz.aciertos >= 8 ? `¡Eres un experto en ${NOMBRE_CAPA[quiz.capa]}!` : quiz.aciertos >= 5 ? '¡Bien! Repasa los que fallaste.' : 'Explora el cuerpo y vuelve a intentarlo.'}</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button onClick={() => setVerEnvio(true)} style={boton(true, '#fbbf24')}>📤 Enviar al profesor</button>
+                    <button onClick={() => empezarQuiz(quiz.capa)} style={boton(false)}>🔁 Otra vez</button>
+                    <button onClick={() => setQuiz(null)} style={boton(false)}>🔀 Cambiar</button>
+                    <button onClick={() => { setModo('explorar'); setQuiz(null); }} style={boton(false)}>🔍 Explorar</button>
+                </div>
+            </>
+        ) : (
+            <>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', letterSpacing: 1 }}>PREGUNTA {quiz.i + 1}/{quiz.preguntas.length} · ✓ {quiz.aciertos}</div>
+                <div style={{ fontSize: estrecho ? '1.15rem' : '1.35rem', fontWeight: 900 }}>Toca: <span style={{ color: '#fbbf24' }}>{objetivoQuiz?.nombre}</span></div>
+                {objetivoQuiz?.lado && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Vale cualquiera de los dos lados</div>}
+            </>
+        )
+    );
+    const cajaPregunta = { background: 'rgba(15,23,42,0.9)', border: '2px solid #fbbf24', borderRadius: 16, padding: '10px 18px', textAlign: 'center' };
+
+    const botonesMovimientos = MOVIMIENTOS.map(m => (
+        <button key={m.id} onClick={() => setMovId(m.id)} style={{ ...boton(movId === m.id, '#4ade80'), textAlign: 'left' }}>{m.emoji} {m.nombre}</button>
+    ));
+
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#0f172a', color: '#e2e8f0', fontFamily: 'system-ui, "Segoe UI", sans-serif', overflow: 'hidden' }}>
-            <div ref={contRef} style={{ position: 'absolute', inset: 0 }} />
+            <div ref={contRef} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: estrecho ? altoCab : 0 }} />
 
             {!datos && !error && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
@@ -978,82 +1045,70 @@ export default function VisorCuerpo({ onExit }) {
                 </div>
             )}
 
-            {/* Barra superior */}
-            <div style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', pointerEvents: 'none' }}>
-                <button onClick={onExit} style={{ ...boton(false), pointerEvents: 'auto' }}>← Volver</button>
-                <div style={{ fontWeight: 800, fontSize: '1.05rem', marginRight: 6 }}>🦴 Cuerpo humano 3D</div>
-                <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
+            {/* Barra superior · en móvil es una cabecera en columna y el modelo empieza debajo */}
+            <div ref={cabRef} style={estrecho
+                ? { position: 'absolute', top: 0, left: 0, right: 0, padding: '8px 8px 6px', display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,23,42,0.96)', borderBottom: '1px solid rgba(148,163,184,0.15)', zIndex: 2 }
+                : { position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', pointerEvents: 'none' }}>
+                <div style={estrecho ? { display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 } : { display: 'contents' }}>
+                    <button onClick={onExit} style={{ ...boton(false), pointerEvents: 'auto' }}>← Volver</button>
+                    <div style={{ fontWeight: 800, fontSize: estrecho ? '0.98rem' : '1.05rem', marginRight: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🦴 Cuerpo humano 3D</div>
+                </div>
+                <div style={{ ...(estrecho ? filaDeslizable : { display: 'flex', gap: 6 }), pointerEvents: 'auto' }}>
                     <button onClick={() => { setModo('explorar'); setQuiz(null); }} style={boton(modo === 'explorar')}>🔍 Explorar</button>
                     <button onClick={() => { if (!datos) return; setModo('quiz'); setQuiz(null); setSel(null); visorRef.current?.seleccionar(null); }} style={boton(modo === 'quiz', '#fbbf24')}>❓ ¿Dónde está?</button>
                     <button onClick={entrarMovimientos} style={boton(modo === 'movimiento', '#4ade80')}>🏃 Movimientos</button>
                     <button onClick={() => datos && setVerFicha(true)} style={boton(false)}>🖨️ Ficha PDF</button>
-                    <div ref={vrRef} style={{ display: 'inline-flex' }} />
+                    <div ref={vrRef} style={{ display: 'inline-flex', flexShrink: 0 }} />
                 </div>
                 {modo === 'explorar' && datos && (
-                    <div style={{ position: 'relative', pointerEvents: 'auto', flex: estrecho ? '1 1 100%' : '0 1 260px' }}>
-                        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar… (fémur, bíceps, hígado…)"
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 999, border: '1px solid rgba(148,163,184,0.4)', background: 'rgba(15,23,42,0.85)', color: '#fff', fontSize: '0.9rem' }} />
-                        {resultados.length > 0 && (
-                            <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: '#1e293b', borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', maxHeight: 300, overflowY: 'auto', zIndex: 5 }}>
-                                {resultados.map(p => (
-                                    <div key={p.id} onClick={() => { elegir(p); setBusqueda(''); }} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.88rem' }}>
-                                        {nombreConLado(p)} <span style={{ color: '#64748b', fontSize: '0.75rem' }}>· {p.zonaNombre}</span>
-                                    </div>
-                                ))}
-                            </div>
+                    <div style={estrecho ? { display: 'flex', gap: 6, alignItems: 'center' } : { display: 'contents' }}>
+                        <div style={{ position: 'relative', pointerEvents: 'auto', flex: estrecho ? '1 1 auto' : '0 1 260px', minWidth: 0 }}>
+                            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar… (fémur, bíceps, hígado…)"
+                                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 999, border: '1px solid rgba(148,163,184,0.4)', background: 'rgba(15,23,42,0.85)', color: '#fff', fontSize: '0.9rem' }} />
+                            {resultados.length > 0 && (
+                                <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: '#1e293b', borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', maxHeight: 300, overflowY: 'auto', zIndex: 5 }}>
+                                    {resultados.map(p => (
+                                        <div key={p.id} onClick={() => { elegir(p); setBusqueda(''); }} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.88rem' }}>
+                                            {nombreConLado(p)} <span style={{ color: '#64748b', fontSize: '0.75rem' }}>· {p.zonaNombre}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        {estrecho && (
+                            <button onClick={() => setVerFiltros(v => !v)} style={{ ...boton(verFiltros || nFiltros > 0, '#a5b4fc'), flexShrink: 0 }}>
+                                🧭 Filtros{nFiltros > 0 ? ` (${nFiltros})` : ''} {verFiltros ? '▴' : '▾'}
+                            </button>
                         )}
                     </div>
                 )}
+                {/* Móvil: zonas y aparatos plegables, en filas que se deslizan de lado */}
+                {estrecho && modo === 'explorar' && datos && verFiltros && (
+                    <>
+                        <div style={filaDeslizable}>{botonesZonas}</div>
+                        {conAparatos && <div style={filaDeslizable}>{etiquetaAparatos}{botonesAparatos}</div>}
+                    </>
+                )}
+                {estrecho && contenidoPregunta && <div style={cajaPregunta}>{contenidoPregunta}</div>}
+                {estrecho && modo === 'movimiento' && datos && movimiento && <div style={filaDeslizable}>{botonesMovimientos}</div>}
             </div>
 
-            {/* Zonas */}
-            {datos && modo === 'explorar' && (
-                <div style={{ position: 'absolute', top: estrecho ? 96 : 56, left: 10, right: estrecho ? 10 : 340, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button onClick={() => setZonas(null)} style={boton(zonas === null, '#a5b4fc')}>Todo</button>
-                    {datos.zonas.map(z => (
-                        <button key={z.id} onClick={() => alternarZona(z.id)} style={boton(zonas !== null && zonas.has(z.id), '#a5b4fc')}>{z.nombre}</button>
-                    ))}
-                    {capas.organos?.visible && datos.aparatos.length > 0 && (
+            {/* Zonas (ordenador) */}
+            {!estrecho && datos && modo === 'explorar' && (
+                <div style={{ position: 'absolute', top: 56, left: 10, right: 340, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {botonesZonas}
+                    {conAparatos && (
                         <div style={{ flexBasis: '100%', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 800 }}>🫀 Aparatos:</span>
-                            {datos.aparatos.map(g => (
-                                <button key={g} onClick={() => alternarAparato(g)} style={boton(aparatos !== null && aparatos.has(g), '#fbbf24')}>{g}</button>
-                            ))}
+                            {etiquetaAparatos}{botonesAparatos}
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Pregunta del juego */}
-            {modo === 'quiz' && datos && (
-                <div style={{ position: 'absolute', top: estrecho ? 60 : 58, left: '50%', transform: 'translateX(-50%)', background: 'rgba(15,23,42,0.9)', border: '2px solid #fbbf24', borderRadius: 16, padding: '10px 18px', textAlign: 'center', minWidth: 260, maxWidth: '92vw' }}>
-                    {!quiz ? (
-                        <>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: 8 }}>¿Qué quieres buscar?</div>
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                                <button onClick={() => empezarQuiz('esqueleto')} style={boton(true, '#fbbf24')}>🦴 Huesos</button>
-                                <button onClick={() => empezarQuiz('musculos')} style={boton(true, '#fb7185')}>💪 Músculos</button>
-                                <button onClick={() => empezarQuiz('organos')} style={boton(true, '#38bdf8')}>🫀 Órganos</button>
-                            </div>
-                        </>
-                    ) : quiz.fin ? (
-                        <>
-                            <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fbbf24' }}>🏁 {quiz.aciertos} de {quiz.preguntas.length}</div>
-                            <div style={{ fontSize: '0.85rem', color: '#cbd5e1', margin: '4px 0 8px' }}>{quiz.aciertos >= 8 ? `¡Eres un experto en ${NOMBRE_CAPA[quiz.capa]}!` : quiz.aciertos >= 5 ? '¡Bien! Repasa los que fallaste.' : 'Explora el cuerpo y vuelve a intentarlo.'}</div>
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                                <button onClick={() => setVerEnvio(true)} style={boton(true, '#fbbf24')}>📤 Enviar al profesor</button>
-                                <button onClick={() => empezarQuiz(quiz.capa)} style={boton(false)}>🔁 Otra vez</button>
-                                <button onClick={() => setQuiz(null)} style={boton(false)}>🔀 Cambiar</button>
-                                <button onClick={() => { setModo('explorar'); setQuiz(null); }} style={boton(false)}>🔍 Explorar</button>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', letterSpacing: 1 }}>PREGUNTA {quiz.i + 1}/{quiz.preguntas.length} · ✓ {quiz.aciertos}</div>
-                            <div style={{ fontSize: '1.35rem', fontWeight: 900 }}>Toca: <span style={{ color: '#fbbf24' }}>{objetivoQuiz?.nombre}</span></div>
-                            {objetivoQuiz?.lado && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Vale cualquiera de los dos lados</div>}
-                        </>
-                    )}
+            {/* Pregunta del juego (ordenador) */}
+            {!estrecho && contenidoPregunta && (
+                <div style={{ ...cajaPregunta, position: 'absolute', top: 58, left: '50%', transform: 'translateX(-50%)', minWidth: 260, maxWidth: '92vw' }}>
+                    {contenidoPregunta}
                 </div>
             )}
             {aviso && (
@@ -1109,11 +1164,11 @@ export default function VisorCuerpo({ onExit }) {
                 const relajan = nombresDe(fase.antagonistas);
                 return (
                     <>
-                        <div style={{ position: 'absolute', top: estrecho ? 60 : 58, left: 10, display: 'flex', flexDirection: estrecho ? 'row' : 'column', gap: 6, flexWrap: 'wrap', maxWidth: estrecho ? 'calc(100% - 20px)' : 230 }}>
-                            {MOVIMIENTOS.map(m => (
-                                <button key={m.id} onClick={() => setMovId(m.id)} style={{ ...boton(movId === m.id, '#4ade80'), textAlign: 'left' }}>{m.emoji} {m.nombre}</button>
-                            ))}
-                        </div>
+                        {!estrecho && (
+                            <div style={{ position: 'absolute', top: 58, left: 10, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 230 }}>
+                                {botonesMovimientos}
+                            </div>
+                        )}
                         <div style={{
                             position: 'absolute', background: 'rgba(15,23,42,0.94)', border: '1px solid rgba(74,222,128,0.4)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', overflowY: 'auto',
                             ...(estrecho ? { left: 8, right: 8, bottom: 8, maxHeight: '44vh' } : { top: 56, right: 12, width: 330, maxHeight: 'calc(100vh - 80px)' }),
@@ -1161,7 +1216,7 @@ export default function VisorCuerpo({ onExit }) {
 
             {/* Controles inferiores */}
             {datos && modo === 'explorar' && !(estrecho && sel) && (
-                <div style={{ position: 'absolute', left: 10, bottom: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', background: 'rgba(15,23,42,0.8)', padding: '8px 12px', borderRadius: 14 }}>
+                <div style={{ position: 'absolute', left: estrecho ? 8 : 10, right: estrecho ? 8 : 'auto', bottom: estrecho ? 22 : 10, display: 'flex', gap: estrecho ? 6 : 10, alignItems: 'center', flexWrap: 'wrap', background: 'rgba(15,23,42,0.8)', padding: estrecho ? '6px 8px' : '8px 12px', borderRadius: 14 }}>
                     {CAPAS.map(c => (
                         <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <button onClick={() => cambiarCapa(c.id, { visible: !capas[c.id].visible })} style={boton(capas[c.id].visible, COLOR_CAPA[c.id])}>{c.emoji} {c.nombre}</button>
@@ -1173,7 +1228,7 @@ export default function VisorCuerpo({ onExit }) {
                     ))}
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', fontWeight: 700 }}>
                         🧩 Despiece
-                        <input type="range" min="0" max="1" step="0.01" value={despiece} onChange={e => setDespiece(Number(e.target.value))} style={{ width: 120 }} />
+                        <input type="range" min="0" max="1" step="0.01" value={despiece} onChange={e => setDespiece(Number(e.target.value))} style={{ width: estrecho ? 90 : 120 }} />
                     </label>
                     {separadas.size > 0 && <button onClick={() => { visorRef.current?.devolverTodas(); setSeparadas(new Set()); }} style={boton(false)}>↩ Devolver todos ({separadas.size})</button>}
                     <button onClick={() => visorRef.current?.vistaInicial()} style={boton(false)}>🎥 Centrar</button>
@@ -1188,7 +1243,7 @@ export default function VisorCuerpo({ onExit }) {
                 </div>
             )}
 
-            <div style={{ position: 'absolute', right: 10, bottom: 6, fontSize: '0.62rem', color: '#64748b', textAlign: 'right', pointerEvents: 'auto', display: estrecho && sel ? 'none' : 'block' }}>
+            <div style={{ position: 'absolute', right: 10, bottom: estrecho ? 4 : 6, left: estrecho ? 10 : 'auto', fontSize: estrecho ? '0.56rem' : '0.62rem', color: '#64748b', textAlign: estrecho ? 'center' : 'right', whiteSpace: estrecho ? 'nowrap' : 'normal', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'auto', display: estrecho && sel ? 'none' : 'block' }}>
                 Modelo: <a href="https://www.z-anatomy.com" target="_blank" rel="noreferrer" style={{ color: '#94a3b8' }}>Z-Anatomy</a> (CC BY-SA 4.0), basado en{' '}
                 <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/" target="_blank" rel="noreferrer" style={{ color: '#94a3b8' }}>BodyParts3D</a> (DBCLS, CC BY-SA 2.1 JP)
             </div>

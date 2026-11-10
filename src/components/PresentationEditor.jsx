@@ -13,7 +13,7 @@ import {
 } from './presentacion/render';
 import PanelPropiedades, { CLAVES_ESTILO, ordenarEls } from './presentacion/PanelPropiedades';
 import { PanelElementos, PanelPlantillas, PanelCapas } from './presentacion/paneles';
-import { PLANTILLAS } from './presentacion/plantillas';
+import { PLANTILLAS, PLANTILLAS_POR_ID, DISENOS_IA } from './presentacion/plantillas';
 import { ColorPicker, CampoDegradado, Deslizador } from './presentacion/ui';
 import { useHistorial, comprimirImagen, proporcionImagen, clonarDiapositiva } from './presentacion/utilidades';
 
@@ -1954,7 +1954,10 @@ function SlideCanvas({ slide, onChange, usuario, canvas, anadirEls, superficieRe
 // ─── GENERACIÓN CON IA (Gemini aquí o prompt para la IA del profe) ─────────────
 const LAYOUTS_IA = ['title', 'content', 'image-right', 'image-left', 'two-col', 'cta', 'map'];
 
-export function construirPromptPresentacion({ tema, numSlides, nivel = '', idioma = 'español', extra = '' }) {
+// disenos = true → la IA elige entre los diseños de PiKT (formas, emojis, animaciones);
+// false → formato antiguo de plantillas fijas (layout/heading/body)
+export function construirPromptPresentacion({ tema, numSlides, nivel = '', idioma = 'español', extra = '', disenos = true }) {
+  if (disenos) return promptDisenos({ tema, numSlides, nivel, idioma, extra });
   return `Actúa como profesor/a experto/a y crea una presentación educativa SENCILLA para la web PiKT.
 
 TEMA: "${tema || '[escribe aquí el tema]'}"
@@ -1992,6 +1995,38 @@ Reglas:
 - Separa las líneas de body y col2 con \\n.
 - Los campos que no use un layout pueden omitirse.
 - Responde ÚNICAMENTE con el JSON.`;
+}
+
+function promptDisenos({ tema, numSlides, nivel, idioma, extra }) {
+  const lista = DISENOS_IA.map(([id, uso, campos]) => `- "${id}": ${uso}. Campos: ${campos}`).join('\n');
+  return `Actúa como profesor/a experto/a y crea una presentación educativa visual y atractiva para la web PiKT.
+
+TEMA: "${tema || '[escribe aquí el tema]'}"
+${nivel ? `NIVEL / CURSO: ${nivel}
+` : ''}IDIOMA: ${idioma}
+NÚMERO DE DIAPOSITIVAS: exactamente ${numSlides}
+${extra ? `INDICACIONES DEL PROFESOR: ${extra}
+` : ''}
+Cada diapositiva usa UNO de estos diseños (campo "diseno") y rellena sus campos:
+${lista}
+
+Devuelve SOLO un objeto JSON (sin markdown, sin bloques de código, sin explicaciones). Ejemplo de forma:
+{
+  "titulo": "Título de la presentación",
+  "slides": [
+    { "diseno": "portada", "titulo": "Los volcanes", "subtitulo": "Ciencias Naturales · 1.º ESO", "notas": "Pregunta si alguien ha visto un volcán" },
+    { "diseno": "tarjetas", "titulo": "Partes de un volcán", "tarjetas": [ {"emoji": "🌋", "titulo": "Cráter", "texto": "Abertura por donde sale la lava."} ] },
+    { "diseno": "pasos", "titulo": "Cómo se forma una erupción", "pasos": [ {"titulo": "Magma", "texto": "La roca se funde en el interior."} ] }
+  ]
+}
+
+Reglas:
+- La 1.ª diapositiva es "portada" (o "portadaFoto") y la última "cierre" o "pregunta" con un reto final para la clase.
+- Varía los diseños: no repitas el mismo dos veces seguidas y usa al menos 5 diseños distintos. Elige el que mejor encaje con cada contenido (procesos → "pasos", fechas → "linea", comparar → "comparacion", conceptos → "definicion" o "mapa"…).
+- Textos MUY breves (es una diapositiva, no un libro): títulos de máx. 7 palabras, puntos de máx. 10 palabras, "texto" de máx. 30 palabras.
+- Los "emoji" son UN solo emoji que represente la idea.
+- "notas" (opcional, en cualquier diseño): lo que el profesor puede decir o preguntar en esa diapositiva.
+- Usa exactamente los nombres de campos indicados. Responde ÚNICAMENTE con el JSON.`;
 }
 
 // Pasa una diapositiva de plantilla a modo libre: cada texto es una caja que se
@@ -2039,7 +2074,16 @@ export function parsearPresentacionIA(raw, theme = 'dark', opciones = {}) {
     ? v.map(x => (String(x).trim().startsWith('•') ? String(x) : '• ' + x)).join('\n')
     : String(v || '');
   const base = Date.now();
+  const t = THEMES[theme] || THEMES.dark;
   const slides = lista.map((s, i) => {
+    // Diseño desconocido (la IA se lo inventa) → uno de respaldo con sus textos
+    const diseno = PLANTILLAS_POR_ID[s?.diseno] || PLANTILLAS_POR_ID[s?.design]
+      || ((s?.diseno || s?.design) ? PLANTILLAS_POR_ID[s.puntos ? 'objetivos' : 'lateral'] : null);
+    if (diseno) {
+      let elements;
+      try { elements = diseno.crear(t, s); } catch { elements = diseno.crear(t, {}); }
+      return { ...newSlide('free', theme), id: base + i, elements, ...(s.notas || s.notes ? { notes: String(s.notas || s.notes) } : {}) };
+    }
     const layout = LAYOUTS_IA.includes(s?.layout) ? s.layout : 'content';
     const nodos = Array.isArray(s?.mapNodes) ? s.mapNodes.map((n, j) => ({
       id: n.id ?? j + 1, text: String(n.text || ''),
@@ -2057,19 +2101,20 @@ export function parsearPresentacionIA(raw, theme = 'dark', opciones = {}) {
       tags: Array.isArray(s?.tags) ? s.tags.map(String).slice(0, 6) : [],
       imageBase64: null,
       mapNodes: layout === 'map' && !nodos.length ? SLIDE_DEFAULTS.map.mapNodes : nodos,
+      ...(s?.notas || s?.notes ? { notes: String(s.notas || s.notes) } : {}),
     };
   });
-  return { titulo, slides: opciones.cajas ? slides.map(diapositivaACajas) : slides };
+  return { titulo, slides: opciones.cajas ? slides.map(sl => (sl.layout === 'free' ? sl : diapositivaACajas(sl))) : slides };
 }
 
-async function generateWithGemini(topic, numSlides, theme) {
-  const prompt = construirPromptPresentacion({ tema: topic, numSlides });
+async function generateWithGemini(topic, numSlides, theme, { nivel = '', extra = '', disenos = true } = {}) {
+  const prompt = construirPromptPresentacion({ tema: topic, numSlides, nivel, extra, disenos });
   const data = await callGeminiProxy({
     model: 'gemini-2.0-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 4000 },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 8000, responseMimeType: 'application/json' },
   });
-  return parsearPresentacionIA(extractText(data), theme).slides;
+  return parsearPresentacionIA(extractText(data), theme, { cajas: disenos });
 }
 
 // ─── MAIN EDITOR COMPONENT ────────────────────────────────────────────────────
@@ -2463,18 +2508,18 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     setGenerating(true);
     setAiError('');
     try {
-      const generated = await generateWithGemini(aiTopic, aiSlides, aiTheme);
+      const { titulo: tit, slides: generated } = await generateWithGemini(aiTopic, aiSlides, aiTheme, { nivel: aiNivel.trim(), extra: aiExtra.trim(), disenos: aiCajas });
       setSlides(generated);
       setActiveIdx(0);
       setShowAI(false);
-      setTitulo(aiTopic);
+      setTitulo(tit || aiTopic);
     } catch (e) {
       setAiError('Error generando: ' + e.message);
     }
     setGenerating(false);
   };
 
-  const promptMiIA = construirPromptPresentacion({ tema: aiTopic.trim(), numSlides: aiSlides, nivel: aiNivel.trim(), extra: aiExtra.trim() });
+  const promptMiIA = construirPromptPresentacion({ tema: aiTopic.trim(), numSlides: aiSlides, nivel: aiNivel.trim(), extra: aiExtra.trim(), disenos: aiCajas });
 
   const copiarPrompt = async () => {
     try { await navigator.clipboard.writeText(promptMiIA); }
@@ -2932,9 +2977,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                 </select>
               </div>
             </div>
-            {aiModo === 'miIA' && (
-              <>
-                <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 160px' }}>
                     <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 6 }}>NIVEL / CURSO (opcional)</label>
                     <input value={aiNivel} onChange={e => setAiNivel(e.target.value)} placeholder="Ej: 2.º ESO"
@@ -2946,6 +2989,12 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                       style={{ width: '100%', background: '#111827', border: '2px solid #374151', borderRadius: 10, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 14, fontSize: 12, color: '#d1d5db', cursor: 'pointer', lineHeight: 1.45, background: aiCajas ? 'rgba(108,99,255,0.12)' : '#111827', border: `1px solid ${aiCajas ? 'rgba(108,99,255,0.45)' : '#374151'}`, borderRadius: 10, padding: '10px 12px' }}>
+              <input type="checkbox" checked={aiCajas} onChange={e => setAiCajas(e.target.checked)} style={{ marginTop: 2 }} />
+              <span><b>Diseños nuevos</b> (recomendado): la IA elige entre portadas, tarjetas, pasos, línea del tiempo, mapa mental, comparación, cita… con formas, emojis y animaciones, todo editable. Desmárcalo para las plantillas fijas antiguas.</span>
+            </label>
+            {aiModo === 'miIA' && (
+              <>
                 <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: 14, marginBottom: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#e5e7eb', marginBottom: 6 }}>1 · Copia el prompt y pégalo en tu IA</div>
                   <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 10, lineHeight: 1.5 }}>Sirve en ChatGPT, Gemini, Claude, Copilot… Si dejas el tema vacío, escríbelo luego en tu IA.</div>
@@ -2962,10 +3011,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#e5e7eb', marginBottom: 8 }}>2 · Pega aquí la respuesta de tu IA</div>
                   <textarea value={aiPegado} onChange={e => setAiPegado(e.target.value)} placeholder='{ "titulo": "...", "slides": [ ... ] }'
                     style={{ width: '100%', height: 130, background: '#0b1220', border: '2px solid #374151', borderRadius: 10, padding: '10px 12px', color: '#fff', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, fontSize: 12, color: '#d1d5db', cursor: 'pointer', lineHeight: 1.4 }}>
-                    <input type="checkbox" checked={aiCajas} onChange={e => setAiCajas(e.target.checked)} style={{ marginTop: 2 }} />
-                    <span><b>Textos en cajas movibles</b> (recomendado): podrás arrastrar, agrandar y añadir imágenes en cada diapositiva. Desmárcalo para usar las plantillas fijas.</span>
-                  </label>
+                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 6 }}>Se reconocen tanto los diseños nuevos como el formato antiguo.</div>
                 </div>
               </>
             )}

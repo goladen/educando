@@ -70,10 +70,55 @@ function DesfileAliens() {
   );
 }
 
-export default function MenuArcade({ config, setConfig, maxJugadores, apiMatesRef, onJugar, onRapida, onSalir, error, ctrlMandos, onPdf, maxPreguntasPdf }) {
+/** Partida vinculada a una ficha PDF impresa (mismas preguntas, mismo orden). */
+function BannerFicha({ ficha, onQuitar }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border-2 border-fuchsia-400 bg-fuchsia-500/10 p-3 shadow-[0_0_18px_rgba(232,121,249,0.35)]">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-arcade text-[10px] text-fuchsia-300 sm:text-xs">🖨️ VINCULADA A LA FICHA PDF</span>
+        <span className="flex-1" />
+        <button type="button" onClick={onQuitar} className={`${BTN.menu} text-[9px]`}>✕ DESVINCULAR</button>
+      </div>
+      <span className="font-pixel text-2xl leading-tight text-slate-100">{ficha.titulo || 'Preguntas de la ficha'}</span>
+      <span className="font-pixel text-lg leading-tight text-slate-400">
+        Salen las {ficha.preguntas.length} preguntas de la ficha en el mismo orden (#01, #02…). Si se acaban, vuelven a empezar.
+        Para jugar con otro contenido, desvincula o elige otro modo.
+      </span>
+    </div>
+  );
+}
+
+/** Fichas descargadas en este equipo: un toque y la partida queda vinculada otra vez. */
+function FichasImpresas({ fichas, cargando, onAbrir, onOlvidar }) {
+  if (!fichas?.length) return null;
+  return (
+    <div className="flex flex-col gap-2 border-t-2 border-slate-800 pt-3">
+      <span className="font-arcade text-[9px] text-slate-400">🖨️ ¿YA LA IMPRIMISTE? JUEGA LAS PREGUNTAS DE UNA FICHA (MISMO ORDEN)</span>
+      <div className="flex flex-wrap gap-2">
+        {fichas.map((f) => (
+          <span key={f.codigo} className="flex items-stretch">
+            <button type="button" disabled={cargando} onClick={() => onAbrir(f.codigo)}
+              title={`Descargada el ${new Date(f.fecha).toLocaleDateString()}`}
+              className={`${chip(false)} rounded-r-none disabled:opacity-50`}>
+              {f.titulo || 'Ficha'} · {f.n}
+            </button>
+            <button type="button" onClick={() => onOlvidar(f.codigo)} title="Quitar de la lista"
+              className={`${chip(false)} rounded-l-none border-l-0 px-2`}>✕</button>
+          </span>
+        ))}
+      </div>
+      {cargando && <span className="font-pixel text-lg text-amber-300">Cargando la ficha…</span>}
+    </div>
+  );
+}
+
+export default function MenuArcade({
+  config, setConfig, maxJugadores, apiMatesRef, onJugar, onRapida, onSalir, error, ctrlMandos, onPdf, maxPreguntasPdf,
+  fichas = [], cargandoFicha = false, onAbrirFicha, onQuitarFicha, onOlvidarFicha,
+}) {
   const [buscando, setBuscando] = useState(false);
   const [pdfAbierto, setPdfAbierto] = useState(false);
-  const { variante, fuente } = config;
+  const { variante, fuente, ficha } = config;
   const setFuente = (patch) => setConfig({ fuente: { ...fuente, ...patch } });
   const cambiarTipo = (tipo) => {
     if (tipo === fuente.tipo) return;
@@ -126,6 +171,9 @@ export default function MenuArcade({ config, setConfig, maxJugadores, apiMatesRe
         </Seccion>
 
         <Seccion n={2} titulo="¿QUÉ SE PREGUNTA?">
+          {ficha && <BannerFicha ficha={ficha} onQuitar={onQuitarFicha} />}
+          {cargandoFicha && !ficha && <p className="font-pixel text-2xl text-amber-300">🖨️ Cargando las preguntas de la ficha…</p>}
+          {!ficha && (<>
           <div className="flex flex-wrap gap-2">
             {FUENTES.map((f) => (
               <button key={f.id} type="button" onClick={() => cambiarTipo(f.id)} className={chip(fuente.tipo === f.id)}>{f.nombre}</button>
@@ -158,7 +206,7 @@ export default function MenuArcade({ config, setConfig, maxJugadores, apiMatesRe
                   : 'Ejercicios de las fichas de Math World: cada respuesta posible viaja en una nave.'}
               </p>
               <Suspense fallback={<p className="font-arcade text-[10px] text-slate-400">CARGANDO EJERCICIOS…</p>}>
-                <SelectorMatesMandos numerico={variante === 'DISPARA'} apiRef={apiMatesRef} />
+                <SelectorMatesMandos numerico={variante === 'DISPARA'} apiRef={apiMatesRef} temasIniciales={fuente.temas} nivelInicial={fuente.nivel} />
               </Suspense>
             </div>
           )}
@@ -202,6 +250,9 @@ export default function MenuArcade({ config, setConfig, maxJugadores, apiMatesRe
               <span className="font-pixel text-lg text-slate-500">Pulsa una o varias hojas; sin elegir ninguna se juega con todas.</span>
             </div>
           )}
+
+          <FichasImpresas fichas={fichas} cargando={cargandoFicha} onAbrir={onAbrirFicha} onOlvidar={onOlvidarFicha} />
+          </>)}
 
           {permiteEscribir && (
             <div className="flex flex-wrap items-center gap-2">
@@ -317,7 +368,7 @@ export default function MenuArcade({ config, setConfig, maxJugadores, apiMatesRe
       </div>
 
       {pdfAbierto && (
-        <ModalPdf maxPreguntas={maxPreguntasPdf} onGenerar={onPdf} onCerrar={() => setPdfAbierto(false)} />
+        <ModalPdf maxPreguntas={maxPreguntasPdf} vinculada={!!ficha} onGenerar={onPdf} onCerrar={() => setPdfAbierto(false)} />
       )}
 
       {buscando && (

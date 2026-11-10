@@ -18,6 +18,7 @@ import {
 import ChipAntena from './mandos/ChipAntena.jsx';
 import { BotonTutorialMandos } from './mandos/TutorialMandos.jsx';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 import GuardarResultadosMandos from './mandos/GuardarResultadosMandos.jsx';
 
 /* =====================================================================
@@ -2017,6 +2018,7 @@ function BuscadorRecursos({ onBack, onPick }) {
 // =====================================================================
 export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStart = false, codigoSala = null }) {
     const [pantalla, setPantalla] = useState(codigoSala ? 'UNIRSE' : 'MENU');
+    const [recursoPdf, setRecursoPdf] = useState(null); // recurso elegido en el buscador → botón «Ficha PDF»
     const [preguntas, setPreguntas] = useState([]);
     const [titulo, setTitulo] = useState('Modo libre');
     const [meta, setMeta] = useState(15);
@@ -2095,6 +2097,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
             <BuscadorRecursos
                 onBack={() => setPantalla('MENU')}
                 onPick={(r) => {
+                    setRecursoPdf(r);
                     if (preparar(preguntasDeRecurso(r), r.titulo || 'Recurso')) setPantalla('CONFIG');
                 }}
             />
@@ -2138,6 +2141,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <div style={menuWrap}>
                 <div style={{ ...tarjeta, maxWidth: 460 }}>
+                    <FichaFlotante recurso={recursoPdf || recurso} />
                     <button onClick={() => setPantalla('MENU')} style={btnAtras}><ArrowLeft size={16} /> Atrás</button>
                     <h2 style={{ color: '#e6317f', margin: '6px 0 4px', fontSize: '1.35rem' }}>🦑 Preparar partida</h2>
                     <p style={{ color: '#9fb0bb', margin: '0 0 16px', fontSize: '0.9rem' }}>

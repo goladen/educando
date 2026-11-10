@@ -17,6 +17,7 @@ import {
 import EditorMoneyBoard from './components/EditorMoneyBoard';
 import { useEfectosPuntos, CapaEfectos, ESTILOS_EFECTO } from './components/EfectosPuntos';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego from './mandos/RelevosMandos.jsx';
 import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
 
@@ -1283,6 +1284,7 @@ export default function MoneyBoard(props) {
 
 function MoneyBoardJuego({ recurso = null, usuario, onExit, autoStart = false, juegoMandos = null, mandosApi = null }) {
     const [pantalla, setPantalla] = useState('MENU');
+    const [recursoPdf, setRecursoPdf] = useState(null); // recurso elegido en el buscador → botón «Ficha PDF»
     const [categorias, setCategorias] = useState([]);
     const [titulo, setTitulo] = useState('');
     const [config, setConfig] = useState(null);
@@ -1337,7 +1339,7 @@ function MoneyBoardJuego({ recurso = null, usuario, onExit, autoStart = false, j
     // ------------------------- PANTALLAS -------------------------
     if (pantalla === 'BUSCADOR') {
         return <BuscadorRecursos onBack={() => setPantalla('MENU')}
-            onPick={(r, cats) => { if (preparar(r, cats)) setPantalla('CONFIG'); }} />;
+            onPick={(r, cats) => { setRecursoPdf(r); if (preparar(r, cats)) setPantalla('CONFIG'); }} />;
     }
 
     if (pantalla === 'EDITOR') {
@@ -1347,9 +1349,9 @@ function MoneyBoardJuego({ recurso = null, usuario, onExit, autoStart = false, j
     }
 
     if (pantalla === 'CONFIG') {
-        return <PantallaConfig titulo={titulo} categorias={categorias}
+        return <><PantallaConfig titulo={titulo} categorias={categorias}
             onBack={() => setPantalla(autoStart ? 'MENU' : 'BUSCADOR')}
-            onJugar={(c) => { setConfig(c); setGuardado(false); setSemilla(s => s + 1); setPantalla('JUEGO'); }} />;
+            onJugar={(c) => { setConfig(c); setGuardado(false); setSemilla(s => s + 1); setPantalla('JUEGO'); }} /><FichaFlotante recurso={recursoPdf || recurso} /></>;
     }
 
     if (pantalla === 'JUEGO') {

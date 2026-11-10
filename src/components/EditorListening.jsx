@@ -10,8 +10,9 @@ import ModalPdfListening from './ModalPdfListening';
 import {
     TIPO_LISTENING_RECURSO, IDIOMAS_CREAR, NIVELES_MCER, VELOCIDADES_VOZ, TIPOS_TEXTO,
     getIdiomaCrear, nuevoId, contarPalabras, minutosEstimados, construirPrompt,
-    importarRespuestaIA, tokenizar, localizarHuecos, ocurrenciaEn, distractoresAuto, firmaAudio,
+    importarRespuestaIA, tokenizar, localizarHuecos, ocurrenciaEn, distractoresAuto, firmaAudio, motorDeVoz,
 } from '../listeningCrear';
+import { generarKokoro, subirAudioListening } from '../utils/kokoroTTS';
 
 // ──────────────────────────────────────────────────────────
 // Editor de Listening propio (tipoJuego LISTENING_RECURSO)
@@ -27,7 +28,7 @@ export const recursoListeningVacio = (usuario, perfil) => ({
     pais: perfil?.pais || '', region: perfil?.region || '', poblacion: perfil?.poblacion || '',
     tipo: TIPO_LISTENING_RECURSO, tipoJuego: TIPO_LISTENING_RECURSO,
     idioma: 'en', nivel: 'B1', texto: '', dialogo: false,
-    voz: 'en-GB-SoniaNeural', voz2: 'en-GB-RyanNeural', velocidad: '-10%',
+    voz: 'kokoro:bf_emma', voz2: 'kokoro:bm_george', velocidad: '-10%',
     huecos: [], preguntas: [], ordenPartes: 'preguntas',
     isPrivate: false,
 });
@@ -289,6 +290,7 @@ function PanelIA({ datos, set, onImportado }) {
 // ──────────────────────────────────────────────────────────
 function PanelTexto({ datos, set }) {
     const [grabando, setGrabando] = useState(false);
+    const [progreso, setProgreso] = useState(null);
     const [error, setError] = useState('');
     const idi = getIdiomaCrear(datos.idioma);
     const palabras = contarPalabras(datos.texto);
@@ -300,13 +302,38 @@ function PanelTexto({ datos, set }) {
         set({ idioma: id, voz: nuevo.voces[0].id, voz2: (nuevo.voces[1] || nuevo.voces[0]).id });
     };
 
+    // Al elegir una voz de otro motor, la del 2º personaje pasa a ese motor
+    // (un audio se genera entero con Kokoro o entero con Edge)
+    const cambiarVoz = (campo, id) => {
+        const cambios = { [campo]: id };
+        const otro = campo === 'voz' ? 'voz2' : 'voz';
+        if (motorDeVoz(datos[otro]) !== motorDeVoz(id)) {
+            const mismas = idi.voces.filter(v => motorDeVoz(v.id) === motorDeVoz(id));
+            cambios[otro] = (mismas.find(v => v.id !== id) || mismas[0]).id;
+        }
+        set(cambios);
+    };
+
     const grabar = async () => {
         setError('');
         const user = auth.currentUser;
         if (!user) { setError('Inicia sesión para generar el audio.'); return; }
         setGrabando(true);
+        setProgreso(null);
         try {
             const token = await user.getIdToken();
+            if (motorDeVoz(datos.voz) === 'kokoro') {
+                const { mp3 } = await generarKokoro({
+                    texto: datos.texto, idioma: datos.idioma, voz: datos.voz,
+                    voz2: datos.dialogo ? datos.voz2 : null, dialogo: !!datos.dialogo, velocidad: datos.velocidad,
+                }, setProgreso);
+                setProgreso({ fase: 'subir' });
+                const res = await subirAudioListening(mp3, { anterior: datos.audioPublicId || null, token });
+                set({ audioUrl: res.url, audioPublicId: res.publicId, audioDuracion: res.duracion || null, audioFirma: firmaAudio(datos) });
+                setGrabando(false);
+                setProgreso(null);
+                return;
+            }
             const r = await fetch('/api/listening-tts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -322,7 +349,28 @@ function PanelTexto({ datos, set }) {
             setError(e.message);
         }
         setGrabando(false);
+        setProgreso(null);
     };
+
+    const kokoro = motorDeVoz(datos.voz) === 'kokoro';
+    const textoProgreso = () => {
+        if (!progreso) return 'Preparando la voz…';
+        if (progreso.fase === 'subir') return 'Guardando el audio en la nube…';
+        if (progreso.fase === 'mp3') return 'Preparando el archivo de audio…';
+        if (progreso.fase === 'modelo') {
+            const mb = (b) => Math.round((b || 0) / 1e6);
+            return progreso.total ? `Descargando el modelo de voz (solo la 1ª vez): ${mb(progreso.hecho)} / ${mb(progreso.total)} MB` : 'Cargando el modelo de voz…';
+        }
+        return `Generando la voz en tu ordenador… ${progreso.total ? Math.round(100 * progreso.hecho / progreso.total) : 0} %`;
+    };
+    const opcionesVoz = () => (
+        <>
+            {[['kokoro', '🖥️ Kokoro (se genera en tu ordenador)'], ['edge', '☁️ Edge (se genera en la nube)']].map(([motor, label]) => {
+                const vs = idi.voces.filter(v => motorDeVoz(v.id) === motor);
+                return vs.length ? <optgroup key={motor} label={label}>{vs.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</optgroup> : null;
+            })}
+        </>
+    );
 
     return (
         <div>
@@ -354,14 +402,14 @@ function PanelTexto({ datos, set }) {
                 <div style={st.cardTitle}>🎙️ Audio</div>
                 <div style={st.grid}>
                     <Campo label={datos.dialogo ? 'Voz del 1er personaje' : 'Voz'}>
-                        <select value={datos.voz} onChange={e => set({ voz: e.target.value })} style={st.input}>
-                            {idi.voces.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                        <select value={datos.voz} onChange={e => cambiarVoz('voz', e.target.value)} style={st.input}>
+                            {opcionesVoz()}
                         </select>
                     </Campo>
                     {datos.dialogo && (
                         <Campo label="Voz del 2º personaje">
-                            <select value={datos.voz2} onChange={e => set({ voz2: e.target.value })} style={st.input}>
-                                {idi.voces.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                            <select value={datos.voz2} onChange={e => cambiarVoz('voz2', e.target.value)} style={st.input}>
+                                {opcionesVoz()}
                             </select>
                         </Campo>
                     )}
@@ -381,11 +429,14 @@ function PanelTexto({ datos, set }) {
                     </div>
                 )}
                 <button onClick={grabar} disabled={grabando || !datos.texto?.trim()} style={{ ...st.btnMorado, padding: '10px 18px', opacity: grabando || !datos.texto?.trim() ? 0.6 : 1 }}>
-                    {grabando ? <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> Grabando… (puede tardar unos segundos)</>
+                    {grabando ? <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> {kokoro ? textoProgreso() : 'Grabando… (puede tardar unos segundos)'}</>
                         : <><Mic size={16} /> {datos.audioUrl ? 'Volver a generar el audio' : 'Generar audio'}</>}
                 </button>
                 {error && <div style={st.error}><AlertCircle size={15} /> {error}</div>}
                 <p style={st.nota}>El audio se genera con voces neuronales y se guarda en la nube. Si no lo generas, el alumno oirá la voz de su dispositivo.</p>
+                {kokoro && (
+                    <p style={st.nota}>🖥️ Las voces Kokoro se generan en este ordenador: la primera vez se descarga el modelo de voz (de 90 a 330 MB según el equipo) y queda guardado en el navegador. Mantén esta pestaña abierta mientras se genera.</p>
+                )}
             </div>
         </div>
     );

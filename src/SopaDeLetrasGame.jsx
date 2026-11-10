@@ -10,6 +10,7 @@ import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sopa que ya creamos
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 
 // --- DICCIONARIOS (Igual que Wordle) ---
 const LANGUAGES = {
@@ -560,6 +561,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
 
     if (screen === 'SELECT_HOJA') return (
         <div style={styles.screen}>
+            {(recursoPendiente || recursoActual) && <FichaFlotante recurso={recursoPendiente || recursoActual} />}
             <button onClick={() => setScreen('CONFIG')} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
             <h1 style={{ ...styles.h1, color: '#f1c40f', marginTop: '40px' }}>Elige un Nivel</h1>
 
@@ -596,6 +598,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
 
     if (screen === 'CONFIG') return (
         <div style={styles.screen}>
+            {isCustomGame && recursoActual && <FichaFlotante recurso={recursoActual} />}
             <button onClick={onExit} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
             <h1 style={styles.h1}>SOPA DE LETRAS</h1>
             

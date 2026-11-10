@@ -5,9 +5,12 @@ import { TEMAS_MATES, tiposJugables, generarPreguntasMates } from './preguntasMa
 
 const LIMITES = [[19, 'hasta 19'], [100, 'hasta 100'], [1000, 'hasta 1000'], [9999, 'sin límite']];
 
-export default function SelectorMatesMandos({ numerico, apiRef }) {
-  const [temas, setTemas] = useState(['calculo']);
-  const [nivel, setNivel] = useState(1);
+export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales = null, nivelInicial = null }) {
+  const [temas, setTemas] = useState(() => {
+    const validos = (temasIniciales || []).filter((id) => TEMAS_MATES.some((f) => f.id === id));
+    return validos.length ? validos : ['calculo'];
+  });
+  const [nivel, setNivel] = useState(nivelInicial || 1);
   const [maxNum, setMaxNum] = useState(100);
   const [quitados, setQuitados] = useState({}); // 'tema.tipo' → true
   const opts = useMemo(() => ({ nivel, numerico, maxNum }), [nivel, numerico, maxNum]);
@@ -21,7 +24,9 @@ export default function SelectorMatesMandos({ numerico, apiRef }) {
   );
 
   useEffect(() => {
-    apiRef.current = (n) => generarPreguntasMates(seleccion, n, opts);
+    const api = (n) => generarPreguntasMates(seleccion, n, opts);
+    api.estado = { seleccion, opts }; // para vincular una ficha PDF (Invasión Pi la regenera con semilla)
+    apiRef.current = api;
   });
 
   const alternarTema = (id) => setTemas((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));

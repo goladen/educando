@@ -1273,7 +1273,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
         return [...eng.destinations.entries()].map(([id, path]) => ({ id, path, node: eng.board.nodes.get(id) }));
     };
     const eventoMando = (i, ev) => {
-        if (ev.tipo !== 'letra' || pausaActiva || i !== activePlayerIdx) return;
+        if (ev.tipo !== 'letra' || pausaActiva || i !== activePlayerIdx || ['INTRO', 'BUSCADOR', 'RULES', 'SETUP'].includes(pantalla)) return;
         const k = 'ABCD'.indexOf(ev.letra);
         if (gameState === 'WAITING_ROLL') { tirarDado(); return; }
         if (gameState === 'SELECTING') {
@@ -1311,11 +1311,23 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     // ════════════════════════════════════════════════════════════════════════
     // RENDER: PANTALLA INTRO
     // ════════════════════════════════════════════════════════════════════════
+    // Mandos micro:bit en todas las pantallas (también en el inicio y al configurar jugadores), para conectarlos antes de jugar
+    // antes de empezar (pantalla de jugadores) los huecos siguen al número y nombres que se están eligiendo
+    const jugMandos = players.length && pantalla !== 'SETUP' && pantalla !== 'INTRO' ? players : Array.from({ length: numPlayers }, (_, i) => ({ name: nombres[i] || `Jugador ${i + 1}`, color: PLAYER_COLORS[i] }));
+    const mandosUI = (
+        <MandosEnJuego clave="TRIVIAL" juego="Trivial" tipo="TRIVIAL_MANDOS" apiRef={mandosApi}
+            nJug={Math.max(1, Math.min(4, jugMandos.length || 1))} nombresHueco={jugMandos.slice(0, 4).map((p) => p.name)}
+            colores={jugMandos.slice(0, 4).map((p, i) => (typeof p.color === 'string' ? p.color : p.color?.hex) || ['#22d3ee', '#f472b6', '#facc15', '#4ade80'][i])}
+            modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras" relevosPorDefecto={false}
+            onEvento={eventoMando}
+            controles={<>Un mando por <b>jugador</b> (hasta 4) y solo cuenta el del turno. <b>A</b> cambia la letra y <b>B</b> o agitar la envía: para <b>tirar el dado</b> envía cualquier letra; para <b>elegir casilla</b>, la letra del destino (sale en la lista); en las preguntas de opciones, <b>A-D</b>; si fallas, envía cualquier letra para seguir.</>} />
+        );
+
     if (pantalla === 'INTRO') {
         const totalPreguntas = Object.values(PREGUNTAS_JSON).flat().length;
         const totalPrimaria  = Object.values(PREGUNTAS_PRIMARIA).flat().length;
         const totalSuper     = Object.values(PREGUNTAS_SUPER).flat().length;
-        return (
+        return (<>{mandosUI}
             <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', overflow: 'auto', flexDirection: 'column', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', padding: isMobile ? '24px 16px 32px' : '20px', gap: 0 }}>
                 <FullscreenBtn />
 
@@ -1455,7 +1467,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     </button>
                 )}
             </div>
-        );
+        </>);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1464,7 +1476,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     // ════════════════════════════════════════════════════════════════════════
     if (pantalla === 'BUSCADOR') {
         const CAT_COLORS = { geo: '#3498db', esp: '#e84393', his: '#f1c40f', art: '#9b59b6', cie: '#2ecc71', dep: '#e67e22' };
-        return (
+        return (<>{mandosUI}
             <div style={{ minHeight: '100dvh', background: '#0f172a', display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
                 {/* Header */}
                 <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
@@ -1563,7 +1575,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     )}
                 </div>
             </div>
-        );
+        </>);
     }
 
     // RENDER: PANTALLA DE REGLAS
@@ -1597,7 +1609,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
             { n: '5', titulo: '¡Gana el primero!', texto: 'Llega al centro con todos los quesitos y responde la pregunta final para ganar.' },
         ];
 
-        return (
+        return (<>{mandosUI}
             <div style={{
                 minHeight: '100vh',
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e2d4a 50%, #0f172a 100%)',
@@ -1775,11 +1787,11 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     </div>
                 </div>
             </div>
-        );
+        </>);
     }
 
     if (pantalla === 'SETUP') {
-        return (
+        return (<>{mandosUI}
             <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', justifyContent: 'center', alignItems: isMobile ? 'flex-start' : 'center', overflow: 'auto', padding: isMobile ? '16px' : 0 }}>
                 <FullscreenBtn />
                 <div style={{ background: 'rgba(30, 41, 59, 0.95)', padding: isMobile ? '20px 16px' : 40, borderRadius: 20, width: '100%', maxWidth: 500, margin: isMobile ? '16px' : 0, boxSizing: 'border-box', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', border: '2px solid #334155' }}>
@@ -1881,7 +1893,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     <button onClick={() => { if (recursoIdInicial) { onExit?.(); return; } setPantalla('INTRO'); setCategoriasRecurso(null); setErrorPreguntas(''); }} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← {t('Volver al inicio')}</button>
                 </div>
             </div>
-        );
+        </>);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1890,12 +1902,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     return (
         <div style={st.appContainer}>
             {gameState === 'WON' && <Confetti recycle={false} numberOfPieces={500} />}
-            <MandosEnJuego clave="TRIVIAL" juego="Trivial" tipo="TRIVIAL_MANDOS" apiRef={mandosApi}
-                nJug={Math.max(1, Math.min(4, players.length || 1))} nombresHueco={players.slice(0, 4).map((p) => p.name)}
-                colores={players.slice(0, 4).map((p, i) => (typeof p.color === 'string' ? p.color : p.color?.hex) || ['#22d3ee', '#f472b6', '#facc15', '#4ade80'][i])}
-                modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras" relevosPorDefecto={false}
-                onEvento={eventoMando}
-                controles={<>Un mando por <b>jugador</b> (hasta 4) y solo cuenta el del turno. <b>A</b> cambia la letra y <b>B</b> o agitar la envía: para <b>tirar el dado</b> envía cualquier letra; para <b>elegir casilla</b>, la letra del destino (sale en la lista); en las preguntas de opciones, <b>A-D</b>; si fallas, envía cualquier letra para seguir.</>} />
+            {mandosUI}
             {gameState === 'SELECTING' && mandosApi.current?.activos && (
                 <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 2147482000, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'none', fontFamily: 'system-ui, sans-serif' }}>
                     {destinosMando().slice(0, 4).map((d, k) => (

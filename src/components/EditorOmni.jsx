@@ -8,20 +8,26 @@ import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Image as ImgIcon, Globe, Lock } from 'lucide-react';
 import PublicarModal from './PublicarModal';
 import MathInput from './MathInput';
+import { imprimirOmni } from '../utils/pdfOmni';
+import MathText from './MathText';
+import { cargarMotor, motorListo, equivalentes, aLatex } from '../utils/mathEquiv';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const uid = () => 'ex_' + Math.random().toString(36).slice(2, 8);
 const itemUid = () => Math.random().toString(36).slice(2, 8);
 
-const TIPOS = ['fill', 'choice', 'wordbank', 'construct', 'match', 'order', 'truefalse', 'multichoice', 'error'];
+const TIPOS = ['fill', 'choice', 'wordbank', 'construct', 'match', 'order', 'truefalse', 'multichoice', 'error', 'short', 'expr', 'matrix', 'open'];
 const TIPO_LABEL = {
   fill: 'Fill in the blank', choice: 'Choose the correct', wordbank: 'Word bank',
   construct: 'Write a sentence', match: 'Match', order: 'Order words',
   truefalse: 'True / False', multichoice: 'Multiple choice', error: 'Find the error',
+  short: 'Respuesta corta (número, palabra…)', open: 'Respuesta abierta (no puntúa)',
+  expr: 'Expresión matemática (equivalente)', matrix: 'Matriz',
 };
 const TIPO_COLOR = {
   fill: '#6D28D9', choice: '#1D4ED8', wordbank: '#B45309', construct: '#047857',
   match: '#0F766E', order: '#C2410C', truefalse: '#0369A1', multichoice: '#7E22CE', error: '#B91C1C',
+  short: '#0E7490', open: '#64748B', expr: '#1D4ED8', matrix: '#9333EA',
 };
 const NIVELES = ['1 ESO', '2 ESO', '3 ESO', '4 ESO', '1 Bach', '2 Bach', 'Primaria', 'FP', 'Otros'];
 const COLORES = ['#6D28D9', '#1D4ED8', '#047857', '#0F766E', '#C2410C', '#B45309', '#0369A1', '#7E22CE', '#B91C1C', '#BE185D'];
@@ -38,6 +44,10 @@ function newItem(tipo) {
     case 'truefalse':   return { id, lbl: '', statement: '', ans: 'true' };
     case 'multichoice': return { id, lbl: '', question: '', opts: ['', '', '', ''], ans: '' };
     case 'error':       return { id, lbl: '', sentence: '', errorWord: '', correction: '' };
+    case 'short':       return { id, lbl: '', question: '', ans: '', alts: [] };
+    case 'open':        return { id, lbl: '', question: '', ans: '', lineas: 3 };
+    case 'expr':        return { id, lbl: '', question: '', ans: '', alts: [], modo: 'equiv' };
+    case 'matrix':      return { id, lbl: '', question: '', filas: 2, cols: 2, celdas: ['', '', '', ''], corchetes: 'pmatrix' };
     default:            return { id, lbl: '' };
   }
 }
@@ -242,6 +252,115 @@ function ItemEditorError({ item, onChange }) {
   );
 }
 
+function ItemEditorShort({ item, onChange }) {
+  return (
+    <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={lbl}>Etiqueta</label>
+      <input style={inp} value={item.lbl} onChange={e => onChange('lbl', e.target.value)} placeholder="a)" />
+      <label style={lbl}>Pregunta</label>
+      <MathInput multiline value={item.question || ''} onChange={v => onChange('question', v)} placeholder="Calcula $\frac{1}{2}+\frac{1}{4}$" />
+      <label style={lbl}>Respuesta correcta</label>
+      <MathInput value={item.ans || ''} onChange={v => onChange('ans', v)} placeholder="3/4" />
+      <label style={lbl}>Alternativas válidas (separadas por |) · los números equivalentes (0,75 = 3/4) ya se aceptan</label>
+      <input style={inp} value={(item.alts || []).join('|')} onChange={e => onChange('alts', e.target.value.split('|').map(s => s.trim()).filter(Boolean))} placeholder="0,75 | tres cuartos" />
+    </div>
+  );
+}
+
+function ItemEditorOpen({ item, onChange }) {
+  return (
+    <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={lbl}>Etiqueta</label>
+      <input style={inp} value={item.lbl} onChange={e => onChange('lbl', e.target.value)} placeholder="a)" />
+      <label style={lbl}>Pregunta</label>
+      <MathInput multiline value={item.question || ''} onChange={v => onChange('question', v)} placeholder="Explica por qué…" />
+      <label style={lbl}>Respuesta modelo / criterios de corrección</label>
+      <textarea style={{ ...inp, height: 60 }} value={item.ans || ''} onChange={e => onChange('ans', e.target.value)} />
+      <label style={lbl}>Renglones en la ficha de papel</label>
+      <input style={inp} type="number" min="1" max="20" value={item.lineas || 3} onChange={e => onChange('lineas', Math.max(1, Math.min(20, parseInt(e.target.value) || 3)))} />
+    </div>
+  );
+}
+
+// Prueba rápida: ¿daría PIKT por buena esta respuesta?
+function ProbarRespuesta({ item, modo }) {
+  const [v, setV] = useState('');
+  const [listo, setListo] = useState(motorListo());
+  useEffect(() => { if (!listo) cargarMotor().then(() => setListo(true)).catch(() => {}); }, [listo]);
+  const sols = [item.ans, ...(item.alts || [])].filter(Boolean);
+  const r = listo && v.trim() && sols.length ? sols.map(s => equivalentes(v, s, { modo })).find(x => x !== false) ?? false : undefined;
+  const tex = listo && v.trim() ? aLatex(v) : null;
+  return (
+    <div style={{ marginTop: 6, padding: '8px 10px', background: '#F8FAFC', border: '1px dashed #CBD5E1', borderRadius: 8 }}>
+      <label style={lbl}>Probar una respuesta de alumno</label>
+      <input style={inp} value={v} onChange={e => setV(e.target.value)} placeholder="Ej: x(3x+2)   ·   sqrt(8)   ·   log_(2)(8)" />
+      {v.trim() && (
+        <div style={{ fontSize: 12, marginTop: 4, color: r === true ? '#047857' : r === null ? '#B45309' : '#B91C1C' }}>
+          {!listo ? 'Cargando…' : r === true ? '✓ La daría por buena' : r === null ? '⚠️ No se puede comparar: revisa la solución' : '✗ La daría por mala'}
+          {tex && <span style={{ color: '#64748B' }}> · entiende <MathText text={`$${tex}$`} /></span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItemEditorExpr({ item, onChange }) {
+  return (
+    <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={lbl}>Etiqueta</label>
+      <input style={inp} value={item.lbl} onChange={e => onChange('lbl', e.target.value)} placeholder="a)" />
+      <label style={lbl}>Pregunta</label>
+      <MathInput multiline value={item.question || ''} onChange={v => onChange('question', v)} placeholder="Deriva $f(x)=x^3+x^2$" />
+      <label style={lbl}>Solución (una forma; se acepta cualquier expresión equivalente)</label>
+      <MathInput value={item.ans || ''} onChange={v => onChange('ans', v)} placeholder="$3x^2+2x$" />
+      <label style={lbl}>Cómo comparar</label>
+      <select style={inp} value={item.modo || 'equiv'} onChange={e => onChange('modo', e.target.value)}>
+        <option value="equiv">Expresión equivalente (derivadas, simplificar, factorizar…)</option>
+        <option value="constante">Equivalente salvo una constante (integral indefinida, + C)</option>
+      </select>
+      <label style={lbl}>Otras soluciones válidas (separadas por |)</label>
+      <input style={inp} value={(item.alts || []).join('|')} onChange={e => onChange('alts', e.target.value.split('|').map(s => s.trim()).filter(Boolean))} />
+      <ProbarRespuesta item={item} modo={item.modo || 'equiv'} />
+    </div>
+  );
+}
+
+function ItemEditorMatrix({ item, onChange, onMerge }) {
+  const f = item.filas || 1, c = item.cols || 1, cel = item.celdas || [];
+  const redimensionar = (nf, nc) => {
+    nf = Math.max(1, Math.min(6, nf || 1)); nc = Math.max(1, Math.min(6, nc || 1));
+    const nuevas = Array.from({ length: nf * nc }, (_, k) => {
+      const r = Math.floor(k / nc), q = k % nc;
+      return r < f && q < c ? cel[r * c + q] ?? '' : '';
+    });
+    onMerge({ filas: nf, cols: nc, celdas: nuevas });
+  };
+  return (
+    <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={lbl}>Etiqueta</label>
+      <input style={inp} value={item.lbl} onChange={e => onChange('lbl', e.target.value)} placeholder="a)" />
+      <label style={lbl}>Pregunta</label>
+      <MathInput multiline value={item.question || ''} onChange={v => onChange('question', v)} placeholder="$A \cdot B$" />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div><label style={lbl}>Filas</label><input style={{ ...inp, width: 70 }} type="number" min="1" max="6" value={f} onChange={e => redimensionar(parseInt(e.target.value), c)} /></div>
+        <div><label style={lbl}>Columnas</label><input style={{ ...inp, width: 70 }} type="number" min="1" max="6" value={c} onChange={e => redimensionar(f, parseInt(e.target.value))} /></div>
+        <div><label style={lbl}>Paréntesis</label>
+          <select style={inp} value={item.corchetes || 'pmatrix'} onChange={e => onChange('corchetes', e.target.value)}>
+            <option value="pmatrix">( ) Paréntesis</option><option value="bmatrix">[ ] Corchetes</option><option value="vmatrix">| | Determinante</option>
+          </select>
+        </div>
+      </div>
+      <label style={lbl}>Solución (cada casilla admite números, fracciones o expresiones)</label>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c}, minmax(56px, 90px))`, gap: 5, padding: '6px 10px', borderLeft: '2px solid #334155', borderRight: '2px solid #334155', borderRadius: 12, width: 'fit-content' }}>
+        {Array.from({ length: f * c }, (_, k) => (
+          <input key={k} style={{ ...inp, textAlign: 'center', padding: '6px 4px' }} value={cel[k] ?? ''}
+            onChange={e => onChange('celdas', Array.from({ length: f * c }, (_, j) => j === k ? e.target.value : (cel[j] ?? '')))} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ItemEditor({ tipo, item, onChange, onMerge }) {
   switch (tipo) {
     case 'fill':        return <ItemEditorFill item={item} onChange={onChange} onMerge={onMerge} />;
@@ -253,6 +372,10 @@ function ItemEditor({ tipo, item, onChange, onMerge }) {
     case 'truefalse':   return <ItemEditorTrueFalse item={item} onChange={onChange} />;
     case 'multichoice': return <ItemEditorMultiChoice item={item} onChange={onChange} />;
     case 'error':       return <ItemEditorError item={item} onChange={onChange} />;
+    case 'short':       return <ItemEditorShort item={item} onChange={onChange} />;
+    case 'open':        return <ItemEditorOpen item={item} onChange={onChange} />;
+    case 'expr':        return <ItemEditorExpr item={item} onChange={onChange} />;
+    case 'matrix':      return <ItemEditorMatrix item={item} onChange={onChange} onMerge={onMerge} />;
     default: return null;
   }
 }
@@ -468,7 +591,7 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
   return (
     <div style={{ minHeight: '100vh', background: '#F0F4FF', fontFamily: 'inherit' }}>
       {/* top bar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 100 }}>
+      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', padding: '12px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 100 }}>
         <button onClick={() => setModalPublicar('cerrar')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center', gap: 4, fontSize: 14 }}>
           <ArrowLeft size={18} /> Volver
         </button>
@@ -478,6 +601,12 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
         </div>
         <button onClick={() => setShowConfig(c => !c)} style={{ border: '1px solid #E2E8F0', background: showConfig ? '#EEF2FF' : 'white', color: showConfig ? '#4338CA' : '#64748B', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           ⚙ Configuración
+        </button>
+        <button onClick={() => imprimirOmni(recurso)} title="Ficha para imprimir (sin soluciones)" style={{ border: '1px solid #E2E8F0', background: 'white', color: '#64748B', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          🖨️ Ficha
+        </button>
+        <button onClick={() => imprimirOmni(recurso, { soluciones: true })} title="Solucionario para el profesor" style={{ border: '1px solid #E2E8F0', background: 'white', color: '#15803D', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          ✔ Soluciones
         </button>
         {/* Toggle publicar */}
         <button
@@ -577,6 +706,18 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: recurso.soloUnIntento ? '#EA580C' : '#334155' }}>Solo un intento por dispositivo</div>
                     <div style={{ fontSize: 11, color: '#94A3B8' }}>El alumno solo podrá hacer el test una vez desde el mismo navegador. No aparecerá el botón de reintentar.</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: recurso.ordenFijo ? '#EEF2FF' : '#F8FAFC', borderRadius: 10, border: `1px solid ${recurso.ordenFijo ? '#C7D2FE' : '#E2E8F0'}`, cursor: 'pointer' }}
+                  onClick={() => setField('ordenFijo', !recurso.ordenFijo)}>
+                  <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${recurso.ordenFijo ? '#4338CA' : '#CBD5E1'}`, background: recurso.ordenFijo ? '#4338CA' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {recurso.ordenFijo && <span style={{ color: 'white', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: recurso.ordenFijo ? '#4338CA' : '#334155' }}>Mantener el orden de las preguntas</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8' }}>Las preguntas salen en el mismo orden que en la ficha de papel (recomendado si vas a corregir exámenes en papel).</div>
                   </div>
                 </div>
               </div>

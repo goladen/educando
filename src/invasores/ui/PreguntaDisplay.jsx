@@ -14,7 +14,11 @@ export default memo(function PreguntaDisplay({ pregunta, compacta = false }) {
   if (!pregunta) return <div className="py-2 text-center font-arcade text-[10px] text-slate-500">…</div>;
   const { Enunciado } = pregunta;
   return (
-    <div className="@container w-full">
+    <div className="@container relative w-full">
+      {pregunta.fichaNum && (
+        <span className="absolute -top-1 left-0 z-10 rounded border border-fuchsia-400 bg-slate-950/90 px-1.5 py-0.5 font-arcade text-[8px] text-fuchsia-300 sm:text-[9px]"
+          title="Número de la pregunta en la ficha PDF">#{String(pregunta.fichaNum).padStart(2, '0')}</span>
+      )}
       {(pregunta.tema || pregunta.instruccion) && !compacta && (
         <div className="mb-1 truncate text-center font-arcade text-[8px] uppercase tracking-wider text-slate-400 sm:text-[9px]">
           {pregunta.emoji} {pregunta.instruccion || pregunta.tema}

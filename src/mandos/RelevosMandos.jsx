@@ -17,11 +17,34 @@ import { useMandosOvni, ElegirPiloto, PilotoEnJuego } from '../ovniMandos.jsx';
 import ChipAntena from './ChipAntena.jsx';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import GuardarResultadosMandos from './GuardarResultadosMandos.jsx';
+import { escucharEstadoAntena } from './mandosMicrobit.js';
 
 export const COLORES_HUECO = ['#22d3ee', '#f472b6', '#facc15', '#4ade80'];
 
 const leer = (k, def) => { try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); } catch { return def; } };
 const escribir = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
+
+/* ───────────── Esperar a los mandos antes de un arranque automático ─────────────
+   Los juegos que empiezan solos (enlace con recurso, autoStart) llaman a
+   `esperarMandos(clave, empezar)`. Si en clase se usan mandos (antena conectada o mandos ya
+   activados en ese juego), se abre el panel de mandos y la partida empieza al pulsar
+   «✓ Empezar»; si no, devuelve false y el juego arranca como siempre. */
+const esperas = {};        // clave → función que empieza la partida
+const avisosEspera = {};   // clave → abre el panel del MandosEnJuego montado
+
+export function mandosPreparados(clave) {
+    if (leer(`pikt_relevos_${clave}`, false)) return true;
+    let ok = false;
+    escucharEstadoAntena((e) => { ok = !!e.antenaOk; })();
+    return ok;
+}
+
+export function esperarMandos(clave, empezar) {
+    if (!mandosPreparados(clave)) return false;
+    esperas[clave] = empezar;
+    avisosEspera[clave]?.();
+    return true;
+}
 
 /* ───────────────────────── Teclado virtual ───────────────────────── */
 
@@ -241,6 +264,23 @@ export default function MandosEnJuego({
 
     const cambiarActivos = (v) => { setActivos(v); escribir(lsOn, v); if (v) setAbierto(true); };
 
+    // Arranque automático en espera: se abre el panel y, al cerrarlo, empieza la partida
+    const [esperando, setEsperando] = useState(false);
+    useEffect(() => {
+        avisosEspera[clave] = () => { setActivos(true); escribir(lsOn, true); setAbierto(true); setEsperando(true); };
+        if (esperas[clave]) avisosEspera[clave]();
+        return () => { delete avisosEspera[clave]; delete esperas[clave]; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clave]);
+    const abiertoAntes = useRef(false);
+    useEffect(() => {
+        if (abiertoAntes.current && !abierto && esperas[clave]) {
+            const f = esperas[clave]; delete esperas[clave]; setEsperando(false);
+            setTimeout(f, 50);
+        }
+        abiertoAntes.current = abierto;
+    }, [abierto, clave]);
+
     const ref = useRef({});
     ref.current = { teclas, invertir, onEvento, abierto, pausado, onClicMira, pilotos: ctrl.pilotos };
     const puente = useMemo(() => crearPuente((i) => ref.current.teclas?.[i], () => ref.current.invertir), []);
@@ -339,8 +379,13 @@ export default function MandosEnJuego({
                     <div style={st.caja}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                             <b style={{ fontSize: '1.1rem', color: '#facc15', flex: 1 }}>🎮 Mandos micro:bit · {juego}</b>
-                            <button style={{ ...st.boton, color: '#fff' }} onClick={() => setAbierto(false)}>✓ Jugar</button>
+                            <button style={{ ...st.boton, color: esperando ? '#0f172a' : '#fff', background: esperando ? '#4ade80' : st.boton.background }} onClick={() => setAbierto(false)}>{esperando ? '▶ Empezar' : '✓ Jugar'}</button>
                         </div>
+                        {esperando && (
+                            <div style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid #4ade8066', borderRadius: 10, padding: '8px 12px', fontSize: '0.88rem' }}>
+                                ⏸ La partida está esperando: conecta la antena, mueve los mandos y elige quién juega. Empieza al pulsar <b>▶ Empezar</b>.
+                            </div>
+                        )}
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                             <ChipAntena />
                             <BotonTutorialMandos inicial={tutorial || (ctrl.continuo ? 'ovni' : 'futbol')} texto="📖 Cómo se usa el mando" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', padding: '7px 12px' }} />

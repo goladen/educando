@@ -731,9 +731,18 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
         const { modo, hoja } = lastModeRef.current;
         iniciarPartida(modo, hoja); // Repite el mismo modo y hoja que se estaba jugando
     };
+    // Mandos micro:bit: también en el menú, para conectarlos y elegir quién juega antes de empezar
+    const mandosUI = !modoOlimpico && (
+        <MandosEnJuego clave="PIKATRON" juego="Pikatron" tipo="PIKATRON_MANDOS" apiRef={mandosApi}
+            teclas={[{ A: ' ', B: ' ', F: 'ArrowUp', S: ' ' }]}
+            pausado={gameState === 'SETUP'}
+            onEvento={(i, ev) => { if (gameState === 'LEVEL_INTRO' && ev.accion === 'S') startLevelPlaying(); }}
+            controles={<><b>A</b>, <b>B</b>, agitar o inclinar hacia delante = saltar. En la pantalla de nivel, <b>agita</b> para empezar.</>} />
+    );
     // SI ESTAMOS EN SETUP, MOSTRAMOS EL MENÚ Y EL RANKING SI TOCA
     if (gameState === 'SETUP') return (
         <>
+            {mandosUI}
             {/* Si se pulsó el botón, mostramos el ranking encima */}
             {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
 
@@ -943,12 +952,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                 </div>
             )}
 
-            {!modoOlimpico && (
-                <MandosEnJuego clave="PIKATRON" juego="Pikatron" tipo="PIKATRON_MANDOS" apiRef={mandosApi}
-                    teclas={[{ A: ' ', B: ' ', F: 'ArrowUp', S: ' ' }]}
-                    onEvento={(i, ev) => { if (gameState === 'LEVEL_INTRO' && ev.accion === 'S') startLevelPlaying(); }}
-                    controles={<><b>A</b>, <b>B</b>, agitar o inclinar hacia delante = saltar. En la pantalla de nivel, <b>agita</b> para empezar.</>} />
-            )}
+            {mandosUI}
             {/* PANTALLAS SUPERPUESTAS (INTRO, GAMEOVER, WIN) */}
             {/* PANTALLA RANKING (ENCIMA DE TODO) */}
             {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}

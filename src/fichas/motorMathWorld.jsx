@@ -4,6 +4,7 @@ import { motorDinero } from './motorDinero';
 import { crearFuente } from './fuenteTexto';
 import { crearMotorMultitema, conTema, ETAPAS, CURSOS } from './motorMultitema';
 import { ECUACIONES, SISTEMAS, POLINOMIOS, FUNCIONES } from './fuentes/algebra';
+import { EXPRESIONES } from './fuentes/expresiones';
 import { POTENCIAS, DIVISIBILIDAD, NUMEROS } from './fuentes/numeros';
 import { GEOMETRIA, GEO_ANALITICA, MEDIDAS } from './fuentes/geometria';
 import { ESTADISTICA, PROBABILIDAD } from './fuentes/datos';
@@ -33,6 +34,7 @@ export const FUENTES = {
     probabilidad: crearFuente(PROBABILIDAD),
     ecuaciones: crearFuente(ECUACIONES),
     sistemas: crearFuente(SISTEMAS),
+    expresiones: crearFuente(EXPRESIONES),
     polinomios: crearFuente(POLINOMIOS),
     funciones: crearFuente(FUNCIONES),
     geoAnalitica: crearFuente(GEO_ANALITICA),

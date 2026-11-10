@@ -8,6 +8,7 @@ import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego, { COLORES_HUECO } from './mandos/RelevosMandos.jsx';
 import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
 
@@ -774,6 +775,7 @@ function AhorcadoJuego({ usuario, onExit, recurso, mandosApi, juegoMandos }) {
 
     if (screen === 'MODE_SELECT') return (
         <div style={styles.screen}>
+            {isCustomGame && recursoActual && <FichaFlotante recurso={recursoActual} />}
             <button onClick={volverAlMenu} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
             <h1 style={{ ...styles.h1, color: '#f1c40f' }}>Elige Modo</h1>
             <div style={styles.card}>

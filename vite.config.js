@@ -145,6 +145,7 @@ export default defineConfig({
           '**/kartinged/**',
           '**/kartingedmulti/**',
           '**/racing3d/**',
+          '**/kokoro/**',   // voz Kokoro (worker + espeak-ng): solo al generar audio
           '**/*.mp3',
           '**/*.mp4',
           '**/*.ogg',

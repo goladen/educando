@@ -5,6 +5,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import QuizMandos from './QuizMandos';
 import PistaRobotsMandos from './PistaRobotsMandos.jsx';
+import GuiaJuegosMandos from './GuiaJuegosMandos.jsx';
 import DibujoMandos from './DibujoMandos.jsx';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import ChipAntena from './ChipAntena.jsx';
@@ -451,6 +452,8 @@ export default function MandosMicrobit({ onExit }) {
             ⚽ Fútbol 3D con mandos
           </button>
         </div>
+
+        <GuiaJuegosMandos />
       </div>
     </div>
   );

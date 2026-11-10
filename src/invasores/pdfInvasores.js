@@ -91,7 +91,7 @@ async function capturarEnunciados(preguntas) {
 
 // ═════════════════════════════════════════════════════════
 export async function generarPdfInvasores({
-  preguntas, titulo = '', variante = 'DISPARA', oscuro = false, soluciones = true, qrUrl = null, descargar = true,
+  preguntas, titulo = '', variante = 'DISPARA', oscuro = false, soluciones = true, qrUrl = null, descargar = true, vinculada = false,
 }) {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -158,7 +158,7 @@ export async function generarPdfInvasores({
       const q = 30, xq = A4.w - A4.m - q - 5, yq = A4.m + 5;
       pdf.setFillColor(255, 255, 255); pdf.roundedRect(xq - 1.5, yq - 1.5, q + 3, q + 3, 1.5, 1.5, 'F');
       pdf.addImage(qrImg, 'PNG', xq, yq, q, q);
-      txt('¡JUEGA EN PIKT.ES!', xq + q / 2, yq + q + 3, { tam: 6.5, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[3], align: 'center' });
+      txt(vinculada ? 'JUEGA ESTAS PREGUNTAS' : '¡JUEGA EN PIKT.ES!', xq + q / 2, yq + q + 3, { tam: 6.5, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[3], align: 'center' });
     }
     return A4.m + alto + 5;
   };

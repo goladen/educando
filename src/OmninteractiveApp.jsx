@@ -6,6 +6,7 @@ import FotoARecurso from './FotoARecurso';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import MathText from './components/MathText';
+import { cargarMotor, motorListo, equivalentes, aLatex } from './utils/mathEquiv';
 import { BIBLIOTECA } from './BibliotecaOmni';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -47,6 +48,45 @@ const parseAlts = (alts) => {
 const okAns = (user, correct, alts = []) =>
   !!(user?.trim()) && [correct, ...parseAlts(alts)].some(a => nm(String(a)) === nm(user));
 
+// Respuesta corta: además de texto, admite números equivalentes (0,5 = 0.5 = 1/2) y quita $ y espacios
+const aNum = (s) => {
+  const t = String(s ?? '').replace(/\$/g, '').replace(/\s+/g, '').replace(',', '.');
+  const f = t.match(/^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
+  if (f) return Number(f[2]) ? Number(f[1]) / Number(f[2]) : NaN;
+  return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
+};
+const limpiaCorta = (s) => nm(String(s ?? '').replace(/\$/g, '').replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '$1/$2'))
+  .replace(/\s+/g, '').replace(/\.$/, '');
+const okCorta = (user, correct, alts = []) => {
+  if (!String(user ?? '').trim()) return false;
+  const u = limpiaCorta(user), un = aNum(u);
+  return [correct, ...parseAlts(alts)].some(a => {
+    const c = limpiaCorta(a);
+    if (c === u) return true;
+    const cn = aNum(c);
+    return !isNaN(un) && !isNaN(cn) && Math.abs(un - cn) < 1e-9;
+  });
+};
+
+// Mates: primero comparación de texto/número; si no coincide y el motor (mathjs) está cargado,
+// equivalencia matemática (3x^2+2x = x(3x+2); en modo 'constante' iguales salvo + C)
+const pareceMates = (s) => /[\d\\^√∛=+*/()]|\b(sin|cos|tan|sen|log|ln|sqrt|pi)\b|[a-z]\s*[+\-*/^]/i.test(String(s ?? ''));
+const okMates = (user, correct, alts = [], modo = 'equiv') => {
+  if (!String(user ?? '').trim()) return false;
+  if (modo !== 'constante' && okCorta(user, correct, alts)) return true;
+  if (!motorListo()) return false;
+  return [correct, ...parseAlts(alts)].filter(Boolean).some(sol => equivalentes(user, sol, { modo }) === true);
+};
+const okCelda = (user, sol) => (!String(sol ?? '').trim() ? !String(user ?? '').trim() : okMates(user, sol));
+const okMatriz = (item, ans) => (item.celdas || []).every((sol, k) => okCelda(ans[`mx_${item.id}_${k}`] || '', sol));
+
+// Carga el motor de mates la primera vez que aparece un ejercicio que lo necesita
+function useMotorMates(activo = true) {
+  const [, setListo] = useState(motorListo());
+  useEffect(() => { if (activo && !motorListo()) cargarMotor().then(() => setListo(true)).catch(() => {}); }, [activo]);
+  return motorListo();
+}
+
 function calcScore(ex, ans) {
   let c = 0, t = 0;
   ex.items.forEach(item => {
@@ -74,7 +114,14 @@ function calcScore(ex, ans) {
       t++; if ((ans[`mc_${item.id}`] || '') === item.ans) c++;
     } else if (ex.tipo === 'error') {
       t++; if (nm(ans[`err_${item.id}`] || '') === nm(item.correction)) c++;
+    } else if (ex.tipo === 'short') {
+      t++; if (okMates(ans[`sh_${item.id}`] || '', item.ans, item.alts || [])) c++;
+    } else if (ex.tipo === 'expr') {
+      t++; if (okMates(ans[`ex_${item.id}`] || '', item.ans, item.alts || [], item.modo)) c++;
+    } else if (ex.tipo === 'matrix') {
+      t++; if (okMatriz(item, ans)) c++;
     }
+    // 'open': respuesta abierta, no puntúa (se enseña la respuesta modelo)
   });
   return { c, t };
 }
@@ -90,6 +137,10 @@ const TIPO_INFO = {
   truefalse:   { label: 'True / False',   color: '#0369A1' },
   multichoice: { label: 'Multiple choice',color: '#7E22CE' },
   error:       { label: 'Find the error', color: '#B91C1C' },
+  short:       { label: 'Respuesta corta', color: '#0E7490' },
+  expr:        { label: 'Expresión', color: '#1D4ED8' },
+  matrix:      { label: 'Matriz', color: '#9333EA' },
+  open:        { label: 'Respuesta abierta', color: '#64748B' },
 };
 
 // ─── shared sub-components ───────────────────────────────────────────────────
@@ -468,6 +519,177 @@ function ErrorEx({ ex, ans, setAns, checked }) {
   );
 }
 
+// ─── SHORT (respuesta corta: número, palabra, resultado) ─────────────────────
+function ShortEx({ ex, ans, setAns, checked }) {
+  useMotorMates(ex.items.some(it => pareceMates(it.ans)));
+  return (
+    <div>
+      {ex.items.map(item => {
+        const val = ans[`sh_${item.id}`] || '';
+        const isOk = checked && okMates(val, item.ans, item.alts || []);
+        const st = checked ? (isOk ? '#059669' : '#DC2626') : '#CBD5E1';
+        return (
+          <div key={item.id} style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <ItemLabel lbl={item.lbl} color={ex.color} />
+            <span style={{ lineHeight: 2.2, fontSize: 14, flex: '1 1 200px' }}><MathText text={item.question} /></span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <input value={val} onChange={e => setAns(`sh_${item.id}`, e.target.value)} readOnly={checked} placeholder="Respuesta"
+                style={{ width: 150, height: 32, padding: '0 10px', border: `1.5px solid ${st}`, borderRadius: 8,
+                  background: checked ? (isOk ? '#DCFCE7' : '#FEE2E2') : 'white', fontFamily: 'inherit', fontSize: 14, outline: 'none' }} />
+              {checked && <StatusIcon ok={isOk} />}
+              {checked && !isOk && <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>→ <MathText text={item.ans} /></span>}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── ENTRADA DE MATES (alumno): botonera + «así lo entiende PIKT» ────────────
+const BOTONES_MATES = [
+  { t: 'x²', ins: '^2' }, { t: 'xⁿ', ins: '^()', c: -1 }, { t: 'a/b', ins: '()/()', c: -4 },
+  { t: '√', ins: 'sqrt()', c: -1 }, { t: '∛', ins: 'cbrt()', c: -1 }, { t: 'ⁿ√', ins: 'root[]()', c: -3, tip: 'Raíz de índice n: root[n](x)' },
+  { t: 'log', ins: 'log()', c: -1, tip: 'Logaritmo decimal' }, { t: 'logₐ', ins: 'log_()()', c: -3, tip: 'Logaritmo en base a: log_(2)(8)' }, { t: 'ln', ins: 'ln()', c: -1 },
+  { t: 'sin', ins: 'sin()', c: -1 }, { t: 'cos', ins: 'cos()', c: -1 }, { t: 'tan', ins: 'tan()', c: -1 },
+  { t: 'π', ins: 'pi' }, { t: 'eˣ', ins: 'e^()', c: -1 }, { t: '|x|', ins: 'abs()', c: -1 }, { t: '°', ins: '°' },
+];
+
+function EntradaMates({ value, onChange, readOnly, estado, placeholder = 'Escribe tu respuesta', ancho = '100%' }) {
+  const ref = useRef(null);
+  const listo = useMotorMates(true);
+  const insertar = (b) => {
+    const el = ref.current;
+    const ini = el?.selectionStart ?? value.length, fin = el?.selectionEnd ?? value.length;
+    onChange(value.slice(0, ini) + b.ins + value.slice(fin));
+    const pos = ini + b.ins.length + (b.c || 0);
+    requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(pos, pos); } });
+  };
+  const tex = listo && value.trim() ? aLatex(value) : null;
+  const borde = estado === 'ok' ? '#059669' : estado === 'err' ? '#DC2626' : '#CBD5E1';
+  return (
+    <div style={{ width: ancho, maxWidth: '100%' }}>
+      {!readOnly && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 4 }}>
+          {BOTONES_MATES.map(b => (
+            <button key={b.t} type="button" title={b.tip || b.ins} onMouseDown={e => e.preventDefault()} onClick={() => insertar(b)}
+              style={{ padding: '2px 7px', minWidth: 30, border: '1px solid #E2E8F0', borderRadius: 6, background: '#F8FAFC', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', color: '#334155' }}>{b.t}</button>
+          ))}
+        </div>
+      )}
+      <input ref={ref} value={value} onChange={e => onChange(e.target.value)} readOnly={readOnly} placeholder={placeholder}
+        autoCapitalize="off" autoCorrect="off" spellCheck={false}
+        style={{ width: '100%', boxSizing: 'border-box', height: 34, padding: '0 10px', border: `1.5px solid ${borde}`, borderRadius: 8,
+          background: estado === 'ok' ? '#DCFCE7' : estado === 'err' ? '#FEE2E2' : 'white', fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 14, outline: 'none' }} />
+      {value.trim() && !readOnly && (
+        <div style={{ fontSize: 12, color: '#64748B', marginTop: 3, minHeight: 18 }}>
+          {!listo ? 'Cargando…' : tex ? <>PIKT entiende: <MathText text={`$${tex}$`} /></> : <span style={{ color: '#B45309' }}>⚠️ No se entiende la expresión: revisa los paréntesis.</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EXPR (expresión: se corrige por equivalencia matemática) ────────────────
+function ExprEx({ ex, ans, setAns, checked }) {
+  return (
+    <div>
+      {ex.items.map(item => {
+        const key = `ex_${item.id}`;
+        const val = ans[key] || '';
+        const isOk = checked && okMates(val, item.ans, item.alts || [], item.modo);
+        return (
+          <div key={item.id} style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 6, alignItems: 'flex-start' }}>
+              <ItemLabel lbl={item.lbl} color={ex.color} />
+              <span style={{ fontSize: 15, lineHeight: 1.9 }}><MathText text={item.question} /></span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', paddingLeft: 34 }}>
+              <EntradaMates value={val} onChange={v => setAns(key, v)} readOnly={checked} estado={checked ? (isOk ? 'ok' : 'err') : ''}
+                placeholder={item.modo === 'constante' ? 'Ej: x^3/3 + 2x (la + C es opcional)' : 'Ej: 3x^2 + 2x'} />
+              {checked && <span style={{ paddingTop: 8 }}><StatusIcon ok={isOk} /></span>}
+            </div>
+            {checked && !isOk && (
+              <div style={{ marginTop: 5, paddingLeft: 34, fontSize: 13, color: '#059669', fontWeight: 600 }}>
+                ✓ <MathText text={item.ans} />{item.modo === 'constante' ? ' + C' : ''}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── MATRIX (rellenar las casillas de una matriz) ────────────────────────────
+function MatrixEx({ ex, ans, setAns, checked }) {
+  useMotorMates(true);
+  return (
+    <div>
+      {ex.items.map(item => {
+        const f = item.filas || 1, c = item.cols || 1, cel = item.celdas || [];
+        const todo = checked && okMatriz(item, ans);
+        const radio = item.corchetes === 'bmatrix' ? 2 : item.corchetes === 'vmatrix' ? 0 : 14;
+        return (
+          <div key={item.id} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+              <ItemLabel lbl={item.lbl} color={ex.color} />
+              <span style={{ fontSize: 15, lineHeight: 1.9 }}><MathText text={item.question} /></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 34, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 18 }}>=</span>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c}, minmax(54px, 80px))`, gap: 6, padding: '6px 10px',
+                borderLeft: '2.5px solid #334155', borderRight: '2.5px solid #334155', borderRadius: radio }}>
+                {Array.from({ length: f * c }, (_, k) => {
+                  const key = `mx_${item.id}_${k}`;
+                  const v = ans[key] || '';
+                  const ok = checked && okCelda(v, cel[k]);
+                  return (
+                    <input key={k} value={v} onChange={e => setAns(key, e.target.value)} readOnly={checked} aria-label={`Fila ${Math.floor(k / c) + 1}, columna ${(k % c) + 1}`}
+                      style={{ width: '100%', boxSizing: 'border-box', height: 34, textAlign: 'center', borderRadius: 7, fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                        border: `1.5px solid ${checked ? (ok ? '#059669' : '#DC2626') : '#CBD5E1'}`, background: checked ? (ok ? '#DCFCE7' : '#FEE2E2') : 'white' }} />
+                  );
+                })}
+              </div>
+              {checked && <StatusIcon ok={todo} />}
+              {checked && !todo && (
+                <span style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>
+                  ✓ <MathText text={`$\\begin{${item.corchetes || 'pmatrix'}}${Array.from({ length: f }, (_, r) => cel.slice(r * c, (r + 1) * c).map(s => String(s).replace(/\$/g, '')).join(' & ')).join(' \\\\ ')}\\end{${item.corchetes || 'pmatrix'}}$`} />
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── OPEN (respuesta abierta: no se autocorrige, enseña la respuesta modelo) ──
+function OpenEx({ ex, ans, setAns, checked }) {
+  return (
+    <div>
+      {ex.items.map(item => (
+        <div key={item.id} style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 6 }}>
+            <ItemLabel lbl={item.lbl} color={ex.color} />
+            <span style={{ fontSize: 14, lineHeight: 1.6 }}><MathText text={item.question} /></span>
+          </div>
+          <textarea value={ans[`op_${item.id}`] || ''} onChange={e => setAns(`op_${item.id}`, e.target.value)} readOnly={checked}
+            rows={Math.min(8, Math.max(2, item.lineas || 3))} placeholder="Escribe tu respuesta…"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, resize: 'vertical' }} />
+          {checked && (
+            <div style={{ marginTop: 6, padding: '8px 12px', background: '#F0FDF4', border: '1px dashed #86EFAC', borderRadius: 8, fontSize: 13, color: '#166534' }}>
+              <b>Respuesta modelo:</b> <MathText text={item.ans || '—'} />
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 3 }}>Compárala con la tuya: esta pregunta la revisa tu profesor.</div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── EXERCISE RENDERER ────────────────────────────────────────────────────────
 function ExRenderer({ ex, ans, setAns, checked }) {
   const props = { ex, ans, setAns, checked };
@@ -481,6 +703,10 @@ function ExRenderer({ ex, ans, setAns, checked }) {
     case 'truefalse':   return <TrueFalseEx {...props} />;
     case 'multichoice': return <MultiChoiceEx {...props} />;
     case 'error':       return <ErrorEx {...props} />;
+    case 'short':       return <ShortEx {...props} />;
+    case 'expr':        return <ExprEx {...props} />;
+    case 'matrix':      return <MatrixEx {...props} />;
+    case 'open':        return <OpenEx {...props} />;
     default: return null;
   }
 }
@@ -657,7 +883,7 @@ function SummaryScreen({ recurso, shuffledEj, answers, onBack, onRetry }) {
       </div>
       <div style={{ maxWidth:600, margin:'0 auto', padding:'20px 16px 40px' }}>
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:20 }}>
-          {resultados.map(r => (
+          {resultados.filter(r => r.t > 0).map(r => (
             <div key={r.id} style={{ background:'white', borderRadius:12, padding:'14px 18px', boxShadow:'0 1px 6px rgba(0,0,0,0.06)', display:'flex', alignItems:'center', gap:14 }}>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontWeight:600, fontSize:14, color:'#1F2937', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{r.titulo}</div>
@@ -690,7 +916,8 @@ function PlayScreen({ recurso, onBack }) {
   const isMobile = useIsMobile();
   const [shuffledEj]    = useState(() => (recurso.ejercicios || []).map(ex => ({
     ...ex,
-    items: shuffleArr((ex.items || []).map(item => {
+    // Fichas pasadas desde papel: mismo orden que la ficha original
+    items: (recurso.ordenFijo ? (a => a) : shuffleArr)((ex.items || []).map(item => {
       // Restore alts from Firestore flat format ["a|b"] → [["a","b"]]
       if (Array.isArray(item.alts)) {
         return { ...item, alts: item.alts.map(a => Array.isArray(a) ? a : (typeof a === 'string' ? a.split('|').map(s => s.trim()).filter(Boolean) : [])) };
@@ -715,7 +942,7 @@ function PlayScreen({ recurso, onBack }) {
   const completados = shuffledEj.filter(e => checked[e.id]).length;
   const globalPct   = totalEx > 0 ? Math.round(completados / totalEx * 100) : 0;
   const score = (ex && isChecked) ? calcScore(ex, exAns) : null;
-  const pct   = score ? Math.round(score.c / score.t * 100) : 0;
+  const pct   = score ? (score.t ? Math.round(score.c / score.t * 100) : 100) : 0;
   const scol  = !score ? recurso.color : pct === 100 ? '#059669' : pct >= 60 ? '#D97706' : '#DC2626';
   const info  = TIPO_INFO[ex?.tipo] || { label: '', color: recurso.color };
 
@@ -733,7 +960,8 @@ function PlayScreen({ recurso, onBack }) {
   const handleCheck = () => {
     if (isChecked) return;
     setChecked(p => ({ ...p, [ex.id]: true }));
-    if (calcScore(ex, exAns).c > 0) playAudio(audioCorrect); else playAudio(audioWrong);
+    const sc = calcScore(ex, exAns);
+    if (sc.c > 0 || sc.t === 0) playAudio(audioCorrect); else playAudio(audioWrong);
   };
 
   const handleRetry = () => {
@@ -782,7 +1010,7 @@ function PlayScreen({ recurso, onBack }) {
           <div style={{ display:'flex', padding:'6px 8px', gap:6, width:'max-content' }}>
             {shuffledEj.map((e, i) => {
               const s = checked[e.id] ? calcScore(e, answers[e.id] || {}) : null;
-              const p = s ? Math.round(s.c / s.t * 100) : -1;
+              const p = s ? (s.t ? Math.round(s.c / s.t * 100) : 100) : -1;
               const dc = !s ? '#CBD5E1' : p === 100 ? '#059669' : p >= 60 ? '#D97706' : '#DC2626';
               const active = i === exIdx;
               return (
@@ -802,7 +1030,7 @@ function PlayScreen({ recurso, onBack }) {
           <div style={{ width:200, flexShrink:0, background:'white', borderRight:'1px solid #E2E8F0', overflowY:'auto', display:'flex', flexDirection:'column', gap:4, padding:'12px 8px' }}>
             {shuffledEj.map((e, i) => {
               const s = checked[e.id] ? calcScore(e, answers[e.id] || {}) : null;
-              const p = s ? Math.round(s.c / s.t * 100) : -1;
+              const p = s ? (s.t ? Math.round(s.c / s.t * 100) : 100) : -1;
               const dc = !s ? '#CBD5E1' : p === 100 ? '#059669' : p >= 60 ? '#D97706' : '#DC2626';
               const active = i === exIdx;
               const ti = TIPO_INFO[e.tipo] || {};
@@ -1200,7 +1428,7 @@ function OmniClientExercise({ ex, startTime, subFase, myResult, forceCheck, onSu
 
   const setAns  = (key, val) => setAnswers(p => ({ ...p, [key]: val }));
   const score   = submitted ? calcScore(ex, answers) : null;
-  const pct     = score ? Math.round(score.c / score.t * 100) : 0;
+  const pct     = score ? (score.t ? Math.round(score.c / score.t * 100) : 100) : 0;
   const scol    = !score ? '#6D28D9' : pct === 100 ? '#059669' : pct >= 60 ? '#D97706' : '#DC2626';
   const info    = TIPO_INFO[ex?.tipo] || { label: '', color: '#6D28D9' };
   const sRatio  = myResult?.ratio ?? null;

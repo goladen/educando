@@ -17,7 +17,7 @@ import bg3 from './assets/pantalla3.jpeg';
 import bg4 from './assets/pantalla4.jpeg';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
-import MandosEnJuego, { COLORES_HUECO } from './mandos/RelevosMandos.jsx';
+import MandosEnJuego, { COLORES_HUECO, esperarMandos } from './mandos/RelevosMandos.jsx';
 
 const BACKGROUNDS = [bg1, bg2, bg3, bg4]; // Array para elegir al azar
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';
@@ -244,7 +244,8 @@ function CazaBurbujasJuego({ recurso, usuario, alTerminar, modoOlimpico = false,
     // --- AUTO-START DEEP LINK ---
     useEffect(() => {
         if (autoStart && !modoOlimpico && recurso && fase === 'SETUP') {
-            iniciar(modoJuegoInicial, hojaInicial || 'General');
+            const go = () => iniciar(modoJuegoInicial, hojaInicial || 'General');
+            if (!esperarMandos('BURBUJAS', go)) go(); // con mandos, espera a que se conecten
         }
     }, [autoStart, recurso, fase]);
 

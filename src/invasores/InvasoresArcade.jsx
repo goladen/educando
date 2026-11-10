@@ -35,6 +35,11 @@ import MenuArcade from './pantallas/MenuArcade';
 import FinPartida from './pantallas/FinPartida';
 import Briefing, { briefingVisto } from './pantallas/Briefing';
 import { TIPO_JUEGO } from './pantallas/ModalEnviarProfe';
+import { conSemilla, nuevaSemilla } from '../utils/semilla';
+import {
+  fuenteSerializable, codificarFicha, decodificarFicha, enlaceFicha, fichaDeUrl, resolverFicha,
+  fichasRecientes, guardarFichaReciente, olvidarFichaReciente,
+} from './fichaEnlace';
 import { BTN, NEON, TITULO_NEON } from './tema';
 
 const FUENTES_URL = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap';
@@ -62,6 +67,13 @@ function construirMazo(cfg, apiMates) {
   const resp = respuestaMandos(cfg);
   const filtrar = (lista) => (resp ? jugablesConMandos(jugables(lista, variante), variante, resp) : jugables(lista, variante));
   const aviso = resp ? ' con los mandos' : '';
+  // Partida vinculada a una ficha PDF: sus preguntas, en su orden (y al acabarlas, otra vuelta igual)
+  if (cfg.ficha?.preguntas?.length) {
+    const base = filtrar(cfg.ficha.preguntas);
+    if (!base.length) throw new Error(`Las preguntas de esta ficha no se pueden jugar así${aviso}.`);
+    let vuelta = 0;
+    return crearMazo(base, () => { vuelta += 1; return base.map((p) => ({ ...p, id: `${p.id}v${vuelta}` })); });
+  }
   if (fuente.tipo === 'RAPIDAS') {
     const gen = () => filtrar(generarRapidas(fuente, 40));
     return crearMazo(gen(), gen);
@@ -87,8 +99,21 @@ function construirMazo(cfg, apiMates) {
   return crearMazo(base);
 }
 
+/** Las n primeras preguntas de la partida, generadas con la semilla (siempre las mismas). */
+function preguntasConSemilla(cfg, apiMates, semilla, n) {
+  return conSemilla(semilla, () => {
+    const mazo = construirMazo({ ...cfg, ficha: null }, apiMates);
+    const genera = cfg.fuente.tipo === 'RAPIDAS' || cfg.fuente.tipo === 'MATES';
+    const total = genera ? n : Math.min(n, mazo.tamano);
+    return Array.from({ length: total }, (_, i) => mazo.get(i)).filter(Boolean);
+  });
+}
+/** Número de cada pregunta en la ficha (#01, #02…), visible también en la partida. */
+const numerar = (preguntas) => preguntas.map((p, i) => ({ ...p, fichaNum: i + 1 }));
+
 function tituloPartida(cfg) {
   const v = VARIANTES[cfg.variante].nombre;
+  if (cfg.ficha) return `${v} · 🖨️ Ficha: ${cfg.ficha.titulo || 'preguntas de la ficha'}`;
   const f = cfg.fuente;
   if (f.tipo === 'RAPIDAS') {
     const ops = OPERACIONES_RAPIDAS.filter((o) => f.operaciones?.includes(o.id)).map((o) => o.nombre).join(', ');
@@ -105,6 +130,7 @@ function tituloPartida(cfg) {
 // Récord por dispositivo: misma variante y mismo contenido
 const claveRecord = (cfg) => {
   const f = cfg.fuente;
+  if (cfg.ficha) return `${cfg.variante}|FICHA|${cfg.ficha.semilla}`;
   const k = f.tipo === 'RAPIDAS' ? `${[...(f.operaciones || [])].sort().join('+')}-${f.nivel}`
     : f.tipo === 'BANCO' ? f.clave : f.tipo === 'RECURSO' ? `${f.recurso?.id || ''}${f.hojas?.length ? `#${[...f.hojas].sort((a, b) => a - b).join('.')}` : ''}` : '';
   return `${cfg.variante}|${f.tipo}|${k}`;
@@ -123,13 +149,24 @@ function actualizarRecord(cfg, puntos) {
   } catch { return null; }
 }
 
+// ?mates=expresiones,polinomios&nivel=2 → arranca con Math World y esos temas (enlace desde Álgebra)
+function configDesdeUrl() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const temas = (q.get('mates') || '').split(',').map((t) => t.trim()).filter(Boolean);
+    if (!temas.length) return null;
+    const nivel = Number(q.get('nivel'));
+    return { fuente: { tipo: 'MATES', temas, ...([1, 2, 3].includes(nivel) ? { nivel } : {}) } };
+  } catch { return null; }
+}
+
 const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export default function InvasoresArcade({ onExit, recurso = null }) {
   useFuentesArcade();
   const raizRef = useRef(null);
   const layout = useLayoutJugadores();
-  const [s, dispatch] = useArcadeState(recurso ? { fuente: { tipo: 'RECURSO', recurso } } : null);
+  const [s, dispatch] = useArcadeState(recurso ? { fuente: { tipo: 'RECURSO', recurso } } : configDesdeUrl());
   const { config, fase, jugadores } = s;
   const variante = VARIANTES[config.variante];
   const respMandos = respuestaMandos(config);
@@ -156,7 +193,12 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
   configRef.current = config;
   faseRef.current = fase;
 
-  const setConfig = useCallback((patch) => { setError(''); dispatch({ type: 'CONFIG', config: patch }); }, [dispatch]);
+  // Cambiar el contenido o el modo de juego desvincula la ficha PDF
+  const setConfig = useCallback((patch) => {
+    setError('');
+    const desvincula = patch.fuente || (patch.variante && patch.variante !== configRef.current.variante);
+    dispatch({ type: 'CONFIG', config: desvincula && configRef.current.ficha ? { ...patch, ficha: null } : patch });
+  }, [dispatch]);
   const preguntaDe = useCallback((j) => (j && mazoRef.current ? mazoRef.current.get(j.cursor) : null), []);
   const ctxDe = useCallback((j) => ({ pregunta: preguntaDe(j), velocidad: configRef.current.velocidad }), [preguntaDe]);
 
@@ -412,21 +454,74 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
       else raizRef.current?.requestFullscreen?.();
     } catch { /* sin soporte */ }
   };
-  // Ficha PDF con las mismas preguntas que tendría la partida
+  // ── Ficha PDF vinculada: semilla → mismas preguntas y mismo orden en el papel y en la partida ──
+  const [fichas, setFichas] = useState(() => fichasRecientes());
+  const [cargandoFicha, setCargandoFicha] = useState(false);
+
+  /** Abre una ficha (código del QR o de «fichas impresas»): regenera sus preguntas y las vincula. */
+  const abrirFicha = useCallback(async (codigo) => {
+    const ficha = decodificarFicha(codigo);
+    if (!ficha) { setError('El código de la ficha no es válido.'); return; }
+    setCargandoFicha(true);
+    try {
+      const { fuente, apiMates } = await resolverFicha(ficha);
+      const cfg = { ...configRef.current, variante: ficha.v === 'FILTRO' ? 'FILTRO' : 'DISPARA', fuente, mandos: !!ficha.m, mandosRespuesta: ficha.mr || 'letras' };
+      const preguntas = preguntasConSemilla(cfg, apiMates, ficha.s, ficha.n);
+      if (!preguntas.length) throw new Error('No se han podido recuperar las preguntas de esta ficha.');
+      setError('');
+      dispatch({ type: 'CONFIG', config: {
+        variante: cfg.variante, fuente,
+        ficha: { codigo, semilla: ficha.s, titulo: ficha.t || '', preguntas: numerar(preguntas), enlace: enlaceFicha(codigo) },
+      } });
+    } catch (e) {
+      setError(e?.message || 'No se pudo abrir la ficha.');
+    } finally {
+      setCargandoFicha(false);
+    }
+  }, [dispatch]);
+
+  // /invasores?ficha=… (QR de la ficha impresa)
+  useEffect(() => {
+    const codigo = fichaDeUrl();
+    if (codigo) abrirFicha(codigo);
+  }, [abrirFicha]);
+
+  const quitarFicha = useCallback(() => dispatch({ type: 'CONFIG', config: { ficha: null } }), [dispatch]);
+  const olvidarFicha = useCallback((codigo) => { olvidarFichaReciente(codigo); setFichas(fichasRecientes()); }, []);
+
   const generarPdf = useCallback(async ({ n, oscuro, soluciones }) => {
     const cfg = configRef.current;
-    const mazo = construirMazo(cfg, apiMatesRef.current);
-    const genera = cfg.fuente.tipo === 'RAPIDAS' || cfg.fuente.tipo === 'MATES';
-    const total = genera ? n : Math.min(n, mazo.tamano);
-    const preguntas = Array.from({ length: total }, (_, i) => mazo.get(i)).filter(Boolean);
+    let { ficha } = cfg;
+    let preguntas;
+    if (ficha) {
+      // Ya vinculada: se reimprime la MISMA ficha (mismo QR)
+      preguntas = ficha.preguntas;
+    } else {
+      const semilla = nuevaSemilla();
+      preguntas = preguntasConSemilla(cfg, apiMatesRef.current, semilla, n);
+      const f = await fuenteSerializable(cfg.fuente, apiMatesRef.current);
+      const titulo = tituloPartida(cfg).split(' · ').slice(1).join(' · ').slice(0, 60);
+      if (f && preguntas.length) {
+        const codigo = codificarFicha({ v: cfg.variante, f, s: semilla, n: preguntas.length, m: cfg.mandos ? 1 : 0, mr: cfg.mandosRespuesta, t: titulo });
+        ficha = { codigo, semilla, titulo, preguntas: numerar(preguntas), enlace: enlaceFicha(codigo) };
+      }
+    }
+    if (!preguntas.length) throw new Error('No hay preguntas para la ficha.');
     const { generarPdfInvasores } = await import('./pdfInvasores');
     await generarPdfInvasores({
       preguntas, titulo: tituloPartida(cfg), variante: cfg.variante, oscuro, soluciones,
-      qrUrl: `${window.location.origin}/invasores`,
+      qrUrl: ficha?.enlace || `${window.location.origin}/invasores`, vinculada: !!ficha,
     });
-  }, []);
+    if (ficha && !cfg.ficha) {
+      // La partida queda vinculada a la ficha que se acaba de descargar
+      dispatch({ type: 'CONFIG', config: { ficha } });
+      guardarFichaReciente({ codigo: ficha.codigo, titulo: ficha.titulo, n: preguntas.length });
+      setFichas(fichasRecientes());
+    }
+  }, [dispatch]);
   const maxPreguntasPdf = useMemo(() => {
     const f = config.fuente;
+    if (config.ficha) return config.ficha.preguntas.length;
     if (f.tipo === 'RAPIDAS' || f.tipo === 'MATES') return null;
     try { return construirMazo(config, null).tamano; } catch { return 0; }
   }, [config]);
@@ -443,6 +538,7 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
         <MenuArcade config={config} setConfig={setConfig} maxJugadores={layout.maxJugadores}
           apiMatesRef={apiMatesRef} onJugar={() => empezar()} onRapida={partidaRapida} onSalir={salir} error={error}
           onPdf={generarPdf} maxPreguntasPdf={maxPreguntasPdf}
+          fichas={fichas} cargandoFicha={cargandoFicha} onAbrirFicha={abrirFicha} onQuitarFicha={quitarFicha} onOlvidarFicha={olvidarFicha}
           ctrlMandos={config.mandos ? ctrlMandos : null} />
       </div>
     );
@@ -526,3 +622,4 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
     </div>
   );
 }
+

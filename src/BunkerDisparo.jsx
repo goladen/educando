@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import MandosEnJuego from './mandos/RelevosMandos.jsx';
+import MandosEnJuego, { esperarMandos } from './mandos/RelevosMandos.jsx';
 import * as THREE from 'three';
 import { X, Play, Trophy, Search, RefreshCw, Save, Target, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import sndAplausos from './assets/applause-small-audience-97257.mp3';
@@ -10,6 +10,7 @@ import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc 
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import FichaFlotante from './components/FichaFlotante';
 
 // =====================================================================
 //  BANCOS DE PREGUNTAS INTEGRADOS (modo libre, sin recurso de profesor)
@@ -1651,7 +1652,8 @@ function BunkerDisparoJuego({ recurso = null, onExit, usuario, autoStart = false
         if (autoStart && recurso && gameState === 'MENU') {
             const hojas = recursoAHojas(recurso);
             const preguntas = hojas.flatMap(h => h.preguntas);
-            empezar({ preguntas, titulo: recurso.titulo || 'Recurso', categoria: 'General', recursoId: recurso.id }, true);
+            const go = () => empezar({ preguntas, titulo: recurso.titulo || 'Recurso', categoria: 'General', recursoId: recurso.id }, true);
+            if (!esperarMandos('BUNKER', go)) go(); // con mandos, espera a que se conecten
         }
         // eslint-disable-next-line
     }, [autoStart, recurso]);
@@ -1970,6 +1972,7 @@ function MenuBunker({ recurso, onExit, onEmpezar }) {
                     onJugar={onEmpezar}
                 />
             )}
+            {vista === 'RECURSO' && recursoSel && <FichaFlotante recurso={recursoSel} />}
 
             {vista === 'INICIO' && (
                 <div className="bunker-menu-card">

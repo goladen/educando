@@ -6,13 +6,20 @@ import { TEMAS_MATES, tiposJugables, generarPreguntasMates } from './preguntasMa
 const LIMITES = [[19, 'hasta 19'], [100, 'hasta 100'], [1000, 'hasta 1000'], [9999, 'sin límite']];
 
 export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales = null, nivelInicial = null }) {
+  // Al volver al menú tras una partida el selector se vuelve a montar: se recupera lo que se había
+  // elegido (antes volvía a «Cálculo» con todos los tipos y la partida siguiente los mezclaba todos).
+  const previo = apiRef?.current?.estado?.ui || null;
   const [temas, setTemas] = useState(() => {
+    if (previo?.temas?.length) return previo.temas;
     const validos = (temasIniciales || []).filter((id) => TEMAS_MATES.some((f) => f.id === id));
     return validos.length ? validos : ['calculo'];
   });
-  const [nivel, setNivel] = useState(nivelInicial || 1);
-  const [maxNum, setMaxNum] = useState(100);
-  const [quitados, setQuitados] = useState({}); // 'tema.tipo' → true
+  // «Cálculo» viene marcado solo como ejemplo: al pulsar el primer tema, lo sustituye (antes se
+  // sumaba y, al elegir p. ej. Polinomios, salían también ejercicios de cálculo).
+  const [porDefecto, setPorDefecto] = useState(() => (previo ? previo.porDefecto : !(temasIniciales || []).some((id) => TEMAS_MATES.some((f) => f.id === id))));
+  const [nivel, setNivel] = useState(previo?.nivel || nivelInicial || 1);
+  const [maxNum, setMaxNum] = useState(previo?.maxNum || 100);
+  const [quitados, setQuitados] = useState(previo?.quitados || {}); // 'tema.tipo' → true
   const opts = useMemo(() => ({ nivel, numerico, maxNum }), [nivel, numerico, maxNum]);
 
   const jugables = useMemo(
@@ -25,12 +32,31 @@ export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales =
 
   useEffect(() => {
     const api = (n) => generarPreguntasMates(seleccion, n, opts);
-    api.estado = { seleccion, opts }; // para vincular una ficha PDF (Invasión Pi la regenera con semilla)
+    // seleccion/opts: para vincular una ficha PDF (Invasión Pi la regenera con semilla) · ui: para recordar
+    api.estado = { seleccion, opts, ui: { temas, nivel, maxNum, quitados, porDefecto } };
     apiRef.current = api;
   });
 
-  const alternarTema = (id) => setTemas((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
+  const alternarTema = (id) => {
+    if (porDefecto) {
+      setPorDefecto(false);
+      if (!temas.includes(id)) { setTemas([id]); return; }
+    }
+    setTemas((t) => (t.includes(id) ? t.filter((x) => x !== id) : [...t, id]));
+  };
   const alternarTipo = (k) => setQuitados((q) => ({ ...q, [k]: !q[k] }));
+  /** Marca todos (true) o ninguno (false) de los tipos de un tema. */
+  const marcarTema = (id, todos) => setQuitados((q) => {
+    const n = { ...q };
+    (jugables[id] || []).forEach((tipo) => { n[`${id}.${tipo}`] = !todos; });
+    return n;
+  });
+  /** Deja marcado SOLO ese tipo dentro de su tema. */
+  const soloTipo = (id, tipo) => setQuitados((q) => {
+    const n = { ...q };
+    (jugables[id] || []).forEach((t) => { n[`${id}.${t}`] = t !== tipo; });
+    return n;
+  });
 
   return (
     <div>
@@ -63,7 +89,15 @@ export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales =
         const lista = jugables[id] || [];
         return (
           <div key={id} style={st.tema}>
-            <b style={{ color: '#f1f5f9' }}>{f.emoji} {f.nombre}</b>
+            <div style={{ ...st.fila, justifyContent: 'space-between' }}>
+              <b style={{ color: '#f1f5f9' }}>{f.emoji} {f.nombre}</b>
+              {lista.length > 1 && (
+                <span style={st.fila}>
+                  <button type="button" onClick={() => marcarTema(id, true)} style={st.mini}>✓ Todos</button>
+                  <button type="button" onClick={() => marcarTema(id, false)} style={st.mini}>✕ Ninguno</button>
+                </span>
+              )}
+            </div>
             {lista.length === 0 ? (
               <p style={st.vacio}>
                 {numerico
@@ -75,10 +109,15 @@ export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales =
                 {lista.map((tipo) => {
                   const k = `${id}.${tipo}`;
                   return (
-                    <label key={k} style={st.tipo}>
-                      <input type="checkbox" checked={!quitados[k]} onChange={() => alternarTipo(k)} />
-                      {f.tipos[tipo].label}
-                    </label>
+                    <span key={k} style={st.tipo(!quitados[k])}>
+                      <label style={{ display: 'inline-flex', gap: 5, alignItems: 'center', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!quitados[k]} onChange={() => alternarTipo(k)} />
+                        {f.tipos[tipo].label}
+                      </label>
+                      {lista.length > 1 && (
+                        <button type="button" onClick={() => soloTipo(id, tipo)} title="Dejar solo este" style={st.solo}>solo</button>
+                      )}
+                    </span>
                   );
                 })}
               </div>
@@ -86,6 +125,12 @@ export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales =
           </div>
         );
       })}
+
+      <p style={{ ...st.nota, marginTop: 10, color: seleccion.length ? '#a7f3d0' : '#fca5a5' }}>
+        {seleccion.length
+          ? `Se jugará con ${seleccion.length} tipo${seleccion.length === 1 ? '' : 's'} de ejercicio: ${seleccion.map(({ tema, tipo }) => TEMAS_MATES.find((x) => x.id === tema)?.tipos[tipo]?.label).join(' · ')}`
+          : 'No hay ningún tipo de ejercicio marcado.'}
+      </p>
     </div>
   );
 }
@@ -100,6 +145,8 @@ const st = {
   }),
   select: { padding: '6px 10px', borderRadius: 8, border: '1px solid #475569', background: '#020617', color: '#f1f5f9', fontSize: 14 },
   tema: { marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(15,23,42,0.6)', border: '1px solid #334155' },
-  tipo: { display: 'inline-flex', gap: 5, alignItems: 'center', color: '#cbd5e1', fontSize: 13.5, cursor: 'pointer' },
+  tipo: (on) => ({ display: 'inline-flex', gap: 6, alignItems: 'center', color: on ? '#f1f5f9' : '#64748b', fontSize: 13.5, padding: '3px 8px', borderRadius: 8, border: `1px solid ${on ? '#38bdf8' : '#334155'}`, background: on ? 'rgba(56,189,248,0.12)' : 'transparent', textDecoration: on ? 'none' : 'line-through' }),
+  mini: { padding: '3px 9px', borderRadius: 999, border: '1px solid #475569', background: 'transparent', color: '#cbd5e1', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  solo: { padding: '1px 6px', borderRadius: 6, border: '1px solid #475569', background: 'transparent', color: '#94a3b8', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' },
   vacio: { color: '#fde68a', fontSize: 13, margin: '6px 0 0' },
 };

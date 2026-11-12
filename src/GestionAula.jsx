@@ -29,6 +29,7 @@ import { BANCO_IMAGENES } from './pizarraBancoImagenes';
 import { SONIDOS, reproducirSonido } from './pizarraSonidos';
 import { suavizarCamino, muestrearCamino, anguloEnCamino, difAngulo, longitudCamino } from './pizarraAnimacion';
 import PlanetaEsfera, { renderEsferaDataURL } from './PlanetaEsfera';
+import { CalculadoraFlotante as CalculadoraCasio } from './calculadora/CalculadoraInteractiva';
 
 const NUM_CAPAS = 5;
 
@@ -332,86 +333,9 @@ function GraficadoraFlotante({ onClose, onInsertar }) {
     );
 }
 
+// Calculadora de la pizarra: Casio fx-82MS interactiva; «Pegar» lleva el resultado a la pizarra
 function CalculadoraFlotante({ onClose, onCopiar }) {
-    const [expr, setExpr] = useState('');
-    const [res, setRes] = useState('');
-    const [isScientific, setIsScientific] = useState(false);
-    const [pos, startDrag] = useDrag(Math.max(10, window.innerWidth - 270), 60);
-
-    const calcular = () => {
-        try { 
-            const toEval = prepareMathExpr(expr);
-            // eslint-disable-next-line no-eval
-            const r = eval(toEval);
-            setRes(Number.isFinite(r) ? parseFloat(r.toFixed(6)) : 'Error');
-        } catch(e) { setRes('Error'); }
-    };
-
-    const BasicPad = [
-        ['(', ')', 'C', '÷'],
-        ['7', '8', '9', '×'],
-        ['4', '5', '6', '-'],
-        ['1', '2', '3', '+'],
-        ['0', '.', '=', '']
-    ];
-
-    const ScientificPad = [
-        ['sin(', 'cos(', 'tan(', 'pi'],
-        ['asin(', 'acos(', 'atan(', 'e'],
-        ['ln(', 'log(', 'sqrt(', '^'],
-    ];
-
-    const handleBtn = (btn) => {
-        if (btn === 'C') { setExpr(''); setRes(''); }
-        else if (btn === '=') calcular();
-        else if (btn !== '') setExpr(e => e + btn);
-    };
-
-    return (
-        <div style={{ position: 'fixed', left: pos.x, top: pos.y, width: isScientific ? 320 : 250, background: '#2c3e50', padding: 15, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', zIndex: 500, transition: 'width 0.2s', userSelect: 'none' }}>
-            <div onMouseDown={startDrag} style={{ display: 'flex', justifyContent: 'space-between', color: 'white', marginBottom: 10, alignItems: 'center', cursor: 'move' }}>
-                <span style={{ fontWeight: 'bold' }}><CalcIcon size={16} style={{ verticalAlign: 'middle', marginRight: 5 }}/> Calculadora</span>
-                <button onClick={onClose} onMouseDown={e => e.stopPropagation()} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={16}/></button>
-            </div>
-            
-            <div style={{ background: '#ecf0f1', padding: 10, borderRadius: 8, marginBottom: 10, minHeight: 40, textAlign: 'right', fontSize: '1.2rem', fontFamily: 'monospace', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{expr || '0'}</div>
-                <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>{res}</div>
-            </div>
-
-            <button onClick={() => setIsScientific(!isScientific)} style={{ width: '100%', padding: '5px', background: 'transparent', border: '1px solid #7f8c8d', color: '#bdc3c7', borderRadius: 5, marginBottom: 10, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5 }}>
-                {isScientific ? <ChevronUp size={14}/> : <ChevronDown size={14}/>} {isScientific ? 'Ocultar Científica' : 'Modo Científico'}
-            </button>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-                {isScientific && (
-                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
-                        {ScientificPad.flat().map((btn, i) => (
-                            <button key={`sci-${i}`} onClick={() => handleBtn(btn)} style={{ padding: 8, border: 'none', borderRadius: 5, background: '#34495e', color: '#3498db', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>{btn}</button>
-                        ))}
-                    </div>
-                )}
-                
-                <div style={{ flex: isScientific ? 1.5 : 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
-                    {BasicPad.flat().map((btn, i) => (
-                        <button key={`bsc-${i}`} onClick={() => handleBtn(btn)} 
-                            style={{ 
-                                padding: 8, border: 'none', borderRadius: 5, cursor: btn === '' ? 'default' : 'pointer', fontWeight: 'bold',
-                                background: btn === '=' ? '#2ecc71' : btn === 'C' ? '#e74c3c' : ['÷','×','-','+'].includes(btn) ? '#f39c12' : '#ecf0f1',
-                                color: ['=','C','÷','×','-','+'].includes(btn) ? 'white' : '#2c3e50',
-                                visibility: btn === '' ? 'hidden' : 'visible'
-                            }}>
-                            {btn}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <button onClick={() => { if(res !== 'Error' && res !== '') onCopiar(res.toString()); }} style={{ width: '100%', marginTop: 10, padding: 10, border: 'none', borderRadius: 5, background: '#f1c40f', color: '#2c3e50', fontWeight: 'bold', cursor: 'pointer' }}>
-                Pegar resultado en pizarra
-            </button>
-        </div>
-    );
+    return <CalculadoraCasio onClose={onClose} onCopiar={(txt) => onCopiar(txt)} textoCopiar="📋 Pegar" />;
 }
 
 // ─── VISOR 3D INTERACTIVO ─────────────────────────────────────────────────────

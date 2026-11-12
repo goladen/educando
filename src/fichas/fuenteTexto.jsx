@@ -78,7 +78,8 @@ const normalizar = (t) => String(t || '').toLowerCase().normalize('NFD').replace
 export const comprobador = (q) => (valor) => {
     if (q.tipo === 'opcion') return { ok: valor === q.v };
     if (q.tipo === 'lista') {
-        const items = String(valor || '').replace(/xs*[=:]/gi, '').split(/[;s]+|,(?=s|$)/).map(t => t.trim()).filter(Boolean);
+        const items = String(valor || '').replace(/[°º]/g, '').replace(/x\s*[₁₂₃₄]?\s*[=:]/gi, '').replace(/([−–-])\s+/g, '$1')
+            .split(/[;\s]+|,(?=\s|$)/).map(t => t.trim()).filter(Boolean);
         if (!items.length) return null;
         const vals = items.map(leerFrac);
         if (vals.some(Number.isNaN)) return null;
@@ -130,11 +131,13 @@ export const crearFuente = (def) => {
             : ap.largo
             ? <p style={{ margin: 0, fontSize: `calc(${size} * 0.62)`, lineHeight: 1.5, color: '#2c3e50', fontWeight: 600, whiteSpace: 'pre-line' }}>{ap.e}</p>
             : <span style={{ fontSize: `calc(${size} * 0.8)`, fontWeight: 800, color: '#2c3e50', whiteSpace: 'pre-line' }}>{ap.e}</span>;
-        if (!ap.img && !(Visual && ap.v)) return texto;
+        // ap.v.soloSolucion: el dibujo solo aparece en la solución (no en el enunciado)
+        const conVisual = Visual && ap.v && !ap.v.soloSolucion;
+        if (!ap.img && !conVisual) return texto;
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
                 {ap.img && <img src={ap.img} alt="" crossOrigin="anonymous" style={{ height: `calc(${size} * ${ap.imgAlto || 3.2})`, maxWidth: '100%', objectFit: 'contain', borderRadius: 8, border: '1px solid #eee', background: 'white' }} />}
-                {Visual && ap.v && <Visual ap={ap} size={size} />}
+                {conVisual && <Visual ap={ap} size={size} />}
                 {(ap.e || ap.m) && texto}
             </div>
         );

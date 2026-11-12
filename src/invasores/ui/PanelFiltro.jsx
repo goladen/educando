@@ -14,6 +14,8 @@ export const CabeceraFiltro = memo(function CabeceraFiltro({ pregunta }) {
 });
 
 const mantener = (onCambio) => ({
+  tabIndex: -1,
+  onMouseDown: (e) => e.preventDefault(),
   onPointerDown: (e) => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); onCambio(true); },
   onPointerUp: () => onCambio(false),
   onPointerCancel: () => onCambio(false),

@@ -535,7 +535,7 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
   if (fase === 'menu') {
     return (
       <div ref={raizRef} className={raiz}>
-        <MenuArcade config={config} setConfig={setConfig} maxJugadores={layout.maxJugadores}
+        <MenuArcade config={config} setConfig={setConfig} maxJugadores={layout.maxJugadores} pantallaJusta={layout.pantallaJusta}
           apiMatesRef={apiMatesRef} onJugar={() => empezar()} onRapida={partidaRapida} onSalir={salir} error={error}
           onPdf={generarPdf} maxPreguntasPdf={maxPreguntasPdf}
           fichas={fichas} cargandoFicha={cargandoFicha} onAbrirFicha={abrirFicha} onQuitarFicha={quitarFicha} onOlvidarFicha={olvidarFicha}
@@ -557,8 +557,10 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
   const n = jugadores.length;
   const coop = n > 1 && config.modo === 'cooperativo';
 
+  // touch-action: none → en pizarras/monitores táctiles el segundo dedo no se toma como zoom o
+  // desplazamiento (eso cancelaba los toques del otro jugador): cada alumno pulsa en su zona a la vez.
   return (
-    <div ref={raizRef} className={raiz}>
+    <div ref={raizRef} className={raiz} style={{ touchAction: 'none' }}>
       {/* Barra superior */}
       <div className="flex items-center gap-2 border-b-2 border-slate-800 bg-slate-950 px-2 py-1.5 sm:px-3">
         <button type="button" onClick={() => dispatch({ type: 'FASE', fase: 'pausa' })} className={`${BTN.menu} px-3 py-2 text-[10px]`} title="Pausa">⏸</button>

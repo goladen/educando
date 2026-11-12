@@ -5,8 +5,12 @@ import React, { memo } from 'react';
 import { BTN } from '../tema';
 
 const ALTO = 'min-h-[clamp(38px,6.6vh,64px)]';
+// tabIndex -1 + mousedown sin foco: si un botón se queda con el foco, el Intro/Espacio del
+// otro jugador (su FUEGO en el teclado) lo «pulsaría» y le robaría la jugada.
 const press = (fn) => ({
+  tabIndex: -1,
   onPointerDown: (e) => { e.preventDefault(); fn(); },
+  onMouseDown: (e) => e.preventDefault(),
   onContextMenu: (e) => e.preventDefault(),
 });
 

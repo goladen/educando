@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { R, pick, N, P, frac, termino, polinomio, mcm } from '../fuenteTexto';
 import { TIPOS_FACTORIZAR, VisualPolinomio } from './factorizarPol.jsx';
+import { TIPOS_ECU_AVANZADAS, VisualEcuacion } from './ecuacionesAvanzadas.jsx';
 
 const noCero = (a, b) => { let v; do { v = R(a, b); } while (v === 0); return v; };
 // «ax + b» (b puede ser 0 o negativo)
@@ -15,8 +16,9 @@ const solX = (x) => [{ etiqueta: 'x =', tipo: 'frac', v: x, placeholder: 'x' }];
 //  ECUACIONES
 // ═════════════════════════════════════════════════════════════════════════════
 export const ECUACIONES = {
-    id: 'ecuaciones', nombre: 'Ecuaciones', emoji: '⚖️', color: '#2980b9', etapas: ['eso'],
-    desc: 'Primer grado, con paréntesis, con denominadores, segundo grado y problemas',
+    id: 'ecuaciones', nombre: 'Ecuaciones', emoji: '⚖️', color: '#2980b9', etapas: ['eso', 'bach'],
+    Visual: VisualEcuacion,
+    desc: 'Primer y segundo grado, bicuadradas, racionales, irracionales, producto = 0, exponenciales, logarítmicas, trigonométricas y problemas (con solución gráfica)',
     tipos: {
         primerGrado: {
             label: '1.er grado', titulo: 'Resuelve las siguientes ecuaciones.', cols: 2, alto: 100,
@@ -123,6 +125,7 @@ export const ECUACIONES = {
                     pasos: [`x + (x + ${y}) + 2(x + ${y}) = ${tot + x + y}`, `4x + ${3 * y} = ${tot + x + y}`, `x = ${x}`] };
             },
         },
+        ...TIPOS_ECU_AVANZADAS,
     },
 };
 

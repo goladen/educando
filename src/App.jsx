@@ -178,7 +178,7 @@ function App() {
         'sopa','sopa_letras','question_sender','q-sender',
         'omninteractive','videoquizz','sintaxis','listening',
         'etiquetas','etiquetame',
-        'geometrix','calculo','calculadora','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
+        'geometrix','calculo','calculadora','pizarras_verticales','pizarrasverticales','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca','domino','musica',
         'algebra','polinomios','estadistica','probabilidad',
         'api','admin','login','app','join','alumno',

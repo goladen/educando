@@ -52,6 +52,7 @@ const Ecuaciones = lazy(() => import('../Ecuaciones'));
 const EcuacionSistemas = lazy(() => import('../EcuacionSistemas'));
 const PotenciasRaices = lazy(() => import('../PotenciasRaices'));
 const UsoCalculadora = lazy(() => import('../calculadora/UsoCalculadora'));
+const PizarrasVerticales = lazy(() => import('../pizarrasVerticales/PizarrasVerticales'));
 import BotonCalculadora from '../calculadora/BotonCalculadora';
 const Funciones = lazy(() => import('../Funciones'));
 const GeometriaAnalitica = lazy(() => import('../Funciones2'));
@@ -813,6 +814,7 @@ export const APPS = [
     { id: 'POLINOMIOS',   name: 'Álgebra',      desc: 'Operaciones con polinomios.',              color: '#FF9800', emoji: '✖️', isMath: true, shareable: true },
     { id: 'POTENCIAS_RAICES', name: 'Potencias y Raíces', desc: 'Propiedades de potencias y raíces: ejercicios aleatorios.', color: '#0ea5e9', emoji: '⚡', isMath: true, shareable: true },
     { id: 'CALCULADORA', name: 'Calculadora', desc: 'Retos con la Casio fx-82MS: teclas exactas y regularidades por descubrir.', color: '#0f766e', emoji: '🧮', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/calculadora` },
+    { id: 'PIZARRAS_VERTICALES', name: 'Pizarras verticales', desc: 'Problemas de ingenio por temas para aulas de pensamiento, con instrucciones para el profesor.', color: '#4338ca', emoji: '🧱', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/pizarras_verticales` },
     { id: 'MATES_MANDOS', name: 'Mates con mandos', desc: 'Toda la clase responde a los ejercicios de Math World con mandos micro:bit.', color: '#0d9488', emoji: '🎮', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/matesmandos` },
     { id: 'LAB_MICROBIT', name: 'Laboratorio micro:bit', desc: 'Crea tu sala en 3D: GPS de clase, distancias, inclinómetro, brújula y más con micro:bit.', color: '#0369a1', emoji: '🛰️', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/labmicrobit` },
     { id: 'ESTADISTICA',  name: 'Estadística',  desc: 'Tablas, parámetros y representación gráfica.', color: '#9C27B0', emoji: '📊', isMath: true, shareable: true },
@@ -1135,6 +1137,70 @@ export const GAME_INFO = {
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    DUELO_PIRATAS: {
+        descripcion: 'Duelo de barcos piratas para 2 jugadores en el mismo dispositivo. Cada jugador resuelve operaciones de cálculo y, al acertar, dispara un cañonazo: hay que sincronizar el ángulo del cañón para dar al barco enemigo. Gana quien hunde antes al rival.',
+        tipoPreguntas: 'Operaciones de cálculo mental generadas al azar, de respuesta escrita.',
+        biblioteca: 'No necesita recursos: las operaciones se generan automáticamente.',
+        multiplayer: 'Sí, 2 jugadores en local (mismo dispositivo).',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    MATES_OAOA: {
+        descripcion: 'Método OAOA para primaria con seis actividades manipulativas: Bloques de decenas y unidades, Monstruo comenúmeros (descomponer sumando o en factores), Regletas y restas (libre, retos y resta por comparación), Geoplano (figuras, perímetro y área), Estimar tamaños y precios, y Caminos flexibles, donde el alumno escribe su propia estrategia de cálculo.',
+        tipoPreguntas: 'Manipulación visual y retos por niveles: descomposiciones, construcción de figuras en el geoplano, estimaciones con deslizador (nota de 0 a 100) y respuestas escritas.',
+        biblioteca: 'No necesita recursos: todas las actividades y retos vienen incluidos.',
+        multiplayer: 'Individual. Al final se envía al profesor un único informe con el resumen de todas las actividades.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria'],
+    },
+    FERIA_MATES: {
+        descripcion: 'Feria del Cálculo: operaciones contrarreloj al estilo OAOA. Tres modos: Globos (individual), Dual (2 jugadores) y Tirón de cuerda. Se eligen el tipo de números y las operaciones, y el tiempo por pregunta.',
+        tipoPreguntas: 'Operaciones generadas al azar: sumas, restas, multiplicaciones y divisiones con naturales, decimales, negativos o fracciones.',
+        biblioteca: 'No necesita recursos: las operaciones se generan automáticamente. El profesor puede compartir un reto por enlace con la configuración ya fijada.',
+        multiplayer: 'Individual (Globos) o 2 jugadores en el mismo dispositivo (Dual y Tirón de cuerda).',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    DIVISIBILIDAD: {
+        descripcion: 'Divisibilidad para la pizarra digital: Criba de Eratóstenes para marcar primos y múltiplos a mano, y juegos de Encuentra los primos, Múltiplos (del 2 al 12), Divisores de números grandes, Tabla del 100 con divisores y Descubre primos, cuadrados y pares con fichas arrastrables.',
+        tipoPreguntas: 'Marcar números en tablas, juegos contrarreloj (100 s) y clasificar fichas: primo o compuesto, cuadrado perfecto, par o impar.',
+        biblioteca: 'No necesita recursos: los números se generan al azar. Incluye ficha imprimible de divisibilidad.',
+        multiplayer: 'Individual, o en gran grupo proyectado en la pizarra. Los resultados se pueden enviar al profesor.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    GEO_PERIMETRO_AREA: {
+        descripcion: 'Perímetros y áreas en una cuadrícula: el alumno pinta losas para formar el área y pone vallas en los bordes para el perímetro. Tiene un modo con diagonales para trabajar triángulos y medias losas.',
+        tipoPreguntas: 'Misiones por estrellas: perímetro exacto, área exacta, varias figuras distintas con la misma medida, área y perímetro a la vez, cuadrados perfectos y retos imposibles que hay que detectar.',
+        biblioteca: 'No necesita recursos: las misiones vienen incluidas. Incluye ficha imprimible de geometría.',
+        multiplayer: 'Individual. Los resultados se pueden enviar al profesor.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria'],
+    },
+    GEO_VISOR_POLIEDROS: {
+        descripcion: 'Visor 3D de poliedros: se gira la figura arrastrando y se tocan sus vértices, aristas y caras para contarlos y comprobar la fórmula de Euler (V − A + C = 2). También muestra el desarrollo plano de cada poliedro.',
+        tipoPreguntas: 'No hay preguntas: es una herramienta de exploración y conteo.',
+        biblioteca: 'Incluye una colección de poliedros (los mismos que la Sala de Geometría 3D).',
+        multiplayer: 'Individual, o en gran grupo proyectado en la pizarra.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    GEOMETRIA_PRIMARIA: {
+        descripcion: 'Zona de geometría de primaria con dos apps: Perímetros y Áreas en cuadrícula, y el visor 3D de poliedros con la fórmula de Euler.',
+        tipoPreguntas: 'Misiones de construcción en cuadrícula y exploración de poliedros en 3D.',
+        biblioteca: 'No necesita recursos: todo viene incluido.',
+        multiplayer: 'Individual, o proyectado en la pizarra.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria'],
+    },
+    PRIMARIA_MW: {
+        descripcion: 'Zona de matemáticas para primaria dentro de Math World. Reúne el Método OAOA (bloques de decenas y unidades, monstruo comenúmeros, regletas, geoplano y caminos flexibles), la Feria del Cálculo, Dinero (billetes, monedas, la vuelta, IVA y rebajas), Fracciones, Divisibilidad (primos, múltiplos, divisores y criba de Eratóstenes) y Geometría (perímetros y áreas en cuadrícula y poliedros 3D con la fórmula de Euler). También da acceso a las fichas imprimibles de primaria.',
+        tipoPreguntas: 'Según la app: manipulación visual, operaciones contrarreloj, ejercicios de respuesta escrita y retos de construcción en cuadrícula.',
+        biblioteca: 'No necesita recursos: los ejercicios se generan automáticamente.',
+        multiplayer: 'Individual en la mayoría; Fracciones incluye tirón de cuerda por equipos.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria'],
+    },
     // Herramientas
     SINTAXIS: {
         descripcion: 'Herramienta de Lengua con cuatro bloques: SINTAXIS (marcar sujeto, predicado y complementos, en español, francés y catalán), ORTOGRAFÍA (agudas/llanas/esdrújulas, sílaba tónica, ¿lleva tilde?, letras dudosas b/v, g/j, h, ll/y, c/cc, c/z, m/n, r/rr), MORFOLOGÍA (frases generadas al infinito para cazar sustantivos, verbos, adjetivos, determinantes, pronombres, preposiciones, conjunciones y adverbios, y clasificar sus tipos) y SEMÁNTICA Y LÉXICO (sinónimos, antónimos, emparejar a contrarreloj, campos semánticos, familias de palabras, refranes y frases hechas, ruleta de campos para toda la clase).',
@@ -1409,6 +1475,14 @@ export const GAME_INFO = {
         materias: ['Matemáticas'],
         etapas: ['ESO', 'Bachillerato'],
     },
+    PIZARRAS_VERTICALES: {
+        descripcion: 'Banco de problemas de ingenio para trabajar en pizarras verticales (aulas de pensamiento): grupos aleatorios de 3, de pie, con un solo rotulador. Organizado por los sentidos matemáticos (numérico, medida, espacial, algebraico, estocástico) y un bloque de lógica e ingenio, en la línea del programa ARCOMAT de Aragón para 1º y 2º ESO. Cada problema trae instrucciones para el profesor: cómo lanzarlo, pistas graduadas, extensiones, errores frecuentes, consolidación y solución.',
+        tipoPreguntas: 'Problemas abiertos de suelo bajo y techo alto (estimación de Fermi, patrones, recuento, estrategias de juego, lógica). Problemas «de arranque» no curriculares para crear la cultura de pensar en grupo.',
+        biblioteca: 'Sí, 33 problemas propios y 6 juegos de magia matemática para proyectar (cartas mágicas en binario, adivino en 7 preguntas, truco del 1089, adivino de cumpleaños, la cifra borrada y el 21 contra la máquina), cada uno con su explicación y retos para las pizarras. El profesor puede añadir los suyos (con la fuente), exportarlos e importarlos.',
+        multiplayer: 'En grupo, en el aula: modo proyector con cronómetro y pistas, sorteo de grupos visible, impresión del enunciado o de la ficha del profesor y registro de cada sesión en «Mis registros».',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
     FUNCIONES: {
         descripcion: 'Explorador interactivo de funciones matemáticas: representación gráfica en el plano cartesiano, análisis de dominio, recorrido, crecimiento, extremos y simetrías.',
         tipoPreguntas: 'Análisis y representación de funciones. La herramienta genera ejemplos automáticamente.',
@@ -1487,7 +1561,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI', 'INVASORES'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'PIZARRAS_VERTICALES', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI', 'INVASORES'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1980,6 +2054,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'DUELO_PIRATAS' });
             } else if (path === 'calculadora' || path.startsWith('calculadora/')) {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'CALCULADORA', bloque: path.split('/')[1] || null, item: params.get('item') });
+            } else if (path === 'pizarras_verticales' || path === 'pizarrasverticales') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'PIZARRAS_VERTICALES' });
             } else if (path === 'potencias_raices' || path === 'potencias') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POTENCIAS_RAICES' });
             } else if (path === 'ecuacion_sistemas' || path === 'sistemas') {
@@ -2566,6 +2642,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
 
         const appInfo = APPS.find(a => a.id === appId);
 
+        if (appId === 'PIZARRAS_VERTICALES') {
+            window.history.pushState({}, '', '/pizarras_verticales');
+            setJuegoActivo({ tipoJuego: 'PIZARRAS_VERTICALES' });
+            return;
+        }
+
         if (appId === 'CALCULADORA') {
             window.history.pushState({}, '', '/calculadora');
             setJuegoActivo({ tipoJuego: 'CALCULADORA' });
@@ -3039,6 +3121,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <><AlgebraApp      usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="POLINOMIOS" /><FichaFlotante tema="polinomios" alAbrir="usar" /></>;
         if (juegoActivo.tipoJuego === 'ESTADISTICA') return <><EstadisticaApp  usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="ESTADISTICA" /><FichaFlotante tema="estadistica" alAbrir="usar" /></>;
         if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <><SimuladorDados onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><FichaFlotante tema="probabilidad" alAbrir="usar" /></>;
+        if (juegoActivo.tipoJuego === 'PIZARRAS_VERTICALES') return <PizarrasVerticales onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULADORA') return <UsoCalculadora key={`${juegoActivo.bloque}-${juegoActivo.item}`} bloqueInicial={juegoActivo.bloque} itemInicial={juegoActivo.item} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_OAOA') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflow: 'hidden' }}>
@@ -3161,12 +3244,23 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         </div>
     );
 
+    // Botón ℹ de las tarjetas de Primaria / Geometría (la tarjeta debe tener position: relative)
+    const btnInfoMath = (id, name, color, emoji) => GAME_INFO[id] ? (
+        <button
+            onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[id], name, color, emoji }); }}
+            title="Información"
+            style={{ position:'absolute', top:8, left:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 7px', cursor:'pointer', color, fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
+        >ℹ</button>
+    ) : null;
+    const infoModalMath = infoModal && <InfoModal info={infoModal.info} name={infoModal.name} color={infoModal.color} emoji={infoModal.emoji} img={infoModal.img} onClose={() => setInfoModal(null)} />;
+
     if (zonaActiva === 'MATH') {
         // Subvista: Primaria
         if (subzonaMath === 'PRIMARIA') {
             return (
                 <div style={{ width: '100%', marginTop: '20px' }}>
                     {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
+                    {infoModalMath}
                     <button onClick={() => { setSubzonaMath(null); window.history.pushState({}, '', '/math_world'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                         <Home size={20} /> Volver a Math World
                     </button>
@@ -3183,6 +3277,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('MATES_OAOA', 'Método OAOA', '#009688', '🧮')}
                             {btnCompartirPrimaria('MATES_OAOA', '/primaria/oaoa', 'Método OAOA', '#009688')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🧮</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#009688', fontSize: '1.4rem' }}>Método OAOA</h3>
@@ -3191,10 +3286,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/feria'); setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true }); }}
-                            style={{ background: '#FFF3E0', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #e67e22' }}
+                            style={{ position: 'relative', background: '#FFF3E0', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #e67e22' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('FERIA_MATES', 'Feria del Cálculo', '#e67e22', '🎡')}
                             {btnCompartirPrimaria('FERIA_MATES', '/primaria/feria', 'Feria del Cálculo', '#e67e22')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🎡</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#e67e22', fontSize: '1.4rem' }}>Feria del Cálculo</h3>
@@ -3206,6 +3302,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('DINERO', 'Dinero', '#16a085', '💶')}
                             {btnCompartirPrimaria('DINERO', '/primaria/dinero', 'Dinero', '#16a085')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>💶</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#16a085', fontSize: '1.4rem' }}>Dinero</h3>
@@ -3218,6 +3315,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('FRACCIONES', 'Fracciones', '#7b1fa2', '🍰')}
                             {btnCompartirPrimaria('FRACCIONES', '/primaria/fracciones', 'Fracciones', '#7b1fa2')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🍰</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#7b1fa2', fontSize: '1.4rem' }}>Fracciones</h3>
@@ -3226,10 +3324,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/divisibilidad'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' }); }}
-                            style={{ background: '#F3E5F5', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #7B1FA2' }}
+                            style={{ position: 'relative', background: '#F3E5F5', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #7B1FA2' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('DIVISIBILIDAD', 'Divisibilidad', '#7B1FA2', '🔢')}
                             {btnCompartirPrimaria('DIVISIBILIDAD', '/primaria/divisibilidad', 'Divisibilidad', '#7B1FA2')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔢</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#7B1FA2', fontSize: '1.4rem' }}>Divisibilidad</h3>
@@ -3237,10 +3336,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }}
-                            style={{ background: '#E3F2FD', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #1976D2' }}
+                            style={{ position: 'relative', background: '#E3F2FD', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #1976D2' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('GEOMETRIA_PRIMARIA', 'Geometría', '#1976D2', '📐')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>📐</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#1976D2', fontSize: '1.4rem' }}>Geometría</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Perímetros y áreas, y el visor 3D de poliedros con la fórmula de Euler.</p>
@@ -3254,6 +3354,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             return (
                 <div style={{ width: '100%', marginTop: '20px' }}>
                     {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
+                    {infoModalMath}
                     <button onClick={() => { setSubzonaMath('PRIMARIA'); window.history.pushState({}, '', '/primaria'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                         <Home size={20} /> Volver a Primaria
                     </button>
@@ -3265,10 +3366,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '700px', margin: '0 auto', paddingBottom: '40px' }}>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/geometria/perimetro-area'); setJuegoActivo({ tipoJuego: 'GEO_PERIMETRO_AREA' }); }}
-                            style={{ background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #2E7D32' }}
+                            style={{ position: 'relative', background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #2E7D32' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('GEO_PERIMETRO_AREA', 'Perímetros y Áreas', '#2E7D32', '🟩')}
                             {btnCompartirPrimaria('GEO_PERIMETRO_AREA', '/primaria/geometria/perimetro-area', 'Perímetros y Áreas', '#2E7D32')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🟩</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#2E7D32', fontSize: '1.4rem' }}>Perímetros y Áreas</h3>
@@ -3276,10 +3378,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/geometria/poliedros'); setJuegoActivo({ tipoJuego: 'GEO_VISOR_POLIEDROS' }); }}
-                            style={{ background: '#EDE7F6', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #5E35B1' }}
+                            style={{ position: 'relative', background: '#EDE7F6', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #5E35B1' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnInfoMath('GEO_VISOR_POLIEDROS', 'Poliedros 3D · Euler', '#5E35B1', '🔷')}
                             {btnCompartirPrimaria('GEO_VISOR_POLIEDROS', '/primaria/geometria/poliedros', 'Poliedros 3D', '#5E35B1')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔷</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#5E35B1', fontSize: '1.4rem' }}>Poliedros 3D · Euler</h3>
@@ -3290,39 +3393,18 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             );
         }
 
-        return (
-            <div style={{ width: '100%', marginTop: '20px' }}>
-                {/* Botón Volver Modificado */}
-                <button onClick={() => {
-                    setZonaActiva('MAIN');
-                    setSubzonaMath(null);
-                    window.history.pushState({}, '', '/');
-                    window.dispatchEvent(new Event('popstate'));
-                }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
-                    <Home size={20} /> Volver al Menú Principal
-                </button>
-
-                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                    <div style={{ fontSize: '70px', marginBottom: '10px' }}>🌍</div>
-                    <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Math World</h1>
-                    <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Tu ecosistema de herramientas matemáticas</p>
-                </div>
-                {bannerFichas(false)}
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
-                    {/* Tarjeta Primaria */}
-                    <div
-                        onClick={() => { setSubzonaMath('PRIMARIA'); window.history.pushState({}, '', '/primaria'); }}
-                        style={{ background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #4CAF50' }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                        <div style={{ fontSize: '50px', marginBottom: '15px' }}>🏫</div>
-                        <h3 style={{ margin: '0 0 10px 0', color: '#4CAF50', fontSize: '1.4rem' }}>Primaria</h3>
-                        <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Juegos de cálculo: Método OAOA y Feria del Cálculo.</p>
-                    </div>
-
-                    {APPS.filter(app => app.isMath || app.alsoMath).map(app => {
+        // Orden de las tarjetas: primero los temas (de primaria a probabilidad);
+        // abajo, juegos y laboratorios. Lo que no esté en las listas va al final de abajo.
+        const ORDEN_TEMAS_MATH = ['CALCULO', 'FRACCIONES', 'POTENCIAS_RAICES', 'POLINOMIOS', 'ECUACIONES', 'ECUACION_SISTEMAS', 'GEOMETRIX', 'GEOMETRÍA_ANALÍTICA', 'FUNCIONES', 'ESTADISTICA', 'PROBABILIDAD'];
+        const ORDEN_JUEGOS_MATH = ['SIXSEVEN', 'INVASORES'];
+        const ORDEN_LAB_MATH = ['CALCULADORA', 'PIZARRAS_VERTICALES', 'MATES_MANDOS', 'LAB_MICROBIT', 'DINERO'];
+        const appsMath = APPS.filter(app => app.isMath || app.alsoMath);
+        const appsEnOrden = ids => ids.map(id => appsMath.find(a => a.id === id)).filter(Boolean);
+        const yaOrdenadas = [...ORDEN_TEMAS_MATH, ...ORDEN_JUEGOS_MATH, ...ORDEN_LAB_MATH];
+        const temasMath = appsEnOrden(ORDEN_TEMAS_MATH);
+        const juegosMath = appsEnOrden(ORDEN_JUEGOS_MATH);
+        const labMath = [...appsEnOrden(ORDEN_LAB_MATH), ...appsMath.filter(a => !yaOrdenadas.includes(a.id))];
+        const renderAppMath = (app) => {
                         if (app.id === 'CALCULO') return (
                             <div key={app.id} style={{ position: 'relative',
                                 background: '#E0F2F1', borderRadius: '20px', padding: '22px 18px',
@@ -3407,12 +3489,57 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 {piBadge(app.id, app.name)}
                             </div>
                         );
-                    })}
+        };
+
+        return (
+            <div style={{ width: '100%', marginTop: '20px' }}>
+                {/* Botón Volver Modificado */}
+                <button onClick={() => {
+                    setZonaActiva('MAIN');
+                    setSubzonaMath(null);
+                    window.history.pushState({}, '', '/');
+                    window.dispatchEvent(new Event('popstate'));
+                }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
+                    <Home size={20} /> Volver al Menú Principal
+                </button>
+
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <div style={{ fontSize: '70px', marginBottom: '10px' }}>🌍</div>
+                    <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Math World</h1>
+                    <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Tu ecosistema de herramientas matemáticas</p>
+                </div>
+                {bannerFichas(false)}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
+                    {/* Tarjeta Primaria */}
+                    <div
+                        onClick={() => { setSubzonaMath('PRIMARIA'); window.history.pushState({}, '', '/primaria'); }}
+                        style={{ position: 'relative', background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #4CAF50' }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                        <button
+                            onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO.PRIMARIA_MW, name: 'Primaria', color: '#4CAF50', emoji: '🏫' }); }}
+                            title="Información"
+                            style={{ position:'absolute', top:8, left:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 7px', cursor:'pointer', color:'#4CAF50', fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
+                        >ℹ</button>
+                        <div style={{ fontSize: '50px', marginBottom: '15px' }}>🏫</div>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#4CAF50', fontSize: '1.4rem' }}>Primaria</h3>
+                        <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Juegos de cálculo: Método OAOA y Feria del Cálculo.</p>
+                    </div>
+
+                    {temasMath.map(renderAppMath)}
+                </div>
+
+                <h2 style={{ textAlign: 'center', color: '#009688', fontSize: '1.8rem', margin: '10px 0 25px' }}>🎮 Juegos y laboratorios</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
+                    {juegosMath.map(renderAppMath)}
 
                     {/* ── Duelo de Piratas ── */}
                     <div
                         onClick={() => { window.history.pushState({}, '', '/duelo-piratas'); setJuegoActivo({ tipoJuego: 'DUELO_PIRATAS' }); }}
                         style={{
+                            position: 'relative',
                             background: 'linear-gradient(135deg,#0a1628 0%,#1a3a5c 100%)',
                             borderRadius: '20px', padding: '28px 18px', textAlign: 'center',
                             cursor: 'pointer', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
@@ -3422,6 +3549,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 14px 32px rgba(0,0,0,0.35)'; }}
                         onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)'; }}
                     >
+                        <button
+                            onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO.DUELO_PIRATAS, name: 'Duelo de Piratas', color: '#1a3a5c', emoji: '🏴‍☠️' }); }}
+                            title="Información"
+                            style={{ position:'absolute', top:8, left:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 7px', cursor:'pointer', color:'#1a3a5c', fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
+                        >ℹ</button>
                         <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏴‍☠️</div>
                         <h3 style={{ margin: '0 0 8px', color: '#f9c74f', fontSize: '1.35rem', fontFamily: 'Georgia,serif' }}>Duelo de Piratas</h3>
                         <p style={{ margin: 0, color: '#94d2bd', fontSize: '0.88rem' }}>
@@ -3431,8 +3563,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             ⚓ 2 Jugadores · Local
                         </span>
                     </div>
+
+                    {labMath.map(renderAppMath)}
                 </div>
                 {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
+                {infoModal && <InfoModal info={infoModal.info} name={infoModal.name} color={infoModal.color} emoji={infoModal.emoji} img={infoModal.img} onClose={() => setInfoModal(null)} />}
             </div>
         );
     }
@@ -4567,6 +4702,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
     if (appData.id === 'ECUACION_SISTEMAS') return <><EcuacionSistemas onExit={handleExitGame} /><FichaFlotante tema="sistemas" alAbrir="usar" /></>;
     if (appData.id === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={handleExitGame} /><BotonCalculadora app="POTENCIAS_RAICES" /><FichaFlotante tema="potencias" alAbrir="usar" /></>;
     if (appData.id === 'CALCULADORA') return <UsoCalculadora onExit={handleExitGame} />;
+    if (appData.id === 'PIZARRAS_VERTICALES') return <PizarrasVerticales onExit={handleExitGame} />;
     if (appData.id === 'FUNCIONES') return <><Funciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FUNCIONES" /><FichaFlotante tema="funciones" alAbrir="usar" /></>;
     if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /><FichaFlotante tema="geoAnalitica" alAbrir="usar" /></>;
 

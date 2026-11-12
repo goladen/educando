@@ -68,6 +68,7 @@ export const JUEGOS_REGISTRO_META = {
     JEOPARDY:            { nombre: 'Money Board',         emoji: '💰', color: '#2563eb' },
     LENGUA:              { nombre: 'Lengua',              emoji: '📖', color: '#3498db' },
     CALCULADORA:         { nombre: 'Calculadora',         emoji: '🧮', color: '#0f766e' },
+    PIZARRAS_VERTICALES: { nombre: 'Pizarras verticales', emoji: '🧱', color: '#4338ca' },
     QUIZ_MANOS:          { nombre: 'Quiz con los dedos',  emoji: '✋', color: '#7c3aed' },
     AVATAR_CUERPO:       { nombre: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2' },
     ORIENTACION:         { nombre: 'Orientación',          emoji: '🚩', color: '#c026d3' },

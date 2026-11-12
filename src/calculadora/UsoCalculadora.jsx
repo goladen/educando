@@ -2,9 +2,10 @@
 // teclas de la Casio fx-82MS y series para descubrir regularidades.
 // Se usa como herramienta propia (tarjeta CALCULADORA, ruta /calculadora) y
 // embebida en otras apps de Math World con `bloques` filtrados (BotonCalculadora).
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BLOQUES } from './retosCalculadora';
 import Fx82MS, { ChipsTeclas, useAnimacionTeclas } from './Fx82MS';
+import { estadoInicial, aplicarTecla, pantallaDe, useTecladoFisico } from './CalculadoraInteractiva';
 import { comprobar, formatear } from './respuestas';
 import { sonidoCorrecto, sonidoIncorrecto } from '../utils/sonidosFeedback';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
@@ -185,7 +186,33 @@ function VistaBloque({ bloque, progreso, marcar, movil, itemInicial, apps, irApp
     const registrado = useRef(false);
     const calcRef = useRef(null);
 
+    // Calculadora que CALCULA (motorCalculadora): siempre encendida, conserva Ans y memorias.
+    // base = estado de partida · inicio = estado al empezar la secuencia mostrada ·
+    // conAnim = se le aplican las pulsaciones de la animación (las teclas se pulsan de verdad).
+    const [calc, setCalc] = useState(() => { const e = estadoInicial(); return { base: e, inicio: e, conAnim: false }; });
+    const estadoCalc = useMemo(() => {
+        let st = calc.base;
+        if (calc.conAnim) for (const p of anim.pulsadas || []) { if (!p.reset && p.teclas?.length) st = aplicarTecla(st, p.teclas[0]); }
+        return st;
+    }, [calc, anim.pulsadas]);
+    const estadoRef = useRef(estadoCalc);
+    estadoRef.current = estadoCalc;
+    // El alumno pulsa una tecla: toma el control (se para la animación)
+    const pulsarUsuario = useCallback((id) => {
+        anim.parar();
+        setCalc((c) => ({ ...c, base: aplicarTecla(estadoRef.current, id), conAnim: false }));
+    }, [anim.parar]); // eslint-disable-line react-hooks/exhaustive-deps
+    useTecladoFisico(pulsarUsuario);
+    const repetir = () => { setCalc((c) => ({ ...c, base: c.inicio, conAnim: true })); anim.reproducir(); };
+    const pasoAPaso = () => {
+        if (!calc.conAnim) { setCalc((c) => ({ ...c, base: c.inicio, conAnim: true })); anim.reiniciar(); }
+        anim.siguiente();
+    };
+
     const verTeclas = (teclas, pantalla) => {
+        // como en la calculadora real: AC antes de empezar (Ans y memorias se conservan)
+        const ini = aplicarTecla(estadoRef.current, 'AC');
+        setCalc({ base: ini, inicio: ini, conAnim: true });
         setSecuencia({ teclas, pantalla });
         // en móvil la calculadora queda debajo: llevar la vista hasta ella
         if (movil) setTimeout(() => calcRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
@@ -281,17 +308,20 @@ function VistaBloque({ bloque, progreso, marcar, movil, itemInicial, apps, irApp
             </div>
 
             <div ref={calcRef} style={{ position: movil ? 'static' : 'sticky', top: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                <Fx82MS anim={anim} resultado={secuencia.pantalla?.split('→').pop().trim()} ancho={movil ? 280 : 290} />
+                <Fx82MS anim={calc.conAnim ? anim : null} onTecla={pulsarUsuario} pantalla={pantallaDe(estadoCalc)} ancho={movil ? 280 : 290} />
                 {secuencia.teclas ? (
                     <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={anim.reproducir} style={btn('#0f766e')}>▶ Repetir</button>
-                        <button onClick={anim.siguiente} disabled={anim.terminado} style={{ ...btn('#fff', '#0f766e'), opacity: anim.terminado ? 0.5 : 1 }}>Paso a paso ⏭</button>
+                        <button onClick={repetir} style={btn('#0f766e')}>▶ Repetir</button>
+                        <button onClick={pasoAPaso} disabled={calc.conAnim && anim.terminado} style={{ ...btn('#fff', '#0f766e'), opacity: calc.conAnim && anim.terminado ? 0.5 : 1 }}>Paso a paso ⏭</button>
                     </div>
                 ) : (
                     <div style={{ fontSize: 13, color: '#475569', textAlign: 'center', maxWidth: 260 }}>
                         Pulsa <b>🎹 Ver teclas</b> en un reto para ver aquí qué teclas hay que pulsar.
                     </div>
                 )}
+                <div style={{ fontSize: 12, color: '#0f766e', textAlign: 'center', maxWidth: 270, fontWeight: 700 }}>
+                    ✋ Es una calculadora de verdad: pulsa sus teclas (o usa el teclado) para hacer tus propias operaciones.
+                </div>
                 {secuencia.teclas && <div style={{ ...tarjeta, padding: 10, width: '100%', boxSizing: 'border-box', marginBottom: 0 }}><ChipsTeclas teclas={secuencia.teclas} activo={anim.tokenActivo} compacto /></div>}
             </div>
         </div>

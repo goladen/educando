@@ -1,7 +1,9 @@
 // Cuántos jugadores caben según el dispositivo y cómo se reparte la pantalla.
-//   móvil (< 640 px)          → 1 jugador
-//   tablet / portátil         → hasta 2
-//   PC grande / pizarra (≥ 1280 px de ancho y ≥ 640 de alto) → hasta 4
+//   móvil (< 640 px de ancho) → 1 jugador
+//   tablet en vertical        → hasta 2
+//   ordenador / pizarra / proyector (≥ 900 px de ancho) → hasta 4
+// OJO: un PC proyectado suele dar 1366×768 o menos (escala de Windows al 125-150 % y la barra del
+// navegador): antes se exigían 1280×640 y no dejaba elegir 4 jugadores. Ahora se permite y se avisa.
 import { useEffect, useState } from 'react';
 
 const medir = () => ({
@@ -10,9 +12,8 @@ const medir = () => ({
 });
 
 export function maxJugadoresPara({ ancho, alto }) {
-  const corto = Math.min(ancho, alto);
-  if (corto < 500 || ancho < 640) return 1;
-  if (ancho >= 1280 && alto >= 640) return 4;
+  if (ancho < 640 || alto < 340) return 1;
+  if (ancho >= 900) return 4;
   return 2;
 }
 
@@ -25,7 +26,8 @@ export function useLayoutJugadores() {
     return () => { window.removeEventListener('resize', on); window.removeEventListener('orientationchange', on); };
   }, []);
   const apaisado = m.ancho >= m.alto;
-  return { ...m, apaisado, maxJugadores: maxJugadoresPara(m) };
+  // pantallaJusta: caben 4, pero cada zona queda pequeña (se avisa en el menú)
+  return { ...m, apaisado, maxJugadores: maxJugadoresPara(m), pantallaJusta: m.ancho < 1280 || m.alto < 640 };
 }
 
 /** Clases de la rejilla de zonas. */

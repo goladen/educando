@@ -22,6 +22,7 @@ import startSoundFile from './assets/inicio-juego.mp3';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import { CalculadoraFlotante as CalculadoraCasio } from './calculadora/CalculadoraInteractiva';
 
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
 const audioCorrect = _mkAudio(correctSoundFile);
@@ -1705,70 +1706,9 @@ function ClientPreguntaGeo({ pregunta, startTime, subFase, myResult, puntuacion,
 // ─────────────────────────────────────────────────────────────────────────────
 // MINI CALCULADORA
 // ─────────────────────────────────────────────────────────────────────────────
+// Calculadora de ayuda: Casio fx-82MS interactiva (mismo aspecto que «Uso de la calculadora»)
 function MiniCalculadora({ onClose }) {
-    const [display, setDisplay] = useState('0');
-    const [prev, setPrev] = useState(null);
-    const [op, setOp] = useState(null);
-    const [waitNext, setWaitNext] = useState(false);
-
-    const pressNum = (n) => {
-        if (waitNext) { setDisplay(String(n)); setWaitNext(false); }
-        else setDisplay(d => d === '0' ? String(n) : d + n);
-    };
-    const pressDecimal = () => {
-        if (waitNext) { setDisplay('0.'); setWaitNext(false); return; }
-        if (!display.includes('.')) setDisplay(d => d + '.');
-    };
-    const pressOp = (o) => {
-        const cur = parseFloat(display);
-        if (prev !== null && !waitNext) {
-            const res = calc(prev, cur, op);
-            setDisplay(String(parseFloat(res.toFixed(8))));
-            setPrev(parseFloat(res.toFixed(8)));
-        } else { setPrev(cur); }
-        setOp(o); setWaitNext(true);
-    };
-    const calc = (a, b, o) => { if (o === '+') return a + b; if (o === '-') return a - b; if (o === '×') return a * b; if (o === '÷') return b !== 0 ? a / b : 0; return b; };
-    const pressEqual = () => {
-        if (op === null || prev === null) return;
-        const res = calc(prev, parseFloat(display), op);
-        setDisplay(String(parseFloat(res.toFixed(8))));
-        setPrev(null); setOp(null); setWaitNext(true);
-    };
-    const pressClear = () => { setDisplay('0'); setPrev(null); setOp(null); setWaitNext(false); };
-    const pressPi = () => { setDisplay(String(parseFloat(Math.PI.toFixed(8)))); setWaitNext(false); };
-    const pressSqrt = () => { setDisplay(d => String(parseFloat(Math.sqrt(parseFloat(d)).toFixed(8)))); setWaitNext(true); };
-    const pressSq = () => { const v = parseFloat(display); setDisplay(String(parseFloat((v * v).toFixed(8)))); setWaitNext(true); };
-
-    const btn = (label, onClick, bg = '#f0f0f0', col = '#333') => (
-        <button key={label} onClick={onClick} style={{ padding: '10px 0', background: bg, color: col, border: '1px solid #ddd', borderRadius: 8, fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', touchAction: 'manipulation' }}>
-            {label}
-        </button>
-    );
-
-    return (
-        <div style={{ background: '#1a1a2e', borderRadius: 16, padding: 14, marginBottom: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-            <button onClick={onClose} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
-            <div style={{ background: '#0d0d1f', color: '#f1c40f', fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'right', padding: '10px 12px', borderRadius: 10, marginBottom: 10, minHeight: 48, wordBreak: 'break-all' }}>
-                {op && <span style={{ fontSize: '0.75rem', color: '#888', marginRight: 8 }}>{prev} {op}</span>}
-                {display}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                {btn('C', pressClear, '#e74c3c', 'white')}
-                {btn('√', pressSqrt, '#3498db', 'white')}
-                {btn('x²', pressSq, '#3498db', 'white')}
-                {btn('÷', () => pressOp('÷'), '#f39c12', 'white')}
-                {btn('7', () => pressNum('7'))}{btn('8', () => pressNum('8'))}{btn('9', () => pressNum('9'))}
-                {btn('×', () => pressOp('×'), '#f39c12', 'white')}
-                {btn('4', () => pressNum('4'))}{btn('5', () => pressNum('5'))}{btn('6', () => pressNum('6'))}
-                {btn('-', () => pressOp('-'), '#f39c12', 'white')}
-                {btn('1', () => pressNum('1'))}{btn('2', () => pressNum('2'))}{btn('3', () => pressNum('3'))}
-                {btn('+', () => pressOp('+'), '#f39c12', 'white')}
-                {btn('π', pressPi, '#9b59b6', 'white')}{btn('0', () => pressNum('0'))}{btn('.', pressDecimal)}
-                {btn('=', pressEqual, '#2ecc71', 'white')}
-            </div>
-        </div>
-    );
+    return <CalculadoraCasio onClose={onClose} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

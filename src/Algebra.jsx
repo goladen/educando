@@ -9,6 +9,7 @@ import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { M_FactorComun, M_Factorizacion, PASOS_NOMBRE } from './algebra/Factorizacion';
 import BotonFichas from './components/BotonFichas';
+import PantallaDual, { dualDisponible } from './components/PantallaDual';
 import { M_Formulas, M_AreasPolinomios } from './algebra/ProblemasAlgebra';
 import { TermPolinomios, TraduccionAlgebraica } from './algebra/Terminologia';
 import PolyInput from './algebra/PolyInput';
@@ -820,7 +821,7 @@ function AlgebraPanel({ onExit, usuario, embebido = false, lado = '', onDual = n
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:'0.85rem',color:'#8b949e'}}>Total: {totalOk}/{totalTotal}</span>
-                    {onDual && !reto && typeof window!=='undefined' && window.innerWidth>=1000 && (
+                    {onDual && !reto && dualDisponible() && (
                         <button onClick={onDual} title='Divide la pantalla en dos: cada lado elige su apartado (para monitores interactivos)' style={{background:'transparent',border:'1px solid #9b59b6',color:'#c39bd3',padding:'6px 10px',borderRadius:7,cursor:'pointer',fontWeight:700}}>◧◨ Pantalla dual</button>
                     )}
                     {!embebido && <button onClick={compartir} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
@@ -969,35 +970,14 @@ function AlgebraPanel({ onExit, usuario, embebido = false, lado = '', onDual = n
 
 /**
  * Álgebra con modo «pantalla dual» para monitores interactivos: dos apps independientes,
- * una en cada mitad. El transform de cada mitad hace que sus modales (position: fixed)
- * se queden dentro de ella en vez de tapar toda la pantalla.
+ * una en cada mitad, que dos alumnos usan a la vez (ver components/PantallaDual.jsx).
  */
 export default function AlgebraApp({ onExit, usuario }) {
     const [dual, setDual] = useState(false);
-    const dualRef = useRef(null);
-    const pantallaCompleta = () => {
-        try {
-            if(document.fullscreenElement) document.exitFullscreen?.();
-            else dualRef.current?.requestFullscreen?.();
-        } catch { /* sin soporte */ }
-    };
-    const salirDual = () => {
-        try { if(document.fullscreenElement) document.exitFullscreen?.(); } catch { /* nada */ }
-        setDual(false);
-    };
-
     if(!dual) return <AlgebraPanel onExit={onExit} usuario={usuario} onDual={()=>setDual(true)}/>;
-
     return (
-        <div ref={dualRef} style={{position:'fixed',inset:0,zIndex:5000,display:'flex',background:'#0d1117'}}>
-            {['Izquierda','Derecha'].map((lado, i) => (
-                <React.Fragment key={lado}>
-                    {i===1 && <div aria-hidden='true' style={{width:6,flexShrink:0,background:'linear-gradient(#9b59b6,#3498db,#9b59b6)'}}/>}
-                    <div style={{flex:1,minWidth:0,overflowY:'auto',overflowX:'hidden',position:'relative',transform:'translateZ(0)'}}>
-                        <AlgebraPanel embebido lado={lado} usuario={null} onExit={salirDual} onPantallaCompleta={pantallaCompleta}/>
-                    </div>
-                </React.Fragment>
-            ))}
-        </div>
+        <PantallaDual onSalir={()=>setDual(false)} render={(lado, { salir, pantallaCompleta }) => (
+            <AlgebraPanel embebido lado={lado} usuario={null} onExit={salir} onPantallaCompleta={pantallaCompleta}/>
+        )}/>
     );
 }

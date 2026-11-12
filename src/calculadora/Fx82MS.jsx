@@ -1,7 +1,9 @@
-// Calculadora Casio fx-82MS virtual (solo visual): pinta el teclado, resalta
-// las teclas de una secuencia paso a paso y muestra la expresión en pantalla.
-// No calcula: el resultado final lo aporta el reto (campo `pantalla`).
+// Calculadora Casio fx-82MS virtual: pinta el teclado, resalta las teclas de una
+// secuencia paso a paso y muestra la expresión en pantalla. Por sí sola no calcula
+// (el resultado lo aporta el reto); con `onTecla` + `pantalla` se vuelve pulsable
+// y la usa CalculadoraInteractiva.jsx, que sí calcula (motorCalculadora.js).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { marcasSexagesimales } from './motorCalculadora';
 
 // id → { main, shift (amarillo), alpha (rojo), disp (texto en pantalla), tipo }
 export const TECLAS = {
@@ -183,6 +185,7 @@ export function useAnimacionTeclas(teclas) {
         if (p.reset) { linea = ''; continue; }
         linea += p.disp || '';
     }
+    linea = marcasSexagesimales(linea);
     if (actual && (actual.teclas[0] === 'SHIFT' || actual.teclas[0] === 'ALPHA')) shiftOn = actual.teclas[0];
     return {
         reproducir: () => { setI(-1); setPlay(true); },
@@ -192,17 +195,26 @@ export function useAnimacionTeclas(teclas) {
         resaltadas: actual ? actual.teclas : [],
         tokenActivo: actual ? actual.tokenIdx : -1,
         linea, shiftOn, terminado: i === lista.length - 1, reproduciendo: play,
+        // pulsaciones ya hechas (para pasarlas a la calculadora que calcula de verdad)
+        pulsadas: lista.slice(0, i + 1),
         progreso: lista.length ? (i + 1) / lista.length : 0,
     };
 }
 
-function Tecla({ id, on, ancho }) {
+function Tecla({ id, on, ancho, onTecla }) {
+    const [pulsada, setPulsada] = useState(false);
     const k = TECLAS[id];
     if (!k) return <div />;
+    on = on || pulsada;
+    const eventos = onTecla ? {
+        role: 'button', tabIndex: -1, title: k.main,
+        onPointerDown: (e) => { e.preventDefault(); setPulsada(true); onTecla(id); },
+        onPointerUp: () => setPulsada(false), onPointerLeave: () => setPulsada(false),
+    } : {};
     const base = k.tipo === 'num' ? '#a9adb5' : k.tipo === 'rojo' ? '#e4483f' : k.tipo === 'mod' || k.tipo === 'alpha' ? '#3a3f4b' : '#23262e';
     const color = k.tipo === 'num' ? '#111' : '#fff';
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
+        <div {...eventos} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, cursor: onTecla ? 'pointer' : 'default', touchAction: 'manipulation' }}>
             <div style={{ height: 12, fontSize: 8.5, fontWeight: 700, whiteSpace: 'nowrap', display: 'flex', gap: 4 }}>
                 {k.shift && <span style={{ color: COL.shift }}>{k.shift}</span>}
                 {k.alpha && <span style={{ color: COL.alpha }}>{k.alpha}</span>}
@@ -223,9 +235,11 @@ function Tecla({ id, on, ancho }) {
 }
 
 // Calculadora completa. `anim` = resultado de useAnimacionTeclas; `resultado` = texto final.
-export default function Fx82MS({ anim, resultado, ancho = 260 }) {
+// Interactiva: `onTecla(id)` al pulsar y `pantalla` = { linea, resultado, shift, alpha, modo, sto, hyp, m }.
+export default function Fx82MS({ anim, resultado, ancho = 260, onTecla, pantalla }) {
     const on = new Set(anim?.resaltadas || []);
     const mostrarRes = anim?.terminado && resultado;
+
     return (
         <div style={{
             width: ancho, maxWidth: '100%', background: 'linear-gradient(180deg,#3b3f4a,#2a2d35)', borderRadius: 22,
@@ -242,36 +256,40 @@ export default function Fx82MS({ anim, resultado, ancho = 260 }) {
                 color: '#1f2a1f', minHeight: 50, marginBottom: 10, border: '3px solid #555b66', boxSizing: 'border-box',
             }}>
                 <div style={{ fontSize: 9, height: 11, display: 'flex', gap: 6, fontWeight: 700 }}>
-                    {anim?.shiftOn === 'SHIFT' && <span>S</span>}
-                    {anim?.shiftOn === 'ALPHA' && <span>A</span>}
-                    <span style={{ marginLeft: 'auto' }}>D</span>
+                    {(pantalla ? pantalla.shift : anim?.shiftOn === 'SHIFT') && <span>S</span>}
+                    {(pantalla ? pantalla.alpha : anim?.shiftOn === 'ALPHA') && <span>A</span>}
+                    {pantalla?.m && <span>M</span>}
+                    {pantalla?.sto && <span>STO</span>}
+                    {pantalla?.rcl && <span>RCL</span>}
+                    {pantalla?.hyp && <span>hyp</span>}
+                    <span style={{ marginLeft: 'auto' }}>{pantalla?.modo || 'D'}</span>
                 </div>
                 <div style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', direction: 'rtl', textAlign: 'left', height: 17 }}>
-                    <bdi>{anim?.linea || ' '}</bdi>
+                    <bdi>{(pantalla ? pantalla.linea : anim?.linea) || ' '}</bdi>
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 700, textAlign: 'right', height: 21, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                    {mostrarRes ? resultado : (anim?.linea ? '' : '0.')}
+                    {pantalla ? pantalla.resultado : mostrarRes ? resultado : (anim?.linea ? '' : '0.')}
                 </div>
             </div>
             {/* Fila SHIFT ALPHA · pad · MODE ON */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2.2fr 1fr 1fr', gap: 5, alignItems: 'center', marginBottom: 2 }}>
-                <Tecla id="SHIFT" on={on.has('SHIFT')} />
-                <Tecla id="ALPHA" on={on.has('ALPHA')} />
+                <Tecla id="SHIFT" on={on.has('SHIFT')} onTecla={onTecla} />
+                <Tecla id="ALPHA" on={on.has('ALPHA')} onTecla={onTecla} />
                 <div style={{ gridRow: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 14px)', background: '#c9ccd1', borderRadius: '50%', width: 62, height: 46, margin: '0 auto', padding: 2, fontSize: 9, color: '#333' }}>
-                    <span /> <span style={{ textAlign: 'center', color: on.has('↑') ? '#16a34a' : '#333' }}>▲</span> <span />
-                    <span style={{ textAlign: 'center', color: on.has('←') ? '#16a34a' : '#333' }}>◀</span>
+                    <span /> <span onPointerDown={onTecla ? (e) => { e.preventDefault(); onTecla('↑'); } : undefined} style={{ textAlign: 'center', color: on.has('↑') ? '#16a34a' : '#333', cursor: onTecla ? 'pointer' : 'default' }}>▲</span> <span />
+                    <span onPointerDown={onTecla ? (e) => { e.preventDefault(); onTecla('←'); } : undefined} style={{ textAlign: 'center', color: on.has('←') ? '#16a34a' : '#333', cursor: onTecla ? 'pointer' : 'default' }}>◀</span>
                     <span style={{ textAlign: 'center', fontSize: 7 }}>REPLAY</span>
-                    <span style={{ textAlign: 'center', color: on.has('→') ? '#16a34a' : '#333' }}>▶</span>
-                    <span /> <span style={{ textAlign: 'center', color: on.has('↓') ? '#16a34a' : '#333' }}>▼</span> <span />
+                    <span onPointerDown={onTecla ? (e) => { e.preventDefault(); onTecla('→'); } : undefined} style={{ textAlign: 'center', color: on.has('→') ? '#16a34a' : '#333', cursor: onTecla ? 'pointer' : 'default' }}>▶</span>
+                    <span /> <span onPointerDown={onTecla ? (e) => { e.preventDefault(); onTecla('↓'); } : undefined} style={{ textAlign: 'center', color: on.has('↓') ? '#16a34a' : '#333', cursor: onTecla ? 'pointer' : 'default' }}>▼</span> <span />
                 </div>
-                <Tecla id="MODE" on={on.has('MODE')} />
-                <Tecla id="ON" on={on.has('ON')} />
+                <Tecla id="MODE" on={on.has('MODE')} onTecla={onTecla} />
+                <Tecla id="ON" on={on.has('ON')} onTecla={onTecla} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '2px 5px' }}>
-                {FILAS_FUNC.flat().map((id, i) => id ? <Tecla key={i} id={id} on={on.has(id)} /> : <div key={i} />)}
+                {FILAS_FUNC.flat().map((id, i) => id ? <Tecla key={i} id={id} on={on.has(id)} onTecla={onTecla} /> : <div key={i} />)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px 7px', marginTop: 8 }}>
-                {FILAS_NUM.flat().map((id, i) => <Tecla key={i} id={id} on={on.has(id)} />)}
+                {FILAS_NUM.flat().map((id, i) => <Tecla key={i} id={id} on={on.has(id)} onTecla={onTecla} />)}
             </div>
         </div>
     );

@@ -14,6 +14,9 @@ import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
 import startSoundFile from './assets/inicio-juego.mp3';
+import { TIPOS_AVANZADOS, CLAVES_AVANZADAS, esTipoAvanzado, generarAvanzada, comprobarMulti, textoSoluciones } from './ecuaciones/ecuacionesAvanzadas';
+import { ElementoAvanzado, esElementoAvanzado, EntradaSoluciones, SolucionMulti, FraccionMath } from './ecuaciones/UIEcuaciones';
+import { CalculadoraFlotante as CalculadoraCasio } from './calculadora/CalculadoraInteractiva';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -94,7 +97,10 @@ export const DEFAULT_CONFIG = {
     conEnunciados: false,
     numPantallas: 1,   // 1 | 2 | 3
     numAlumnos: 1,     // 1 = sin etiquetas, >1 = cicla por alumnos
+    // Ecuaciones avanzadas y problemas (src/ecuaciones/ecuacionesAvanzadas.js)
+    ...Object.fromEntries(CLAVES_AVANZADAS.map(k => [k, false])),
 };
+const SIN_AVANZADAS = Object.fromEntries(CLAVES_AVANZADAS.map(k => [k, false]));
 
 // Modos predefinidos (equivalentes a los originales) + Personalizado
 const MODOS_PRESET = [
@@ -130,6 +136,24 @@ const MODOS_PRESET = [
                segundoGrado: false, conDenominadores: false, conParentesis: false, conEnunciados: true }
     },
     {
+        id: 'ADVANCED', panel: true, icon: '🧩', label: 'Avanzadas', desc: 'Elige: bicuadradas, racionales, raíces, producto = 0…', color: '#16a085',
+        cfg: { tiempo: 600, minNum: 1, maxNum: 10, primerGrado: false, soloBasico: false,
+               segundoGrado: false, conDenominadores: false, conParentesis: false, conEnunciados: false,
+               ...SIN_AVANZADAS, bicuadradas: true, racionales: true, radicales: true, factorizadas: true }
+    },
+    {
+        id: 'EXPLOGTRIG', panel: true, icon: '📈', label: 'Exp · Log · Trig', desc: 'Exponenciales, logarítmicas y trigonométricas', color: '#c0392b',
+        cfg: { tiempo: 600, minNum: 1, maxNum: 10, primerGrado: false, soloBasico: false,
+               segundoGrado: false, conDenominadores: false, conParentesis: false, conEnunciados: false,
+               ...SIN_AVANZADAS, exponenciales: true, logaritmicas: true, trigonometricas: true }
+    },
+    {
+        id: 'PROBLEMS', panel: true, icon: '📖', label: 'Problemas', desc: '1.er grado, áreas (2.º grado) y prop. inversa', color: '#e67e22',
+        cfg: { tiempo: 600, minNum: 1, maxNum: 10, primerGrado: false, soloBasico: false,
+               segundoGrado: false, conDenominadores: false, conParentesis: false, conEnunciados: false,
+               ...SIN_AVANZADAS, probPrimer: true, probAreas: true, probInversa: true }
+    },
+    {
         id: 'CUSTOM', icon: '⚙️', label: 'Personalizado', desc: 'Elige el tipo, dificultad y tiempo', color: '#8e44ad',
         cfg: null
     },
@@ -147,6 +171,7 @@ export const resumenEcuaciones = (c) => {
         !preset && cfg.conParentesis && '( ) Paréntesis',
         !preset && cfg.conDenominadores && '¹⁄ₓ Denominadores',
         !preset && cfg.conEnunciados && '🗣️ Enunciados',
+        ...(!preset ? TIPOS_AVANZADOS.filter(t => cfg[t.key]).map(t => `${t.icon} ${t.label}`) : []),
         !preset && `🔢 ${cfg.minNum}–${cfg.maxNum}`,
         `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
     ].filter(Boolean);
@@ -185,6 +210,7 @@ const generarEcuacion = (cfg, enunciadosBag = null) => {
         opciones.push('CUAD_COMPLETA', 'CUAD_SIN_B', 'CUAD_SIN_C');
     }
     if (conEnunciados) opciones.push('ENUNCIADO');
+    TIPOS_AVANZADOS.forEach(t => { if (cfg[t.key]) opciones.push(t.tipo); });
 
     if (opciones.length === 0) {
         ast.push({ t: 'text', v: 'Activa al menos una opción' });
@@ -192,6 +218,7 @@ const generarEcuacion = (cfg, enunciadosBag = null) => {
     }
 
     tipo = opciones[Math.floor(Math.random() * opciones.length)];
+    if (esTipoAvanzado(tipo)) return generarAvanzada(tipo);
 
     if (tipo === 'BASICA') {
         // Nivel básico: la solución siempre es positiva
@@ -320,6 +347,10 @@ const serializarPregunta = (eq, tiempo, puntosMax, puntosMin) => ({
     correctAnswers: eq.correctAnswers,
     multipleChoice: eq.multipleChoice || null,
     tipo: eq.tipo || 'SIMPLE',
+    ...(eq.tipo === 'MULTI' ? {
+        sub: eq.sub || null, grados: !!eq.grados, descartadas: eq.descartadas || [], pasos: eq.pasos || [],
+        etiqueta: eq.etiqueta || null, unidad: eq.unidad || null, instruccion: eq.instruccion || null,
+    } : {}),
     tiempo, puntosMax, puntosMin,
 });
 
@@ -426,6 +457,21 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
                     </div>
                 </div>
 
+                {/* Ecuaciones avanzadas y problemas */}
+                {[['ecu', 'Ecuaciones avanzadas (3.º-4.º ESO y Bachillerato)'], ['prob', 'Problemas (se resuelven y se escribe el resultado)']].map(([g, titulo]) => (
+                    <div key={g} style={mSt.section}>
+                        <div style={mSt.sTitle}>{titulo}</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {TIPOS_AVANZADOS.filter(t => t.grupo === g).map(t => (
+                                <button key={t.key} onClick={() => set(t.key, !local[t.key])}
+                                    style={{ ...mSt.chip, background: local[t.key] ? t.color : '#f0f0f0', color: local[t.key] ? 'white' : '#555' }}>
+                                    {t.icon} {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+
                 {/* Pantallas / Jugadores (no en retos: cada alumno en su dispositivo) */}
                 {!modoReto && (<>
                 <div style={mSt.section}>
@@ -492,6 +538,7 @@ function EcuacionesGameLocal({ onExit }) {
     const [gameState, setGameState] = useState('START');
     const [config, setConfig] = useState(() => reto ? { ...DEFAULT_CONFIG, ...reto.config, numPantallas: 1, numAlumnos: 1 } : DEFAULT_CONFIG);
     const [showConfig, setShowConfig] = useState(false);
+    const [panelAvz, setPanelAvz] = useState(null); // { sel: [claves], tiempo, numAlumnos } — panel «Avanzadas»
     const [timeLeft, setTimeLeft] = useState(DEFAULT_CONFIG.tiempo);
     const [score, setScore] = useState(0);
     const [aciertos, setAciertos] = useState(0);
@@ -515,6 +562,7 @@ function EcuacionesGameLocal({ onExit }) {
         primerGrado: true, conParentesis: false, conDenominadores: false,
         segundoGrado: false, conEnunciados: false,
         minNum: 1, maxNum: 10,
+        ...SIN_AVANZADAS,
     });
     const [internalHostRoom, setInternalHostRoom] = useState(null);
     const [internalClientRoom, setInternalClientRoom] = useState(null);
@@ -619,6 +667,7 @@ function EcuacionesGameLocal({ onExit }) {
 
     const esMultipleChoice = currentEq?.multipleChoice !== null && currentEq?.multipleChoice !== undefined;
     const esCuadratica = currentEq?.tipo === 'CUADRATICA';
+    const esMulti = currentEq?.tipo === 'MULTI';
     // Lienzo siempre disponible en todos los modos
 
     const comprobarSolucion = (respTexto = null) => {
@@ -627,6 +676,8 @@ function EcuacionesGameLocal({ onExit }) {
         let isCorrect = false;
         if (esMultipleChoice) {
             isCorrect = respTexto === currentEq.correctAnswers[0];
+        } else if (esMulti) {
+            isCorrect = comprobarMulti(currentEq, ans1);
         } else if (esCuadratica) {
             const v1 = parseFloat(ans1), v2 = parseFloat(ans2);
             const [r1, r2] = currentEq.correctAnswers;
@@ -671,6 +722,7 @@ function EcuacionesGameLocal({ onExit }) {
                 conParentesis: liveConfig.conParentesis, conDenominadores: liveConfig.conDenominadores,
                 conEnunciados: liveConfig.conEnunciados, soloBasico: false, forceExperto: false,
                 minNum: liveConfig.minNum, maxNum: liveConfig.maxNum,
+                ...Object.fromEntries(CLAVES_AVANZADAS.map(k => [k, !!liveConfig[k]])),
             };
             const preguntas = Array.from({ length: liveConfig.numPreguntas }, () =>
                 serializarPregunta(generarEcuacion(cfgEq), liveConfig.tiempoPregunta, liveConfig.puntosMax, liveConfig.puntosMin)
@@ -711,18 +763,14 @@ function EcuacionesGameLocal({ onExit }) {
         : 'transparent';
 
     // Fracción renderizada con CSS
-    const Fraction = ({ num, den }) => (
-        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', verticalAlign: 'middle', margin: '0 6px', fontSize: '1.2rem', color: '#2c3e50', fontWeight: 'bold' }}>
-            <span style={{ borderBottom: '3px solid #2c3e50', padding: '0 5px', textAlign: 'center' }}>{num}</span>
-            <span style={{ padding: '0 5px' }}>{den}</span>
-        </span>
-    );
+    const Fraction = FraccionMath;
 
     const renderSolucion = () => {
         if (!currentEq) return null;
         if (esMultipleChoice) {
             return <div style={st.solutionBox}>✅ Era: <b>{currentEq.correctAnswers[0]}</b></div>;
         }
+        if (esMulti) return <SolucionMulti eq={currentEq} />;
         if (esCuadratica) {
             const [r1, r2] = currentEq.correctAnswers;
             return <div style={st.solutionBox}>✅ X₁ = <b>{r1}</b> · X₂ = <b>{r2}</b></div>;
@@ -740,6 +788,7 @@ function EcuacionesGameLocal({ onExit }) {
         }
         if (config.segundoGrado) parts.push('2.º grado');
         if (config.conEnunciados) parts.push('enunciados');
+        TIPOS_AVANZADOS.forEach(t => { if (config[t.key]) parts.push(t.label.toLowerCase()); });
         return parts.join(' · ') || '—';
     };
 
@@ -765,6 +814,19 @@ function EcuacionesGameLocal({ onExit }) {
                 <ConfigModal config={config} onStart={startGame} onClose={() => setShowConfig(false)} />
             )}
 
+            {panelAvz && (
+                <PanelAvanzadas estado={panelAvz} setEstado={setPanelAvz}
+                    onStart={(numPantallas) => {
+                        const cfg = {
+                            ...DEFAULT_CONFIG, primerGrado: false, segundoGrado: false, conParentesis: false, conDenominadores: false, conEnunciados: false,
+                            ...SIN_AVANZADAS, ...Object.fromEntries(panelAvz.sel.map(k => [k, true])),
+                            tiempo: panelAvz.tiempo, numPantallas, numAlumnos: panelAvz.numAlumnos || 1,
+                        };
+                        setPanelAvz(null);
+                        startGame(cfg);
+                    }} />
+            )}
+
             {/* MODAL CONFIG EN VIVO */}
             {showLiveConfig && (
                 <div style={mSt.overlay}>
@@ -781,6 +843,7 @@ function EcuacionesGameLocal({ onExit }) {
                                     { key: 'conDenominadores', label: '¹⁄ₓ Denominadores', color: '#e67e22' },
                                     { key: 'segundoGrado', label: '2.º Grado', color: '#9b59b6' },
                                     { key: 'conEnunciados', label: '🗣️ Enunciados', color: '#34495e' },
+                                    ...TIPOS_AVANZADOS.map(t => ({ key: t.key, label: `${t.icon} ${t.label}`, color: t.color })),
                                 ].map(({ key, label, color }) => (
                                     <button key={key} onClick={() => setLiveConfig(c => ({ ...c, [key]: !c[key] }))}
                                         style={{ ...mSt.chip, background: liveConfig[key] ? color : '#f0f0f0', color: liveConfig[key] ? 'white' : '#555' }}>
@@ -879,12 +942,12 @@ function EcuacionesGameLocal({ onExit }) {
                     <Calculator size={55} color="#3498db" style={{ marginBottom: 12 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.4rem', margin: '8px 0' }}>Maestro de Ecuaciones</h1>
                     <p style={{ color: '#666', marginBottom: 20, fontSize: '1rem', lineHeight: 1.5 }}>
-                        Despeja la X antes de que se acabe el tiempo. ¡Todas las soluciones son números enteros!
+                        Despeja la X antes de que se acabe el tiempo: desde ecuaciones sencillas hasta bicuadradas, racionales, con raíces, exponenciales, logarítmicas, trigonométricas y problemas.
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                         {MODOS_PRESET.map(m => (
                             <button key={m.id}
-                                onClick={() => m.cfg ? startGame(m.cfg) : setShowConfig(true)}
+                                onClick={() => m.panel ? setPanelAvz({ sel: CLAVES_AVANZADAS.filter(k => m.cfg[k]), tiempo: m.cfg.tiempo, numAlumnos: 1 }) : m.cfg ? startGame(m.cfg) : setShowConfig(true)}
                                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
                                     background: 'white', border: `2px solid ${m.color}`, borderRadius: 14,
                                     cursor: 'pointer', textAlign: 'left', transition: 'transform 0.15s',
@@ -973,6 +1036,7 @@ function EcuacionesGameLocal({ onExit }) {
                     {/* Ecuación */}
                     <div style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 'bold', color: '#2c3e50', marginBottom: 24, minHeight: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
                         {currentEq.ast.map((el, i) => {
+                            if (esElementoAvanzado(el)) return <ElementoAvanzado key={i} el={el} />;
                             if (el.t === 'text') return <span key={i} style={{ whiteSpace: 'pre-wrap' }}>{el.v}</span>;
                             if (el.t === 'frac') return <Fraction key={i} num={el.n} den={el.d} />;
                             if (el.t === 'enunciado') return (
@@ -1006,6 +1070,9 @@ function EcuacionesGameLocal({ onExit }) {
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                                {esMulti ? (
+                                    <EntradaSoluciones key={questionKey} eq={currentEq} value={ans1} onChange={setAns1} onSubmit={() => comprobarSolucion()} compacto={isMobile} />
+                                ) : (
                                 <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#3498db' }}>
@@ -1024,6 +1091,7 @@ function EcuacionesGameLocal({ onExit }) {
                                         </div>
                                     )}
                                 </div>
+                                )}
 
                                 <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 380 }}>
                                     <button onClick={handleSkip} style={st.btnSkip}>
@@ -1281,16 +1349,12 @@ function EcuacionesLiveHost({ codigoSala, onExit, usuario }) {
     const ranking = [...jugadores].sort((a, b) => (b.puntos || 0) - (a.puntos || 0));
     const isMobile = window.innerWidth <= 600;
 
-    const Fraction = ({ num, den }) => (
-        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', verticalAlign: 'middle', margin: '0 4px', fontSize: '1.1rem', color: '#2c3e50', fontWeight: 'bold' }}>
-            <span style={{ borderBottom: '2px solid #2c3e50', padding: '0 4px' }}>{num}</span>
-            <span style={{ padding: '0 4px' }}>{den}</span>
-        </span>
-    );
+    const Fraction = FraccionMath;
 
     const renderEcHost = (p) => {
         if (!p?.ast) return null;
         return p.ast.map((el, i) => {
+            if (esElementoAvanzado(el)) return <ElementoAvanzado key={i} el={el} />;
             if (el.t === 'text') return <span key={i} style={{ whiteSpace: 'pre-wrap' }}>{el.v}</span>;
             if (el.t === 'frac') return <Fraction key={i} num={el.n} den={el.d} />;
             if (el.t === 'enunciado') return (
@@ -1371,6 +1435,8 @@ function EcuacionesLiveHost({ codigoSala, onExit, usuario }) {
                                 <div style={{ fontSize: '0.85rem', color: '#aaa', marginBottom: 6 }}>SOLUCIÓN</div>
                                 {preguntaActual.multipleChoice ? (
                                     <div style={{ fontSize: '1.2rem', color: '#2ecc71', fontWeight: 'bold' }}>{preguntaActual.correctAnswers[0]}</div>
+                                ) : preguntaActual.tipo === 'MULTI' ? (
+                                    <SolucionMulti eq={preguntaActual} oscuro pasosAbiertos={false} />
                                 ) : preguntaActual.tipo === 'CUADRATICA' ? (
                                     <div style={{ fontSize: '1.2rem', color: '#2ecc71', fontWeight: 'bold' }}>X₁={preguntaActual.correctAnswers[0]} · X₂={preguntaActual.correctAnswers[1]}</div>
                                 ) : (
@@ -1590,6 +1656,7 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myRe
     // Calcular si la respuesta actual es correcta (sin setState)
     const calcCorrect = (a1, a2) => {
         if (esMultipleChoice) return a1 === pregunta.correctAnswers[0];
+        if (pregunta.tipo === 'MULTI') return comprobarMulti(pregunta, a1);
         if (esCuadratica) {
             const v1 = parseFloat(a1), v2 = parseFloat(a2);
             const [r1, r2] = pregunta.correctAnswers;
@@ -1641,12 +1708,7 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myRe
         onResponder(calcCorrect(a1, a2));
     };
 
-    const Fraction = ({ num, den }) => (
-        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', verticalAlign: 'middle', margin: '0 4px', fontSize: '1.2rem', color: 'white', fontWeight: 'bold' }}>
-            <span style={{ borderBottom: '2px solid white', padding: '0 4px' }}>{num}</span>
-            <span style={{ padding: '0 4px' }}>{den}</span>
-        </span>
-    );
+    const Fraction = FraccionMath;
 
     const barColor = isLate ? '#e74c3c' : '#f1c40f';
 
@@ -1664,6 +1726,7 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myRe
                     <div style={{ color: '#aaa', fontSize: '1rem' }}>
                         Respuesta correcta: <b style={{ color: 'white' }}>
                             {pregunta.multipleChoice ? pregunta.correctAnswers[0]
+                             : pregunta.tipo === 'MULTI' ? textoSoluciones(pregunta)
                              : esCuadratica ? `X₁=${pregunta.correctAnswers[0]}, X₂=${pregunta.correctAnswers[1]}`
                              : `X = ${pregunta.correctAnswers[0]}`}
                         </b>
@@ -1695,6 +1758,7 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myRe
             {/* Ecuación */}
             <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 16, padding: '20px 16px', marginBottom: 20, fontSize: '1.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 4, minHeight: 70, border: '1px solid rgba(255,255,255,0.1)' }}>
                 {pregunta.ast.map((el, i) => {
+                    if (esElementoAvanzado(el)) return <ElementoAvanzado key={i} el={el} />;
                     if (el.t === 'text') return <span key={i} style={{ whiteSpace: 'pre-wrap' }}>{el.v}</span>;
                     if (el.t === 'frac') return <Fraction key={i} num={el.n} den={el.d} />;
                     if (el.t === 'enunciado') return (
@@ -1715,6 +1779,14 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myRe
                             {opt}
                         </button>
                     ))}
+                </div>
+            ) : pregunta.tipo === 'MULTI' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                    <EntradaSoluciones eq={pregunta} value={ans1} onChange={setAns1} onSubmit={() => enviar()} oscuro color="#f1c40f" />
+                    <button onClick={() => enviar()}
+                        style={{ padding: '14px 40px', background: '#f1c40f', color: '#1a1a2e', border: 'none', borderRadius: 30, fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(241,196,15,0.4)' }}>
+                        ✓ Comprobar
+                    </button>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
@@ -1745,65 +1817,9 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myRe
 }
 
 // ─── MiniCalculadora ──────────────────────────────────────────────────────────
+// Calculadora de ayuda: Casio fx-82MS interactiva (mismo aspecto que «Uso de la calculadora»)
 function MiniCalculadora({ onClose }) {
-    const [display, setDisplay] = useState('0');
-    const [prev, setPrev] = useState(null);
-    const [op, setOp] = useState(null);
-    const [waitNext, setWaitNext] = useState(false);
-
-    const pressNum = (n) => {
-        if (waitNext) { setDisplay(String(n)); setWaitNext(false); }
-        else setDisplay(d => d === '0' ? String(n) : d + n);
-    };
-    const pressDecimal = () => {
-        if (waitNext) { setDisplay('0.'); setWaitNext(false); return; }
-        if (!display.includes('.')) setDisplay(d => d + '.');
-    };
-    const calc = (a, b, o) => { if (o === '+') return a + b; if (o === '-') return a - b; if (o === '×') return a * b; if (o === '÷') return b !== 0 ? a / b : 0; return b; };
-    const pressOp = (o) => {
-        const cur = parseFloat(display);
-        if (prev !== null && !waitNext) {
-            const res = calc(prev, cur, op);
-            setDisplay(String(parseFloat(res.toFixed(8)))); setPrev(parseFloat(res.toFixed(8)));
-        } else { setPrev(cur); }
-        setOp(o); setWaitNext(true);
-    };
-    const pressEqual = () => {
-        if (op === null || prev === null) return;
-        const res = calc(prev, parseFloat(display), op);
-        setDisplay(String(parseFloat(res.toFixed(8)))); setPrev(null); setOp(null); setWaitNext(true);
-    };
-    const pressClear = () => { setDisplay('0'); setPrev(null); setOp(null); setWaitNext(false); };
-    const pressSqrt = () => { setDisplay(d => String(parseFloat(Math.sqrt(parseFloat(d)).toFixed(8)))); setWaitNext(true); };
-    const pressSq = () => { const v = parseFloat(display); setDisplay(String(parseFloat((v * v).toFixed(8)))); setWaitNext(true); };
-
-    const btn = (label, onClick, bg = '#f0f0f0', col = '#333') => (
-        <button key={label} onClick={onClick} style={{ padding: '10px 0', background: bg, color: col, border: '1px solid #ddd', borderRadius: 8, fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', touchAction: 'manipulation' }}>{label}</button>
-    );
-
-    return (
-        <div style={{ background: '#1a1a2e', borderRadius: 16, padding: 14, marginBottom: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
-            <button onClick={onClose} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
-            <div style={{ background: '#0d0d1f', color: '#f1c40f', fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'right', padding: '10px 12px', borderRadius: 10, marginBottom: 10, minHeight: 48, wordBreak: 'break-all' }}>
-                {op && <span style={{ fontSize: '0.75rem', color: '#888', marginRight: 8 }}>{prev} {op}</span>}
-                {display}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                {btn('C', pressClear, '#e74c3c', 'white')}
-                {btn('√', pressSqrt, '#3498db', 'white')}
-                {btn('x²', pressSq, '#3498db', 'white')}
-                {btn('÷', () => pressOp('÷'), '#f39c12', 'white')}
-                {btn('7', () => pressNum('7'))}{btn('8', () => pressNum('8'))}{btn('9', () => pressNum('9'))}
-                {btn('×', () => pressOp('×'), '#f39c12', 'white')}
-                {btn('4', () => pressNum('4'))}{btn('5', () => pressNum('5'))}{btn('6', () => pressNum('6'))}
-                {btn('-', () => pressOp('-'), '#f39c12', 'white')}
-                {btn('1', () => pressNum('1'))}{btn('2', () => pressNum('2'))}{btn('3', () => pressNum('3'))}
-                {btn('+', () => pressOp('+'), '#f39c12', 'white')}
-                {btn('0', () => pressNum('0'))}{btn('.', pressDecimal)}{btn('±', () => setDisplay(d => String(-parseFloat(d))))}
-                {btn('=', pressEqual, '#2ecc71', 'white')}
-            </div>
-        </div>
-    );
+    return <CalculadoraCasio onClose={onClose} />;
 }
 
 // ─── DrawingCanvas ─────────────────────────────────────────────────────────────
@@ -1926,6 +1942,77 @@ function VirtualKeypad({ value, onChange, onConfirm, color = '#27ae60', label = 
     );
 }
 
+// ─── Panel «Avanzadas»: elegir los tipos y jugar en 1, 2 o 3 pantallas ───────
+function PanelAvanzadas({ estado, setEstado, onStart }) {
+    const { sel, tiempo, numAlumnos = 1 } = estado;
+    const toggle = (k) => setEstado(e => ({ ...e, sel: e.sel.includes(k) ? e.sel.filter(x => x !== k) : [...e.sel, k] }));
+    const grupo = (g) => TIPOS_AVANZADOS.filter(t => t.grupo === g);
+    const todos = (g, on) => setEstado(e => ({ ...e, sel: on ? [...new Set([...e.sel, ...grupo(g).map(t => t.key)])] : e.sel.filter(k => !grupo(g).some(t => t.key === k)) }));
+    const vacio = sel.length === 0;
+    const btnModo = (bg) => ({ flex: 1, minWidth: 130, padding: '12px 10px', background: vacio ? '#bdc3c7' : bg, color: 'white', border: 'none', borderRadius: 14, fontWeight: 'bold', fontSize: '0.95rem', cursor: vacio ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 });
+    return (
+        <div style={mSt.overlay} onClick={() => setEstado(null)}>
+            <div style={{ ...mSt.modal, maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <h2 style={mSt.title}>🧩 Ecuaciones avanzadas y problemas</h2>
+                {[['ecu', 'Tipos de ecuación'], ['prob', 'Problemas']].map(([g, titulo]) => (
+                    <div key={g} style={mSt.section}>
+                        <div style={{ ...mSt.sTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>{titulo}</span>
+                            <span style={{ textTransform: 'none', fontWeight: 'normal' }}>
+                                <button onClick={() => todos(g, true)} style={{ background: 'none', border: 'none', color: '#2980b9', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem' }}>Todos</button>
+                                <button onClick={() => todos(g, false)} style={{ background: 'none', border: 'none', color: '#95a5a6', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem' }}>Ninguno</button>
+                            </span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+                            {grupo(g).map(t => {
+                                const on = sel.includes(t.key);
+                                return (
+                                    <button key={t.key} onClick={() => toggle(t.key)}
+                                        style={{ padding: '10px 10px', borderRadius: 12, border: `2px solid ${t.color}`, background: on ? t.color : 'white', color: on ? 'white' : t.color, fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ fontSize: '1.1rem', minWidth: 26, textAlign: 'center' }}>{on ? '✔' : t.icon}</span>
+                                        <span>{t.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+                <div style={mSt.section}>
+                    <div style={mSt.sTitle}>Tiempo de juego</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {[180, 300, 600, 900].map(t => (
+                            <button key={t} onClick={() => setEstado(e => ({ ...e, tiempo: t }))}
+                                style={{ ...mSt.chip, background: tiempo === t ? '#3498db' : '#f0f0f0', color: tiempo === t ? 'white' : '#555' }}>
+                                {t / 60} min
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div style={mSt.section}>
+                    <div style={mSt.sTitle}>Alumnos por turnos <span style={{ color: '#aaa', fontWeight: 'normal', textTransform: 'none' }}>(opcional)</span></div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {[1, 2, 3, 4, 5, 6].map(nA => (
+                            <button key={nA} onClick={() => setEstado(e => ({ ...e, numAlumnos: nA }))}
+                                style={{ ...mSt.chip, minWidth: 38, background: numAlumnos === nA ? '#9b59b6' : '#f0f0f0', color: numAlumnos === nA ? 'white' : '#555' }}>
+                                {nA === 1 ? 'Libre' : nA}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                {vacio && <p style={{ textAlign: 'center', color: '#e74c3c', fontSize: '0.85rem', margin: '0 0 10px' }}>Elige al menos un tipo.</p>}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button disabled={vacio} onClick={() => onStart(1)} style={btnModo('#27ae60')}><span style={{ fontSize: '1.3rem' }}>▶</span>Jugar</button>
+                    <button disabled={vacio} onClick={() => onStart(2)} style={btnModo('#3498db')}><span style={{ fontSize: '1.3rem' }}>👥</span>Modo dual</button>
+                    <button disabled={vacio} onClick={() => onStart(3)} style={btnModo('#e67e22')}><span style={{ fontSize: '1.3rem' }}>👨‍👩‍👦</span>3 pantallas</button>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: 14 }}>
+                    <button onClick={() => setEstado(null)} style={mSt.btnSec}>Cancelar</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, playSound }) {
     const makeState = () => {
         const eq = generarEcuacion(config);
@@ -1992,6 +2079,7 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
         const esMC = side.eq.multipleChoice != null;
         let ok = false;
         if (esMC)        ok = side.ans1 === side.eq.correctAnswers[0];
+        else if (side.eq.tipo === 'MULTI') ok = comprobarMulti(side.eq, side.ans1);
         else if (esCuad) { const v1=parseFloat(side.ans1),v2=parseFloat(side.ans2); const [r1,r2]=side.eq.correctAnswers; ok=(v1===r1&&v2===r2)||(v1===r2&&v2===r1)||(r1===r2&&(v1===r1||v2===r1)); }
         else             ok = parseFloat(side.ans1) === side.eq.correctAnswers[0];
 
@@ -2025,14 +2113,10 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
         setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, [field]: val }));
     };
 
-    const Fraction = ({ num, den }) => (
-        <span style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', verticalAlign:'middle', margin:'0 4px', fontSize:'1.1rem', color:'#2c3e50', fontWeight:'bold' }}>
-            <span style={{ borderBottom:'2px solid #2c3e50', padding:'0 3px' }}>{num}</span>
-            <span style={{ padding:'0 3px' }}>{den}</span>
-        </span>
-    );
+    const Fraction = FraccionMath;
 
     const renderEq = (eq) => eq?.ast?.map((el, i) => {
+        if (esElementoAvanzado(el)) return <ElementoAvanzado key={i} el={el} />;
         if (el.t === 'text') return <span key={i} style={{ whiteSpace:'pre-wrap' }}>{el.v}</span>;
         if (el.t === 'frac') return <Fraction key={i} num={el.n} den={el.d} />;
         if (el.t === 'enunciado') return <div key={i} style={{ fontSize:'0.85rem', lineHeight:1.4, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, borderLeft:'4px solid #34495e', textAlign:'left', width:'100%' }}>{el.v}</div>;
@@ -2090,7 +2174,8 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                         </div>
                     )}
                 </div>
-                {side.showSol && (
+                {side.showSol && side.eq?.tipo === 'MULTI' && <SolucionMulti eq={side.eq} compacto pasosAbiertos={false} />}
+                {side.showSol && side.eq?.tipo !== 'MULTI' && (
                     <div style={{ background:'#e8f8f0', border:'2px solid #27ae60', borderRadius:10, padding:'7px 12px', fontSize:'0.95rem', textAlign:'center' }}>
                         {esMC ? `✅ ${side.eq.correctAnswers[0]}` : esCuad ? `✅ X₁=${side.eq.correctAnswers[0]} X₂=${side.eq.correctAnswers[1]}` : `✅ X = ${side.eq.correctAnswers[0]}`}
                     </div>
@@ -2107,6 +2192,10 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                         </div>
                     ) : (
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, width:'100%' }}>
+                            {side.eq?.tipo === 'MULTI' ? (
+                                <EntradaSoluciones eq={side.eq} value={side.ans1} onChange={v => setAns(idx, 'ans1', v)}
+                                    onSubmit={() => comprobarPanel(idx)} soloTeclado compacto conBotonComprobar color={color} autoFocus={false} />
+                            ) : (<>
                             <VirtualKeypad
                                 value={side.ans1}
                                 onChange={v => setAns(idx, 'ans1', v)}
@@ -2123,6 +2212,7 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                                     label="X₂="
                                 />
                             )}
+                            </>)}
                             <button onClick={() => skipPanel(idx)}
                                 style={{ width:'100%', padding:'7px', background:'#f39c12', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.8rem' }}>
                                 ⏭ Pasar
@@ -2161,7 +2251,7 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
             <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
                 {Array.from({ length: numPantallas }, (_, i) => (
                     <React.Fragment key={i}>
-                        <Panel idx={i} />
+                        {Panel({ idx: i })}
                         {i < numPantallas - 1 && <div style={{ width:3, background:'#eee', alignSelf:'stretch', borderRadius:4, flexShrink:0 }}/>}
                     </React.Fragment>
                 ))}

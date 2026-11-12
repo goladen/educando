@@ -113,7 +113,7 @@ function FichasImpresas({ fichas, cargando, onAbrir, onOlvidar }) {
 }
 
 export default function MenuArcade({
-  config, setConfig, maxJugadores, apiMatesRef, onJugar, onRapida, onSalir, error, ctrlMandos, onPdf, maxPreguntasPdf,
+  config, setConfig, maxJugadores, pantallaJusta = false, apiMatesRef, onJugar, onRapida, onSalir, error, ctrlMandos, onPdf, maxPreguntasPdf,
   fichas = [], cargandoFicha = false, onAbrirFicha, onQuitarFicha, onOlvidarFicha,
 }) {
   const [buscando, setBuscando] = useState(false);
@@ -272,8 +272,11 @@ export default function MenuArcade({
             ))}
             {maxJugadores < 4 && (
               <span className="font-pixel text-lg text-slate-500">
-                {maxJugadores === 1 ? 'En el móvil se juega de 1 en 1.' : 'Hasta 4 jugadores en un PC grande o pizarra digital.'}
+                {maxJugadores === 1 ? 'En el móvil se juega de 1 en 1.' : 'Hasta 4 jugadores en un ordenador, pizarra o proyector.'}
               </span>
+            )}
+            {maxJugadores === 4 && pantallaJusta && n >= 3 && (
+              <span className="font-pixel text-lg text-amber-300">Pantalla justa: pon el navegador a pantalla completa (F11) para que cada zona se vea más grande.</span>
             )}
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

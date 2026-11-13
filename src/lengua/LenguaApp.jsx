@@ -5,7 +5,7 @@
 //  Práctica (10 preguntas + envío al profe), Contrarreloj o
 //  Competición por equipos (tirón de cuerda).
 // ═══════════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import SintaxisGame from '../SintaxisGamen2';
@@ -16,6 +16,7 @@ import { guardarRegistroLocal } from '../utils/registrosLocales';
 import { sonidoCorrecto, sonidoIncorrecto, sonidoFinal, despertarAudio, sonidoActivo, setSonidoActivo } from '../utils/sonidosFeedback';
 import { TEMAS, temaPorId, configPorDefecto, resumenConfig, barajar, CAMPOS } from './ejercicios';
 import BotonFichas from '../components/BotonFichas';
+const PatioJuegos = lazy(() => import('../patio/PatioJuegos'));
 
 const PRACTICA_N = 10;
 const PRACTICA_N_EMPAREJAR = 4;
@@ -60,19 +61,23 @@ export default function LenguaApp({ onExit, usuario, recurso, isHost, codigoSala
     const [directoSintaxis] = useState(() => !!(recurso || isHost || codigoSala || leerRetoUrl()));
     const [temaId, setTemaId] = useState(temaInicial);
     const [ej, setEj] = useState(null);
+    const [patio, setPatio] = useState(false);
     const salir = () => (typeof onExit === 'function' ? onExit() : window.location.assign('/'));
 
     if (directoSintaxis) return <SintaxisGame onExit={onExit} usuario={usuario} recurso={recurso} isHost={isHost} codigoSala={codigoSala} />;
     if (temaId === 'SINTAXIS') return <SintaxisGame onExit={() => setTemaId(null)} usuario={usuario} />;
 
+    // Patio de Juegos de Primaria (juegos de lengua por curso para la pizarra)
+    if (patio) return <Suspense fallback={<div style={S.pagina} />}><PatioJuegos materiaInicial="lengua" onExit={() => setPatio(false)} /></Suspense>;
+
     const tema = temaPorId(temaId);
     if (tema && ej) return <PantallaEjercicio tema={tema} ej={ej} onVolver={() => setEj(null)} />;
     if (tema) return <PantallaTema tema={tema} onElegir={setEj} onVolver={() => setTemaId(null)} />;
-    return <PantallaInicio onElegir={setTemaId} onSalir={salir} />;
+    return <PantallaInicio onElegir={setTemaId} onSalir={salir} onPatio={() => setPatio(true)} />;
 }
 
 // ── Inicio: los 4 temas ─────────────────────────────────────────────
-function PantallaInicio({ onElegir, onSalir }) {
+function PantallaInicio({ onElegir, onSalir, onPatio }) {
     return (
         <div style={S.pagina}>
             <Barra titulo="📖 Lengua" onVolver={onSalir} textoVolver="← Salir" />
@@ -93,6 +98,19 @@ function PantallaInicio({ onElegir, onSalir }) {
                         </button>
                     ))}
                 </div>
+
+                {/* Patio de Juegos: juegos de lengua de Primaria por curso */}
+                <button onClick={onPatio}
+                    style={{ marginTop: 18, width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', borderRadius: 20, border: '3px solid #2b1d4e', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', background: 'linear-gradient(180deg,#7dd3fc 0%,#bae6fd 72%,#4ade80 72%,#22c55e 100%)', boxShadow: '0 6px 0 #15803d', transition: 'transform .15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}>
+                    <div style={{ fontSize: '2.8rem' }}>🛝</div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 900, fontSize: '1.35rem', color: '#ffd60a', WebkitTextStroke: '1px #2b1d4e', textShadow: '0 2px 0 #2b1d4e' }}>Patio de Juegos · Primaria</div>
+                        <div style={{ fontSize: '0.9rem', color: '#2b1d4e', fontWeight: 700, lineHeight: 1.4 }}>Sílabas, letras dudosas, tildes, clases de palabras y sinónimos de 1º a 6º. Para jugar solo, en carrera en la pizarra o con toda la clase, y con fichas en PDF.</div>
+                    </div>
+                    <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#2b1d4e' }}>▶</div>
+                </button>
 
                 {/* Fichas imprimibles de Lengua (para el profesor) */}
                 <div style={{ marginTop: 18, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>

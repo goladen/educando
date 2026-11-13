@@ -34,7 +34,7 @@ export default function ModalPdf({ maxPreguntas = null, vinculada = false, onGen
         <p className="rounded-md border-2 border-fuchsia-400/60 bg-fuchsia-500/10 px-3 py-2 font-pixel text-xl leading-tight text-fuchsia-100">
           {vinculada
             ? `🔗 La partida ya está vinculada a una ficha: se vuelve a imprimir la misma (${maxPreguntas} preguntas, mismo QR).`
-            : '🔗 La ficha queda VINCULADA al juego: al jugar (aquí o escaneando su QR en cualquier ordenador) salen las mismas preguntas en el mismo orden.'}
+            : '🔗 La ficha queda VINCULADA al juego: al jugar (aquí, escaneando su QR o escribiendo su CÓDIGO en el buscador de códigos de pikt.es, en cualquier dispositivo) salen las mismas preguntas en el mismo orden.'}
         </p>
 
         {!vinculada && <div className="flex flex-col gap-2">

@@ -12,6 +12,8 @@
 //  Elementos del ast nuevos: {t:'m', v} (texto con marcado) y {t:'mfrac', n, d}.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { genProblemaCiencias } from './problemasCiencias';
+
 const rInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const rNZ = (a, b) => { let v = 0; while (v === 0) v = rInt(a, b); return v; };
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -1064,6 +1066,8 @@ export const TIPOS_AVANZADOS = [
     { key: 'probPrimer', tipo: 'PROB1', label: 'Problemas de 1.er grado', icon: '📝', color: '#f39c12', grupo: 'prob', gen: genProblema1 },
     { key: 'probAreas', tipo: 'PROB2', label: 'Problemas de áreas (2.º grado)', icon: '📐', color: '#e67e22', grupo: 'prob', gen: genProblemaArea },
     { key: 'probInversa', tipo: 'PROBINV', label: 'Prop. inversa (x en el denominador)', icon: '⚖️', color: '#9b59b6', grupo: 'prob', gen: genProblemaInversa },
+    // Banco en problemasCiencias.js (arrow: se resuelve al llamarlo, evita el ciclo de imports)
+    { key: 'probCiencias', tipo: 'PROBCIEN', label: 'Física y otras materias', icon: '🔬', color: '#0891b2', grupo: 'prob', gen: () => genProblemaCiencias() },
 ];
 export const CLAVES_AVANZADAS = TIPOS_AVANZADOS.map((t) => t.key);
 const POR_TIPO = Object.fromEntries(TIPOS_AVANZADOS.map((t) => [t.tipo, t]));
@@ -1079,7 +1083,7 @@ const uniqTol = (arr) => {
 };
 // Texto con marcado → expresión JavaScript
 export const exprJS = (s) => {
-    let e = String(s).replace(/[−–]/g, '-').replace(/·/g, '*');
+    let e = String(s).replace(/[−–]/g, '-').replace(/·/g, '*').replace(/π/g, '(Math.PI)');
     e = e.replace(/log_\{(\d+)\}\s*\(/g, 'LG($1,').replace(/log_\{(\d+)\}\s+x/g, 'LG($1,x)');
     e = e.replace(/log\s*\(/g, 'LG(10,').replace(/log\s+(x|\d+)/g, 'LG(10,$1)');
     for (const [f, F] of [['sen', 'SEN'], ['cos', 'COS'], ['tg', 'TG']]) {
@@ -1107,6 +1111,7 @@ export const datosGrafica = (eq) => ({
     desc: eq.descartadas || [],
     grados: !!eq.grados,
     prob: String(eq.sub || '').startsWith('PROB'),
+    ...(eq.rango ? { rango: eq.rango } : {}),
 });
 const cacheFn = new Map();
 export const funcionesEcuacion = (g) => {
@@ -1130,6 +1135,7 @@ export const funcionesEcuacion = (g) => {
 };
 // Intervalo de x que conviene dibujar
 export const ventanaX = (g) => {
+    if (g.rango) return g.rango;
     if (g.grados) return [0, 360];
     const pts = [...g.sols, ...g.desc].filter(isFinite);
     let lo = Math.min(...pts, g.prob ? 0 : Infinity), hi = Math.max(...pts, g.prob ? 0 : -Infinity);
@@ -1183,11 +1189,17 @@ export const astAMathRender = (ast) => (ast || [])
     .join('');
 
 // ─── Comprobación de respuestas ──────────────────────────────────────────────
+const SUP_A_TXT = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-' };
 const parseNum = (p) => {
-    const s = p.replace(/\s+/g, '').replace(',', '.');
+    const s = p.replace(/\s+/g, '').replace(',', '.')
+        .replace(/10([⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (m, e) => `10^${e.split('').map((c) => SUP_A_TXT[c]).join('')}`);
     const m = s.match(/^(-?\d*\.?\d+)\/(-?\d*\.?\d+)$/);
     if (m) return parseFloat(m[1]) / parseFloat(m[2]);
     if (/^-?\d*\.?\d+$/.test(s)) return parseFloat(s);
+    // Notación científica: 1e-5 · 2,5·10^-3 · 10^-5 · 10⁻⁵
+    if (/^-?\d*\.?\d+e-?\d+$/i.test(s)) return parseFloat(s);
+    const c = s.match(/^(?:(-?\d*\.?\d+)[·*x×])?10\^\(?(-?\d+)\)?$/i);
+    if (c) return (c[1] !== undefined ? parseFloat(c[1]) : 1) * 10 ** parseInt(c[2], 10);
     return NaN;
 };
 export const parseListaSoluciones = (txt) => {
@@ -1207,12 +1219,26 @@ export const comprobarMulti = (eq, txt) => {
     if (!vals.length || vals.some((v) => !isFinite(v))) return false;
     if (eq.grados) vals = vals.map((v) => ((v % 360) + 360) % 360);
     const u = uniqSort(vals), c = eq.correctAnswers || [];
-    return u.length === c.length && u.every((v, i) => Math.abs(v - c[i]) < 1e-6);
+    // eq.tol: tolerancia absoluta (respuestas redondeadas) · eq.tolRel: relativa (p. ej. 1e-5 mol/L)
+    const tol = (x) => Math.max(1e-6, eq.tol || 0, (eq.tolRel || 0) * Math.abs(x));
+    return u.length === c.length && u.every((v, i) => Math.abs(v - c[i]) <= tol(c[i]));
 };
-export const formatoSolucion = (eq, v) => (eq.grados ? `${num(v)}°` : num(v));
+const SUP_EXP = (n) => String(n).replace('-', '⁻').replace(/\d/g, (d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+export const decimalEs = (v, d = 2) => String(+(+v).toFixed(d)).replace('-', MENOS).replace('.', ',');
+export const formatoSolucion = (eq, v) => {
+    if (eq.cientifica) {
+        const e = Math.floor(Math.log10(Math.abs(v)) + 1e-9), m = v / 10 ** e;
+        return Math.abs(m - 1) < 1e-9 ? `10${SUP_EXP(e)}` : `${decimalEs(m, 3)}·10${SUP_EXP(e)}`;
+    }
+    const t = eq.decimales != null ? decimalEs(v, eq.decimales) : num(v);
+    return eq.grados ? `${t}°` : t;
+};
 export const textoSoluciones = (eq) => {
     const c = eq?.correctAnswers || [];
     if (!c.length) return 'Sin solución';
     const pre = String(eq.sub || '').startsWith('PROB') ? '' : 'x = ';
     return c.map((v) => pre + formatoSolucion(eq, v)).join(' ; ') + (eq.unidad ? ` ${eq.unidad}` : '');
 };
+
+// Piezas que usa el banco de problemas de ciencias (problemasCiencias.js)
+export { P as crearProblema, poli, lin, simplificar };

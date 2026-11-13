@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [
+  { id: 1, text: "Según la Ley de Ohm, si duplicamos el voltaje (V) manteniendo la misma resistencia, la corriente (I)...", options: ["Se reduce a la mitad", "Se duplica", "Se mantiene igual"], correct: 1 },
+  { id: 2, text: "¿Qué representa la resistencia (R) en un circuito eléctrico?", options: ["La fuerza que empuja a los electrones", "La cantidad de energía almacenada", "La oposición al paso de los electrones"], correct: 2 },
+  { id: 3, text: "Si aumentas mucho la resistencia de la bombilla, ¿qué le ocurre al brillo?", options: ["Aumenta, brilla más", "Disminuye, brilla menos", "Parpadea"], correct: 1 },
+  { id: 4, text: "¿Cuál es la unidad de medida de la Intensidad de Corriente?", options: ["Amperios (A)", "Voltios (V)", "Vatios (W)"], correct: 0 },
+  { id: 5, text: "En este circuito, si el voltaje es 0 V, ¿qué ocurre con los electrones?", options: ["Se mueven a velocidad constante", "Se detienen por completo", "Cambian de dirección"], correct: 1 }
+];
+
 const App = () => {
   const [voltage, setVoltage] = useState(12); // Voltios (V)
   const [resistance, setResistance] = useState(10); // Ohmios (Ω)
@@ -39,13 +48,7 @@ const App = () => {
   const bulbGlowRadius = 20 + Math.min(60, (power / maxPower) * 150);
 
   // Preguntas del cuestionario
-  const questions = [
-    { id: 1, text: "Según la Ley de Ohm, si duplicamos el voltaje (V) manteniendo la misma resistencia, la corriente (I)...", options: ["Se reduce a la mitad", "Se duplica", "Se mantiene igual"], correct: 1 },
-    { id: 2, text: "¿Qué representa la resistencia (R) en un circuito eléctrico?", options: ["La fuerza que empuja a los electrones", "La cantidad de energía almacenada", "La oposición al paso de los electrones"], correct: 2 },
-    { id: 3, text: "Si aumentas mucho la resistencia de la bombilla, ¿qué le ocurre al brillo?", options: ["Aumenta, brilla más", "Disminuye, brilla menos", "Parpadea"], correct: 1 },
-    { id: 4, text: "¿Cuál es la unidad de medida de la Intensidad de Corriente?", options: ["Amperios (A)", "Voltios (V)", "Vatios (W)"], correct: 0 },
-    { id: 5, text: "En este circuito, si el voltaje es 0 V, ¿qué ocurre con los electrones?", options: ["Se mueven a velocidad constante", "Se detienen por completo", "Cambian de dirección"], correct: 1 }
-  ];
+  const questions = PREGUNTAS_SIM;
 
   const handleAnswer = (qId, optionIdx) => {
     if (!showResults) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));

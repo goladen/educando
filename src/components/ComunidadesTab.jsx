@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { db, auth } from '../firebase';
 import { descargarPNG, descargarPDF, compartirClassroom, imprimirElemento } from '../utils/exportar';
 import { FONDOS, fondoUrl, fondoBg } from '../utils/fondos';
@@ -18,6 +18,8 @@ import {
     MoreVertical, Pencil, Image as ImageIcon, Download, Printer
 } from 'lucide-react';
 import { EditorAula } from './MapaAula';
+import { onAuthStateChanged } from 'firebase/auth';
+const BancoRecursos = lazy(() => import('../bancoRecursos/BancoRecursos'));
 import { CompeticionesComunidadPanel } from './CompeticionesTab';
 import PanelConversaciones from './MensajesPrivados';
 
@@ -336,6 +338,9 @@ export function EscaparateMiembros({ comunidad, soloSeccion = null }) {
     const [recursos, setRecursos] = useState([]);
     const [paginas, setPaginas]   = useState([]);
     const [cargando, setCargando] = useState(true);
+    // Banco de recursos de los miembros: solo con sesión (no anónima)
+    const [usuarioBanco, setUsuarioBanco] = useState(() => (auth.currentUser && !auth.currentUser.isAnonymous ? auth.currentUser : null));
+    useEffect(() => onAuthStateChanged(auth, u => setUsuarioBanco(u && !u.isAnonymous ? u : null)), []);
 
     useEffect(() => {
         const uids = (comunidad.miembros || []).slice(0, 30);
@@ -393,6 +398,12 @@ export function EscaparateMiembros({ comunidad, soloSeccion = null }) {
                         ))}
                     </div>
                 )}
+                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '2px dashed #dfe6f2' }}>
+                    {/* Sin sesión se ven solo los recursos públicos del banco */}
+                    <Suspense fallback={<div style={st.vacioMini}>Cargando banco de recursos…</div>}>
+                        <BancoRecursos key={usuarioBanco?.uid || 'publico'} usuario={usuarioBanco} comunidad={comunidad} />
+                    </Suspense>
+                </div>
             </>}
         </div>
     );
@@ -3043,7 +3054,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0', flexWrap: 'wrap' }}>
-                {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['profesores', '👤 Profesores'], ['competiciones', '🏆 Competiciones'], ['equipos', '🖥️ Equipos'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
+                {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['profesores', '👤 Profesores'], ['competiciones', '🏆 Competiciones'], ['recursos', '🗂️ Recursos'], ['equipos', '🖥️ Equipos'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
                     <button key={id} onClick={() => setTab(id)} style={{ ...st.tabBtn, color: tab === id ? AZUL : '#7f8c8d', borderBottom: tab === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: tab === id ? 700 : 500 }}>{lbl}</button>
                 ))}
             </div>
@@ -3091,6 +3102,8 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
             {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'competiciones' && <CompeticionesComunidadPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
+            {/* Colección de recursos (juegos) públicos de los miembros + su Banco de recursos */}
+            {tab === 'recursos' && <EscaparateMiembros comunidad={comunidad} soloSeccion="recursos" />}
             {tab === 'equipos' && <GestionEquipos scope="comunidad" id={comunidad.id} esGestor={esCreador} />}
             {tab === 'mensajes' && <PanelMensajes usuario={usuario} comunidad={comunidad} />}
             {tab === 'miembros' && <PanelMiembros usuario={usuario} comunidad={comunidad} onCambio={onCambio} />}

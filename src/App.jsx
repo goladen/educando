@@ -15,6 +15,8 @@ const Orientacion = lazy(() => import('./orientacion/Orientacion'));
 const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
 const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
 const CompeticionPublica = lazy(() => import('./components/CompeticionPublica'));
+const PaginaBanco = lazy(() => import('./bancoRecursos/PaginaBanco'));
+const HojaInteractiva = lazy(() => import('./ecuaciones/HojaInteractiva'));
 const QuienEsQuien = lazy(() => import('./QuienEsQuien'));
 const QuizManos = lazy(() => import('./manos/QuizManos.jsx'));
 const AvatarCuerpo = lazy(() => import('./cuerpo/AvatarCuerpo.jsx'));
@@ -32,6 +34,7 @@ const InvasoresArcade = lazy(() => import('./invasores/InvasoresArcade'));
 const VaniLa = lazy(() => import('./vanila/VaniLa'));
 const Visor3D = lazy(() => import('./Visor3D'));
 const Esculpir3D = lazy(() => import('./Esculpir3D'));
+const ComicCreator = lazy(() => import('./comic/ComicCreator'));
 const VideosInstagram = lazy(() => import('./components/VideosInstagram'));
 const PizarraApp = lazy(() => import('./GestionAula').then(m => ({ default: m.PizarraApp })));
 import PiTutorial from './components/PiTutorial';
@@ -71,6 +74,7 @@ function App() {
     const [deepLinkGame, setDeepLinkGame] = useState(null);
     const [rutaPublica, setRutaPublica] = useState(null);
     const [vqRecurso, setVqRecurso] = useState(null); // ?vq=ID deep link for VTE VideoQuizz
+    const [hojaFqId, setHojaFqId] = useState(null); // ?hojafq=ID hoja interactiva de Física y Química
 
     // ESTADOS PARA UBICACIÓN
     const [pais, setPais] = useState("");
@@ -95,22 +99,9 @@ function App() {
     const [annotationBg,     setAnnotationBg]     = useState(null);
     const [pizarraCaptura,   setPizarraCaptura]   = useState(false);
 
-    const openAnnotation = async () => {
+    // La captura del fondo se hace al recortar la zona (AnnotationOverlay → utils/capturaPantalla)
+    const openAnnotation = () => {
         if (annotationOpen) { setAnnotationOpen(false); setAnnotationBg(null); return; }
-        try {
-            const h2c = (await import('html2canvas')).default;
-            const canvas = await h2c(document.documentElement, {
-                scale: 1, logging: false, allowTaint: false, useCORS: false,
-                imageTimeout: 2000,
-                x: window.scrollX, y: window.scrollY,
-                width: window.innerWidth, height: window.innerHeight,
-                scrollX: -window.scrollX, scrollY: -window.scrollY,
-                windowWidth: window.innerWidth, windowHeight: window.innerHeight,
-            });
-            setAnnotationBg(canvas.toDataURL('image/jpeg', 0.85));
-        } catch (_) {
-            setAnnotationBg(null);
-        }
         setAnnotationOpen(true);
     };
 
@@ -129,6 +120,8 @@ function App() {
       if (trivialR) { setTrivialRecursoId(trivialR); return; }
       const qsc = params.get('c');
       if (qsc) { setQuestionSenderCode(qsc.toUpperCase()); return; }
+      const hojaFq = params.get('hojafq');
+      if (hojaFq) { setHojaFqId(hojaFq); return; }
       const vqId = params.get('vq');
       if (vqId) {
         getDoc(doc(db, 'resources', vqId)).then(snap => {
@@ -157,7 +150,7 @@ function App() {
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
-          || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'piktboard'
+          || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'comic' || slug === 'piktboard'
           || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion') {
         setRutaPublica(slug);
         return;
@@ -167,6 +160,8 @@ function App() {
       // Comunidades públicas (/comunidades, /comunidad/<id>, /comunidad/<id>/curso/<cursoId>)
       if (slug === 'comunidades' || slug === 'comunidad' || slug.startsWith('comunidad/')) { setRutaPublica('comunidades'); return; }
       if (slug === 'competicion' || slug.startsWith('competicion/')) { setRutaPublica('competicion'); return; }
+      // Banco de recursos del profesorado (/banco, /banco/nuevo)
+      if (slug === 'banco' || slug.startsWith('banco/')) { setRutaPublica('banco'); return; }
       const RUTAS_RESERVADAS = new Set([
         'partes_planta',
         'populares','inicio',
@@ -185,10 +180,10 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','invasores','manos','avatar','orientacion',
-        'comunidades','comunidad','competicion',
+        'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','invasores','manos','avatar','orientacion',
+        'comunidades','comunidad','competicion','banco',
         'fisica',
-        'math_world','primaria','feria',
+        'math_world','primaria','feria','patio',
         'arkade',
         // Vistas por materia (pikt.es/<materia>)
         'mates','matematicas','matecas',
@@ -227,8 +222,23 @@ function App() {
     // DETECTAR DEEP LINK AL MONTAR (funciona para todos: registrados, sin registrar, invitados)
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
+        // Código de una ficha PDF (/?fc=FXXXXXX): mismas preguntas y mismo orden que en el papel
+        const codigoFicha = params.get('fc');
+        if (codigoFicha) {
+            import('./utils/fichaCodigo').then(m => m.abrirCodigoFicha(codigoFicha)).then(res => {
+                if (res?.recurso) setDeepLinkGame({ recurso: res.recurso, hoja: 'General', modoInicial: res.modo || null });
+            }).catch(e => { console.error('Ficha por código:', e); alert(e.message || 'No se pudo abrir la ficha.'); });
+            return;
+        }
         const recursoId = params.get('r');
         if (!recursoId) return;
+        // Recurso virtual de PiKT (preguntas de las herramientas): se construye en el navegador
+        if (recursoId.startsWith('pikt--')) {
+            import('./bancoPreguntas/recursosPikt').then(m => m.recursoPiktPorId(recursoId)).then(recurso => {
+                if (recurso) setDeepLinkGame({ recurso, hoja: params.get('h') || 'General', modoInicial: params.get('m') || null });
+            }).catch(e => console.error('Deep link PiKT:', e));
+            return;
+        }
         getDoc(doc(db, 'resources', recursoId)).then(snap => {
             if (snap.exists()) {
                 setDeepLinkGame({
@@ -372,6 +382,7 @@ function App() {
     if (rutaPublica === 'matesmandos') return <><QuizMandos soloMates onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sixseven') return <><SixSeven onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'comic') return <><ComicCreator onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'esculpir') return <><Esculpir3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'visor3d') return <><Visor3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'videos') return <VideosInstagram onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
@@ -388,6 +399,7 @@ function App() {
         const cursoId = parts[2] === 'curso' ? (parts[3] || null) : null;
         return <ComunidadesPublico comunidadId={comId} cursoId={cursoId} onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     }
+    if (rutaPublica === 'banco') return <PaginaBanco usuario={usuario} cargando={cargando} onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'competicion') {
         const parts = window.location.pathname.split('/').filter(Boolean);
         const compId = parts[0] === 'competicion' ? (parts[1] || null) : null;
@@ -421,6 +433,7 @@ function App() {
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;
 
+    if (hojaFqId) return <Suspense fallback={null}><HojaInteractiva hojaId={hojaFqId} onSalir={() => { setHojaFqId(null); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (vqRecurso) return <VideoQuizzApp recursoDirecto={vqRecurso} onBack={() => { setVqRecurso(null); window.history.pushState({}, '', '/'); }} />;
 
     if (cargando && !deepLinkGame) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;

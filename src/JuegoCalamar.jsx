@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { ArrowLeft, Search, Play, Users, Trophy, Volume2, VolumeX, LogOut } from 'lucide-react';
 import { db } from './firebase';
+import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
+import { elegirEncaje } from './components/ConAvisoEncaje';
+import { letraAjustada } from './utils/encajeTexto';
+import { BANCO_LIBRE_CALAMAR as BANCO_LIBRE } from './bancoPreguntas/datos/calamar';
 import {
     collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
@@ -12,6 +16,7 @@ import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import {
     limpiar, barajar, normalizarPregunta, preguntasDeRecurso, esRespuestaCorrecta,
 } from './utils/normalizarPreguntas';
+const barajarAzar = barajar; // PartidaSolo / SalaMandos lo sustituyen por «sin barajar» con ficha PDF
 import {
     MODOS, LETRAS, setModoMandos, escucharMandos, feedbackMando, nuevaPreguntaMandos, simularPulsacion,
 } from './mandos/mandosMicrobit.js';
@@ -59,28 +64,7 @@ export { preguntasDeRecurso, esRespuestaCorrecta };
 // =====================================================================
 //  BANCO LIBRE (para jugar sin recurso del profesor)
 // =====================================================================
-const BANCO_LIBRE = [
-    { pregunta: '¿Cuánto es 7 × 8?', correcta: '56', incorrectas: ['48', '54', '64'] },
-    { pregunta: '¿Cuánto es 144 : 12?', correcta: '12', incorrectas: ['11', '13', '14'] },
-    { pregunta: '¿Cuál es el 25 % de 80?', correcta: '20', incorrectas: ['15', '25', '40'] },
-    { pregunta: 'Raíz cuadrada de 169', correcta: '13', incorrectas: ['12', '14', '17'] },
-    { pregunta: '¿Capital de Portugal?', correcta: 'Lisboa', incorrectas: ['Oporto', 'Madrid', 'Sevilla'] },
-    { pregunta: '¿Capital de Japón?', correcta: 'Tokio', incorrectas: ['Pekín', 'Seúl', 'Bangkok'] },
-    { pregunta: '¿Océano más grande del planeta?', correcta: 'Pacífico', incorrectas: ['Atlántico', 'Índico', 'Ártico'] },
-    { pregunta: '¿Río más largo de la península ibérica?', correcta: 'Tajo', incorrectas: ['Ebro', 'Duero', 'Guadalquivir'] },
-    { pregunta: 'Símbolo químico del oro', correcta: 'Au', incorrectas: ['Ag', 'Or', 'Go'] },
-    { pregunta: 'Fórmula del agua', correcta: 'H₂O', incorrectas: ['CO₂', 'O₂', 'HO₂'] },
-    { pregunta: 'Órgano que bombea la sangre', correcta: 'Corazón', incorrectas: ['Pulmón', 'Hígado', 'Riñón'] },
-    { pregunta: 'Planeta más cercano al Sol', correcta: 'Mercurio', incorrectas: ['Venus', 'Marte', 'Tierra'] },
-    { tipo: 'SIMPLE', pregunta: '"Casa" en inglés', respuesta: 'House' },
-    { tipo: 'SIMPLE', pregunta: 'Pasado simple del verbo "go"', respuesta: 'Went' },
-    { tipo: 'SIMPLE', pregunta: '¿Cuántos huesos tiene un adulto?', respuesta: '206' },
-    { tipo: 'RELLENAR', pregunta: 'Completa la frase', bloques: ['El triángulo equilátero tiene todos sus lados', 'iguales', 'y sus ángulos de 60º.'] },
-    { tipo: 'RELLENAR', pregunta: 'Completa la frase', bloques: ['La', 'fotosíntesis', 'transforma la luz en energía química.'] },
-    { tipo: 'ORDENAR', pregunta: 'Ordena la frase', bloques: ['Yesterday', 'I', 'went', 'to', 'the', 'cinema'] },
-    { tipo: 'ORDENAR', pregunta: 'Ordena de menor a mayor', bloques: ['1/5', '1/3', '1/2', '3/4'] },
-    { tipo: 'ORDENAR', pregunta: 'Ordena los planetas desde el Sol', bloques: ['Mercurio', 'Venus', 'Tierra', 'Marte'] },
-];
+// (BANCO_LIBRE vive en bancoPreguntas/datos/calamar.js: se comparte con las Preguntas de PiKT)
 
 // =====================================================================
 //  SONIDO (Web Audio, sin archivos)
@@ -663,7 +647,7 @@ function PanelPregunta({ pregunta, luz, deshabilitado, onResponder }) {
 
             <div style={{
                 color: 'white', fontWeight: 800, textAlign: 'center', marginBottom: 12,
-                fontSize: 'clamp(1.05rem, 3.2vw, 1.6rem)', lineHeight: 1.25,
+                fontSize: letraAjustada('clamp(1.05rem, 3.2vw, 1.6rem)', pregunta.enunciado, 120, 0.65), lineHeight: 1.25,
             }}>
                 {pregunta.enunciado}
             </div>
@@ -671,7 +655,7 @@ function PanelPregunta({ pregunta, luz, deshabilitado, onResponder }) {
             {pregunta.tipo === 'MULTIPLE' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10, maxWidth: 900, margin: '0 auto' }}>
                     {pregunta.opciones.map((o, i) => (
-                        <button key={i} style={btnBase} onClick={() => enviar(o)}>{o}</button>
+                        <button key={i} style={{ ...btnBase, fontSize: letraAjustada('clamp(0.95rem, 2.4vw, 1.15rem)', o, 40, 0.7) }} onClick={() => enviar(o)}>{o}</button>
                     ))}
                 </div>
             )}
@@ -839,7 +823,9 @@ function useCicloLuz({ activo, dificultad, audio, sonido, onCambio }) {
 // =====================================================================
 //  PARTIDA INDIVIDUAL
 // =====================================================================
-function PartidaSolo({ preguntas, titulo, meta, dificultad, nombre, usuario, onSalir, onReiniciar }) {
+function PartidaSolo({ preguntas, titulo, meta, dificultad, nombre, usuario, onSalir, onReiniciar, ordenFijo = false }) {
+    // ordenFijo: ficha PDF con código (?fc=) → las preguntas en el orden del papel
+    const barajar = ordenFijo ? (l) => [...(l || [])] : barajarAzar;
     const audioRef = useRef(null);
     if (!audioRef.current) audioRef.current = crearAudio();
     const audio = audioRef.current;
@@ -1376,7 +1362,8 @@ const ETIQUETA_RONDA = {
     ROJA: { txt: '🔴 LUZ ROJA · ¡QUIETOS!', bg: 'linear-gradient(135deg,#e03131,#8d1111)' },
 };
 
-function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
+function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir, ordenFijo = false }) {
+    const barajar = ordenFijo ? (l) => [...(l || [])] : barajarAzar;
     const audioRef = useRef(null);
     if (!audioRef.current) audioRef.current = crearAudio();
     const audio = audioRef.current;
@@ -1960,7 +1947,8 @@ function BuscadorRecursos({ onBack, onPick }) {
         (async () => {
             try {
                 const snap = await getDocs(query(collection(db, 'resources'), where('isPrivate', '==', false)));
-                const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                // Recursos de los profes + preguntas de PiKT por etapa y materia (detrás)
+                const docs = await conRecursosPikt(snap.docs.map(d => ({ ...d.data(), id: d.id })), 'CAZABURBUJAS', {}, { rellenar: true });
                 const jugables = docs
                     .map(r => ({ r, n: preguntasDeRecurso(r).length }))
                     .filter(x => x.n > 0)
@@ -2027,6 +2015,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
     const [codigoEntrada, setCodigoEntrada] = useState(String(codigoSala || '').toUpperCase());
     const [errorUnir, setErrorUnir] = useState('');
     const [semilla, setSemilla] = useState(0);   // fuerza reinicio de la partida
+    const [ordenFijo, setOrdenFijo] = useState(false); // ficha PDF con código: sin barajar
 
     const fuente = useRef({ preguntas: [], titulo: 'Modo libre' });
 
@@ -2036,7 +2025,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
             return false;
         }
         fuente.current = { preguntas: lista, titulo: tit };
-        setPreguntas(lista); setTitulo(tit);
+        setPreguntas(lista); setTitulo(tit); setOrdenFijo(false);
         return true;
     }, []);
 
@@ -2044,7 +2033,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
     useEffect(() => {
         if (!autoStart || !recurso) return;
         const lista = preguntasDeRecurso(recurso);
-        if (lista.length) { preparar(lista, recurso.titulo || 'Recurso'); setPantalla('CONFIG'); }
+        if (lista.length) { preparar(lista, recurso.titulo || 'Recurso'); setOrdenFijo(!!recurso.ordenFicha); setPantalla('CONFIG'); }
     }, [autoStart, recurso, preparar]);
 
     const salirAlMenu = () => { setPantalla('MENU'); setSemilla(s => s + 1); };
@@ -2054,7 +2043,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <PartidaSolo
                 key={'solo' + semilla}
-                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad}
+                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad} ordenFijo={ordenFijo}
                 nombre={nombre || 'Jugador 456'} usuario={usuario}
                 onSalir={salirAlMenu}
                 onReiniciar={() => setSemilla(s => s + 1)}
@@ -2076,7 +2065,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <SalaMandos
                 key={'mandos' + semilla}
-                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad}
+                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad} ordenFijo={ordenFijo}
                 onSalir={salirAlMenu}
             />
         );
@@ -2096,9 +2085,11 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <BuscadorRecursos
                 onBack={() => setPantalla('MENU')}
-                onPick={(r) => {
+                onPick={async (r) => {
+                    const rr = await elegirEncaje(r, 'CALAMAR'); // aviso de textos largos
+                    if (!rr) return;
                     setRecursoPdf(r);
-                    if (preparar(preguntasDeRecurso(r), r.titulo || 'Recurso')) setPantalla('CONFIG');
+                    if (preparar(preguntasDeRecurso(rr), r.titulo || 'Recurso')) setPantalla('CONFIG');
                 }}
             />
         );

@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [
+  { id: 1, text: "En el punto más bajo de la oscilación, ¿cómo es la Energía Cinética?", options: ["Cero", "Máxima", "Igual a la Potencial"], correct: 1 },
+  { id: 2, text: "Cuando el péndulo alcanza su altura máxima en los extremos, su velocidad es...", options: ["Máxima", "Cero (0 m/s)", "Constante"], correct: 1 },
+  { id: 3, text: "¿Qué ocurre con la Energía Mecánica Total durante todo el movimiento (sin rozamiento)?", options: ["Aumenta progresivamente", "Disminuye hasta pararse", "Se mantiene constante"], correct: 2 },
+  { id: 4, text: "Si aumentamos la masa del péndulo a 10 kg, ¿qué le ocurre a la velocidad de caída?", options: ["Cae más rápido", "Cae más lento", "No varía (cae igual)"], correct: 2 },
+  { id: 5, text: "Si la cuerda fuera más larga, el tiempo que tarda en dar una oscilación completa (Periodo)...", options: ["Sería mayor", "Sería menor", "Sería exactamente el mismo"], correct: 0 }
+];
+
 const App = () => {
   const [initialAngleDeg, setInitialAngleDeg] = useState(45);
   const [length, setLength] = useState(2); // metros
@@ -79,13 +88,7 @@ const App = () => {
   const formatNumber = (num) => (isNaN(num) ? "0.0" : num.toFixed(1));
 
   // Cuestionario
-  const questions = [
-    { id: 1, text: "En el punto más bajo de la oscilación, ¿cómo es la Energía Cinética?", options: ["Cero", "Máxima", "Igual a la Potencial"], correct: 1 },
-    { id: 2, text: "Cuando el péndulo alcanza su altura máxima en los extremos, su velocidad es...", options: ["Máxima", "Cero (0 m/s)", "Constante"], correct: 1 },
-    { id: 3, text: "¿Qué ocurre con la Energía Mecánica Total durante todo el movimiento (sin rozamiento)?", options: ["Aumenta progresivamente", "Disminuye hasta pararse", "Se mantiene constante"], correct: 2 },
-    { id: 4, text: "Si aumentamos la masa del péndulo a 10 kg, ¿qué le ocurre a la velocidad de caída?", options: ["Cae más rápido", "Cae más lento", "No varía (cae igual)"], correct: 2 },
-    { id: 5, text: "Si la cuerda fuera más larga, el tiempo que tarda en dar una oscilación completa (Periodo)...", options: ["Sería mayor", "Sería menor", "Sería exactamente el mismo"], correct: 0 }
-  ];
+  const questions = PREGUNTAS_SIM;
 
   const handleAnswer = (qId, optionIdx) => {
     if (!showResults) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));

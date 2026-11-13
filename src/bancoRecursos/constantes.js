@@ -6,7 +6,7 @@ export const MATERIAS_BANCO = [
     { id: 'filosofia', label: 'Filosofía y Valores',   emoji: '🤔' },
     { id: 'economia',  label: 'Economía',              emoji: '💶' },
     { id: 'clasicas',  label: 'Latín y Griego',        emoji: '🏛️' },
-    { id: 'religion',  label: 'Religión',              emoji: '🕊️' },
+    { id: 'orientacion', label: 'Orientación',         emoji: '🧭' },
     { id: 'infantil',  label: 'Infantil (globalizado)', emoji: '🧸' },
     { id: 'tutoria',   label: 'Tutoría y aula',        emoji: '🍎' },
     { id: 'otras',     label: 'Otras',                 emoji: '📦' },
@@ -47,7 +47,11 @@ export const TIPOS_BANCO = [
     { id: 'otro',         label: 'Otro',                      emoji: '🔗' },
 ];
 
-export const buscar = (lista, id) => lista.find(x => x.id === id) || null;
+// Enlaces propios del banco (rutas públicas en App.jsx: /banco y /banco/nuevo)
+export const urlBanco = () => `${window.location.origin}/banco`;
+export const urlBancoNuevo = () => `${window.location.origin}/banco/nuevo`;
+
+export const buscar =(lista, id) => lista.find(x => x.id === id) || null;
 
 /** Añade https:// si falta y quita espacios. */
 export const normalizarUrl = (u) => {

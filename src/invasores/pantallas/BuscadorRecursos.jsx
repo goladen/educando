@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { conRecursosPikt } from '../../bancoPreguntas/recursosPikt';
 import { limpiar } from '../../utils/normalizarPreguntas';
 import { desdeRecurso, jugables } from '../preguntas';
 import { BTN, PANEL } from '../tema';
@@ -20,7 +21,7 @@ export default function BuscadorRecursos({ variante, onPick, onCerrar }) {
     (async () => {
       try {
         const snap = await getDocs(query(collection(db, 'resources'), where('isPrivate', '==', false)));
-        const lista = snap.docs.map((d) => ({ ...d.data(), id: d.id }))
+        const lista = (await conRecursosPikt(snap.docs.map((d) => ({ ...d.data(), id: d.id })), 'CAZABURBUJAS', {}, { rellenar: true }))
           .map((r) => ({ r, n: cuenta(r) }))
           .filter((x) => x.n > 0)
           .sort((a, b) => (b.r.playCount || 0) - (a.r.playCount || 0));

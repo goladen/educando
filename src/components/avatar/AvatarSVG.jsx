@@ -380,6 +380,8 @@ function Cejas({ geo, mood, color }) {
     let izq = 'M-5.5 -8.8 Q0 -12.3 5.5 -9.3', der = 'M-5.5 -9.3 Q0 -12.3 5.5 -8.8';
     if (mood === 'angry') { izq = 'M-5.5 -12 L5 -7.6'; der = 'M-5 -7.6 L5.5 -12'; }
     if (mood === 'happy') { izq = 'M-5.5 -10.3 Q0 -14 5.5 -10.8'; der = 'M-5.5 -10.8 Q0 -14 5.5 -10.3'; }
+    if (mood === 'sad') { izq = 'M-5.5 -8.6 L5 -12'; der = 'M-5 -12 L5.5 -8.6'; }
+    if (mood === 'surprised') { izq = 'M-5.5 -12.5 Q0 -16.5 5.5 -13'; der = 'M-5.5 -13 Q0 -16.5 5.5 -12.5'; }
     const p = { fill: 'none', stroke: color, strokeWidth: 2.4, strokeLinecap: 'round' };
     return <g>
         <path d={izq} transform={`translate(${x1} ${y1}) scale(${s})`} {...p} />
@@ -431,6 +433,8 @@ function Boca({ tipo, y, pantalla, g }) {
             return <g transform={t}><path d="M-5 0.5 Q0 -0.5 5 0.5" {...linea} /></g>;
         case 'enfado':
             return <g transform={t}><path d="M-6 3 Q0 -2.5 6 3" {...linea} /></g>;
+        case 'triste':
+            return <g transform={t}><path d="M-6.5 4 Q0 -2 6.5 4" {...linea} /></g>;
         default:
             return <g transform={t}>{sonrisa}</g>;
     }
@@ -627,6 +631,15 @@ function ExtrasMood({ mood }) {
     if (mood === 'happy') return <g fill="#ffe066" stroke="#f4b400" strokeWidth="0.6">
         <path d={destello(15, 27, 5)} /><path d={destello(86, 33, 4)} /><path d={destello(80, 12, 2.8)} />
     </g>;
+    if (mood === 'sad') return <g fill="#74b9ff" stroke="#0984e3" strokeWidth="0.5">
+        <path d="M33 54 Q30.5 59 33 60.5 Q35.5 59 33 54 Z" /><path d="M67 54 Q64.5 59 67 60.5 Q69.5 59 67 54 Z" />
+    </g>;
+    if (mood === 'surprised') return <g fill="none" stroke="#2d3436" strokeWidth="1.6" strokeLinecap="round">
+        <path d="M14 22 L9 17 M17 18 L15 11 M86 22 L91 17 M83 18 L85 11" />
+    </g>;
+    if (mood === 'sleepy') return <g fill="#2d3436" fontFamily="Arial, sans-serif" fontWeight="bold">
+        <text x="76" y="24" fontSize="9">z</text><text x="83" y="16" fontSize="7">z</text><text x="88" y="10" fontSize="5">z</text>
+    </g>;
     if (mood === 'angry') return <path d="M73 17 Q76.5 20.5 73 24 M83 17 Q79.5 20.5 83 24 M74.5 15.5 Q78 19 81.5 15.5 M74.5 25.5 Q78 22 81.5 25.5"
         fill="none" stroke="#ff3b3b" strokeWidth="2.1" strokeLinecap="round" />;
     return null;
@@ -643,12 +656,14 @@ function hashCfg(obj) {
     return (h >>> 0).toString(36);
 }
 
-export default function AvatarSVG({ config, size = 64, mood = 'neutral', animado = false, style, title }) {
+// sinFondo: sin círculo ni fondo de color (personajes de cómic sobre una escena).
+// soloCabeza: sin cuello ni ropa (el cuerpo entero lo dibuja comic/PersonajeCuerpo.jsx).
+export default function AvatarSVG({ config, size = 64, mood = 'neutral', animado = false, style, title, sinFondo = false, soloCabeza = false }) {
     const a = normalizarAvatar(config);
     const id = 'av' + useId().replace(/[^a-zA-Z0-9]/g, '') + hashCfg(a);
     const geo = geometria(a.base);
-    const ojos = mood === 'happy' ? 'felices' : a.ojos;
-    const boca = mood === 'happy' ? 'risa' : mood === 'angry' ? 'enfado' : a.boca;
+    const ojos = mood === 'happy' ? 'felices' : mood === 'sleepy' ? 'dormidos' : mood === 'surprised' ? 'normales' : a.ojos;
+    const boca = { happy: 'risa', angry: 'enfado', sad: 'triste', surprised: 'sorpresa', sleepy: 'seria' }[mood] || a.boca;
     const esPersona = a.base === 'persona';
     const colorCejas = esPersona ? tono(a.colorPelo, -20) : tono(a.piel, -80);
     const parpadea = animado && !['felices', 'dormidos'].includes(ojos);
@@ -698,12 +713,12 @@ export default function AvatarSVG({ config, size = 64, mood = 'neutral', animado
                 <filter id={`${id}brillo`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.3" /></filter>
                 {parpadea && <style>{CSS_ANIM}</style>}
             </defs>
-            <g clipPath={`url(#${id}clip)`}>
-                <rect width="100" height="100" fill={`url(#${id}fondo)`} />
-                <Patron tipo={a.patron} />
+            <g clipPath={sinFondo || soloCabeza ? undefined : `url(#${id}clip)`}>
+                {!sinFondo && <rect width="100" height="100" fill={`url(#${id}fondo)`} />}
+                {!sinFondo && <Patron tipo={a.patron} />}
                 {esPersona && <PeloDetras pelo={a.pelo} g={g} />}
-                <rect x="43.5" y="62" width="13" height="18" fill={g.cuello} />
-                <Ropa a={a} g={g} />
+                {!soloCabeza && <rect x="43.5" y="62" width="13" height="18" fill={g.cuello} />}
+                {!soloCabeza && <Ropa a={a} g={g} />}
                 <DetrasCabeza a={a} g={g} />
                 <Cabeza a={a} g={g} />
                 <Cara a={a} g={g} />

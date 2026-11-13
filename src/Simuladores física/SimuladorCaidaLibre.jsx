@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [
+  { id: 1, text: "Si duplicamos la masa del objeto que cae, ¿qué ocurre con el tiempo que tarda en llegar al suelo? (Ignorando el aire)", options: ["Se reduce a la mitad", "Se duplica", "No cambia en absoluto"], correct: 2 },
+  { id: 2, text: "La aceleración que experimenta un cuerpo en caída libre cerca de la superficie terrestre es...", options: ["Variable, aumenta al caer", "Cero", "Constante (aprox 9.81 m/s²)"], correct: 2 },
+  { id: 3, text: "¿Cuál es la velocidad inicial de un objeto cuando se deja en caída libre?", options: ["9.81 m/s", "0 m/s", "Depende de la altura inicial"], correct: 1 },
+  { id: 4, text: "Si dejamos caer un objeto desde el cuádruple (x4) de altura, el tiempo de caída...", options: ["Se multiplica por 4", "Se multiplica por 2", "Se mantiene igual"], correct: 1 },
+  { id: 5, text: "A medida que el objeto cae, su energía potencial gravitatoria...", options: ["Aumenta y se convierte en calor", "Disminuye y se transforma en energía cinética", "Se mantiene constante"], correct: 1 }
+];
+
 const App = () => {
   const [initialHeight, setInitialHeight] = useState(50);
   const [mass, setMass] = useState(10);
@@ -76,13 +85,7 @@ const App = () => {
   const formatNumber = (num) => (isNaN(num) ? "0.00" : num.toFixed(2));
 
   // Preguntas del cuestionario
-  const questions = [
-    { id: 1, text: "Si duplicamos la masa del objeto que cae, ¿qué ocurre con el tiempo que tarda en llegar al suelo? (Ignorando el aire)", options: ["Se reduce a la mitad", "Se duplica", "No cambia en absoluto"], correct: 2 },
-    { id: 2, text: "La aceleración que experimenta un cuerpo en caída libre cerca de la superficie terrestre es...", options: ["Variable, aumenta al caer", "Cero", "Constante (aprox 9.81 m/s²)"], correct: 2 },
-    { id: 3, text: "¿Cuál es la velocidad inicial de un objeto cuando se deja en caída libre?", options: ["9.81 m/s", "0 m/s", "Depende de la altura inicial"], correct: 1 },
-    { id: 4, text: "Si dejamos caer un objeto desde el cuádruple (x4) de altura, el tiempo de caída...", options: ["Se multiplica por 4", "Se multiplica por 2", "Se mantiene igual"], correct: 1 },
-    { id: 5, text: "A medida que el objeto cae, su energía potencial gravitatoria...", options: ["Aumenta y se convierte en calor", "Disminuye y se transforma en energía cinética", "Se mantiene constante"], correct: 1 }
-  ];
+  const questions = PREGUNTAS_SIM;
 
   const handleAnswer = (qId, optionIdx) => {
     if (!showResults) {

@@ -3,6 +3,22 @@ import { X, FileDown, RefreshCw, Printer } from 'lucide-react';
 import { formatosDisponibles, generarPdfRecurso, hojasDe } from '../utils/pdfRecurso';
 import { JUEGOS_RECURSO, rutaRecurso } from './ModalRetoRecurso';
 import ModalPdfListening from './ModalPdfListening';
+import { barajar as mezclar } from '../utils/normalizarPreguntas';
+import { crearCodigoFicha, urlCodigoFicha } from '../utils/fichaCodigo';
+
+// Copia congelada del recurso para el código de la ficha: solo las hojas impresas y, si se
+// baraja, ya barajadas (el PDF y el juego usan la MISMA copia → mismo orden en los dos)
+const CAMPOS_RECURSO = ['titulo', 'tipoJuego', 'tipo', 'config', 'temas', 'ciclo', 'profesorNombre', 'profesorUid', 'accessCode', 'esPikt', 'etapaPikt', 'materiaPikt'];
+function recursoCongelado(recurso, hojasSel) {
+    const r = { id: recurso.id, hojas: hojasSel };
+    CAMPOS_RECURSO.forEach(k => { if (recurso[k] !== undefined) r[k] = recurso[k]; });
+    return r;
+}
+const barajarHoja = (h) => ({
+    ...h,
+    ...(Array.isArray(h.preguntas) ? { preguntas: mezclar(h.preguntas) } : {}),
+    ...(Array.isArray(h.palabras) ? { palabras: mezclar(h.palabras) } : {}),
+});
 
 // Ficha en PDF de cualquier recurso del profesor: se entrega a los alumnos en papel
 // y, al terminar, se juega en clase con el mismo recurso (QR + código en la cabecera).
@@ -13,7 +29,10 @@ export default function ModalPdfRecurso({ recurso, onClose, conSoluciones = true
     // Juegos con los que se puede jugar este recurso después (mismo registro que «compartir con configuración»)
     const juegos = useMemo(() => Object.entries(JUEGOS_RECURSO)
         .filter(([, j]) => !j.coleccion && (!j.tipos || j.tipos.includes(recurso.tipoJuego)) && (!j.valido || j.valido(recurso)))
-        .map(([id, j]) => ({ id, label: j.label, ruta: (j.enlace && j.enlace(recurso)) || rutaRecurso(recurso.id, { modo: j.modo }) }))
+        .map(([id, j]) => {
+            const externo = j.enlace && j.enlace(recurso);
+            return { id, label: j.label, ruta: externo || rutaRecurso(recurso.id, { modo: j.modo }), modo: j.modo || null, externo: !!externo };
+        })
         // Primero el juego para el que se creó el recurso
         .sort((a, b) => (b.id === recurso.tipoJuego) - (a.id === recurso.tipoJuego)), [recurso]);
 
@@ -24,6 +43,9 @@ export default function ModalPdfRecurso({ recurso, onClose, conSoluciones = true
     const [dificil, setDificil] = useState(false);
     const [juegoId, setJuegoId] = useState(juegos[0]?.id || '');
     const [generando, setGenerando] = useState(null);
+    // Código de la ficha: se escribe o se escanea en cualquier dispositivo y abre el juego con
+    // estas preguntas en este orden
+    const [vincular, setVincular] = useState(true);
 
     if (recurso.tipoJuego === 'LISTENING_RECURSO') return <ModalPdfListening recurso={recurso} onClose={onClose} conSoluciones={conSoluciones} />;
 
@@ -33,9 +55,28 @@ export default function ModalPdfRecurso({ recurso, onClose, conSoluciones = true
         // La pestaña se abre ya (gesto del usuario) para que no la bloquee el navegador
         const ventana = modo === 'IMPRIMIR' ? window.open('', '_blank') : null;
         try {
-            const pdf = await generarPdfRecurso(recurso, {
-                formato, hojas: selHojas, barajar, soluciones, dificil, descargar: modo === 'DESCARGAR',
-                juego: juego && recurso.id ? { label: juego.label, url: `${window.location.origin}${juego.ruta}` } : null,
+            let recPdf = recurso;
+            let baraja = barajar;
+            let juegoPdf = juego && recurso.id ? { label: juego.label, url: `${window.location.origin}${juego.ruta}` } : null;
+            if (juegoPdf && vincular) {
+                const codigo = juego.externo
+                    ? await crearCodigoFicha({ juego: juego.id, titulo: recurso.titulo, enlace: juego.ruta })
+                    : await (async () => {
+                        const todas = hojasDe(recurso);
+                        const copias = todas.map((h, i) => (selHojas.includes(i) && barajar && conBarajar ? barajarHoja(h) : h));
+                        const codigo = await crearCodigoFicha({
+                            juego: juego.id, titulo: recurso.titulo, modo: juego.modo,
+                            recurso: recursoCongelado(recurso, copias.filter((_, i) => selHojas.includes(i))),
+                        });
+                        // El PDF se hace con la misma copia ya barajada (y sin volver a barajar)
+                        if (codigo) { recPdf = { ...recurso, hojas: copias }; baraja = false; }
+                        return codigo;
+                    })();
+                if (codigo) juegoPdf = { ...juegoPdf, url: urlCodigoFicha(codigo), codigoFicha: codigo };
+            }
+            const pdf = await generarPdfRecurso(recPdf, {
+                formato, hojas: selHojas, barajar: baraja, soluciones, dificil, descargar: modo === 'DESCARGAR',
+                juego: juegoPdf,
             });
             if (modo === 'IMPRIMIR') {
                 const url = pdf.output('bloburl');
@@ -116,6 +157,12 @@ export default function ModalPdfRecurso({ recurso, onClose, conSoluciones = true
                                 La ficha lleva en la cabecera un QR y el enlace para abrir ese juego con este mismo recurso
                                 {recurso.accessCode ? ` (y el código ${recurso.accessCode})` : ''}: primero en papel, luego a jugar.
                             </p>
+                            {juego && recurso.id && (
+                                <label style={check}>
+                                    <input type="checkbox" checked={vincular} onChange={e => setVincular(e.target.checked)} />
+                                    <span>🔗 <b>Código de la ficha</b>: en cualquier dispositivo se juega con estas preguntas en este orden (aunque luego cambies el recurso)</span>
+                                </label>
+                            )}
 
                             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                                 <button onClick={() => generar('IMPRIMIR')} disabled={!!generando || !selHojas.length} style={boton('#0f766e')}>

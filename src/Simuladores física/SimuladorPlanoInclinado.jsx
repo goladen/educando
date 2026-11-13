@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [
+  { id: 1, text: "Si duplicamos la masa del vehículo, ¿qué ocurre con su aceleración?", options: ["Se duplica", "Se reduce a la mitad", "No cambia"], correct: 2 },
+  { id: 2, text: "En un plano inclinado sin rozamiento, la velocidad del objeto...", options: ["Es constante", "Aumenta linealmente con el tiempo", "Aumenta al cuadrado con el tiempo"], correct: 1 },
+  { id: 3, text: "Para calcular la fuerza motriz (paralela a la rampa), ¿qué razón trigonométrica usamos?", options: ["Seno (sen θ)", "Coseno (cos θ)", "Tangente (tan θ)"], correct: 0 },
+  { id: 4, text: "¿A qué ángulo la fuerza normal es nula (0 N)?", options: ["0°", "45°", "90°"], correct: 2 },
+  { id: 5, text: "Si el ángulo de la rampa es 0°, ¿cuál será la aceleración del vehículo?", options: ["9.81 m/s²", "0 m/s²", "Depende de la masa"], correct: 1 }
+];
+
 const App = () => {
   const [angle, setAngle] = useState(30);
   const [mass, setMass] = useState(10);
@@ -81,13 +90,7 @@ const App = () => {
   const formatNumber = (num) => (isNaN(num) ? "0.00" : num.toFixed(2));
 
   // Preguntas del cuestionario
-  const questions = [
-    { id: 1, text: "Si duplicamos la masa del vehículo, ¿qué ocurre con su aceleración?", options: ["Se duplica", "Se reduce a la mitad", "No cambia"], correct: 2 },
-    { id: 2, text: "En un plano inclinado sin rozamiento, la velocidad del objeto...", options: ["Es constante", "Aumenta linealmente con el tiempo", "Aumenta al cuadrado con el tiempo"], correct: 1 },
-    { id: 3, text: "Para calcular la fuerza motriz (paralela a la rampa), ¿qué razón trigonométrica usamos?", options: ["Seno (sen θ)", "Coseno (cos θ)", "Tangente (tan θ)"], correct: 0 },
-    { id: 4, text: "¿A qué ángulo la fuerza normal es nula (0 N)?", options: ["0°", "45°", "90°"], correct: 2 },
-    { id: 5, text: "Si el ángulo de la rampa es 0°, ¿cuál será la aceleración del vehículo?", options: ["9.81 m/s²", "0 m/s²", "Depende de la masa"], correct: 1 }
-  ];
+  const questions = PREGUNTAS_SIM;
 
   const handleAnswer = (qId, optionIdx) => {
     if (!showResults) {

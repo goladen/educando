@@ -1,3 +1,4 @@
+import { generarPdfBloques } from '../utils/pdfBloques';
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where, limit } from 'firebase/firestore';
@@ -111,25 +112,7 @@ const HojaImprimible = React.forwardRef(({ ficha, soluciones }, ref) => {
 });
 
 // Devuelve el documento jsPDF y el nombre de archivo (quien llama decide si lo descarga o lo muestra)
-const generarPdf = async (nodo, nombre) => {
-    const [{ jsPDF }, html2canvas] = await Promise.all([import('jspdf'), import('html2canvas').then(m => m.default)]);
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-    const W = 210, H = 297, M = 12, ancho = W - 2 * M;
-    let y = M;
-    for (const b of nodo.querySelectorAll('[data-bloque]')) {
-        const canvas = await html2canvas(b, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }) // useCORS: imágenes de otras webs (banderas);
-        const h = (canvas.height * ancho) / canvas.width;
-        if (y + h > H - M && y > M) { pdf.addPage(); y = M; }
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', M, y, ancho, h);
-        y += h;
-    }
-    const total = pdf.getNumberOfPages();
-    for (let i = 1; i <= total; i++) {
-        pdf.setPage(i); pdf.setFontSize(8); pdf.setTextColor(150);
-        pdf.text(`${i} / ${total}`, W / 2, H - 5, { align: 'center' });
-    }
-    return { pdf, archivo: `${(nombre || 'ficha').replace(/[^\wáéíóúñü -]/gi, '').trim().replace(/\s+/g, '_') || 'ficha'}.pdf` };
-};
+const generarPdf = generarPdfBloques; // utils/pdfBloques.js (compartido con la ficha de los simuladores)
 
 // ─── Enlace público de una ficha (pikt.es/<ruta>?ficha=ID) ──────────────────
 export const urlFicha = (ruta, id) => `${window.location.origin}${ruta}?ficha=${encodeURIComponent(id)}`;
@@ -466,16 +449,19 @@ export default function FichasImprimibles(props) {
     return <MotorCtx.Provider value={props.motor}><FichasApp {...props} /></MotorCtx.Provider>;
 }
 
-function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
+// nuevaInicial: abre directamente el editor con una ficha nueva (botón «Generar la tuya» del
+// Banco de recursos); al salir del editor se vuelve a quien lo abrió (onSalir).
+function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null, nuevaInicial = false }) {
     const COLECCION = motor.coleccion;
-    const [vista, setVista] = useState(fichaPublicaId ? 'PUBLICA' : 'LISTA'); // LISTA | EDITOR | PIZARRA | PUBLICA
+    const soloEditor = nuevaInicial && !fichaPublicaId;
+    const [vista, setVista] = useState(fichaPublicaId ? 'PUBLICA' : soloEditor ? 'EDITOR' : 'LISTA'); // LISTA | EDITOR | PIZARRA | PUBLICA
     const [meta, setMeta] = useState(null);      // ficha pública: { uid, autor, actualizada } | { error }
     const [enlace, setEnlace] = useState(null);  // { id, titulo } → modal del enlace público
     const [visor, setVisor] = useState(null);    // { url, archivo } → visor del PDF
     const [user, setUser] = useState(() => auth.currentUser);
     const [fichas, setFichas] = useState([]);
     const [cargando, setCargando] = useState(false);
-    const [ficha, setFicha] = useState(null);
+    const [ficha, setFicha] = useState(() => (soloEditor ? fichaVacia(motor) : null));
     const [aviso, setAviso] = useState('');
     const [guardando, setGuardando] = useState(false);
     const [pdf, setPdf] = useState(null); // null | 'alumno' | 'soluciones'
@@ -789,6 +775,12 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
     if (vista === 'EDITOR' && ficha) return (
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
             {barraAviso}
+            {soloEditor && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                    <button onClick={onSalir} style={btn('#7f8c8d', false)}>← Volver</button>
+                    <span style={{ color: '#7b1fa2', fontWeight: 800 }}>{motor.emoji} Tu ficha nueva: elige los ejercicios y pulsa «📄 PDF alumno» (no hace falta guardarla)</span>
+                </div>
+            )}
 
             <div style={{ background: 'white', borderRadius: 18, padding: isMobile ? '12px 10px' : '16px 18px', marginBottom: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.07)' }}>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -873,7 +865,9 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
                 <button onClick={() => setFicha(f => ({ ...f, ejercicios: [...f.ejercicios, nuevoEjercicio(motor, motor.ejercicioNuevo)] }))} style={btn('#7b1fa2')}>➕ Añadir ejercicio</button>
-                <button onClick={() => { cargarFichas(); setVista('LISTA'); }} style={btn('#7f8c8d', false)}>← Mis fichas</button>
+                {soloEditor
+                    ? <button onClick={onSalir} style={btn('#7f8c8d', false)}>← Volver</button>
+                    : <button onClick={() => { cargarFichas(); setVista('LISTA'); }} style={btn('#7f8c8d', false)}>← Mis fichas</button>}
             </div>
         </div>
     );

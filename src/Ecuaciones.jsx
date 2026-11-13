@@ -148,10 +148,10 @@ const MODOS_PRESET = [
                ...SIN_AVANZADAS, exponenciales: true, logaritmicas: true, trigonometricas: true }
     },
     {
-        id: 'PROBLEMS', panel: true, icon: '📖', label: 'Problemas', desc: '1.er grado, áreas (2.º grado) y prop. inversa', color: '#e67e22',
+        id: 'PROBLEMS', panel: true, icon: '📖', label: 'Problemas', desc: '1.er grado, áreas, prop. inversa, física y otras materias', color: '#e67e22',
         cfg: { tiempo: 600, minNum: 1, maxNum: 10, primerGrado: false, soloBasico: false,
                segundoGrado: false, conDenominadores: false, conParentesis: false, conEnunciados: false,
-               ...SIN_AVANZADAS, probPrimer: true, probAreas: true, probInversa: true }
+               ...SIN_AVANZADAS, probPrimer: true, probAreas: true, probInversa: true, probCiencias: true }
     },
     {
         id: 'CUSTOM', icon: '⚙️', label: 'Personalizado', desc: 'Elige el tipo, dificultad y tiempo', color: '#8e44ad',
@@ -350,6 +350,8 @@ const serializarPregunta = (eq, tiempo, puntosMax, puntosMin) => ({
     ...(eq.tipo === 'MULTI' ? {
         sub: eq.sub || null, grados: !!eq.grados, descartadas: eq.descartadas || [], pasos: eq.pasos || [],
         etiqueta: eq.etiqueta || null, unidad: eq.unidad || null, instruccion: eq.instruccion || null,
+        // problemas: ecuación de la gráfica, redondeo y tolerancias (Firestore no admite undefined)
+        ...Object.fromEntries(['ecuacion', 'decimales', 'tol', 'tolRel', 'cientifica', 'rango', 'sinGrafica', 'materia', 'tema'].filter(k => eq[k] !== undefined).map(k => [k, eq[k]])),
     } : {}),
     tiempo, puntosMax, puntosMin,
 });

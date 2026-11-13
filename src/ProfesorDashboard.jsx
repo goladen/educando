@@ -34,7 +34,6 @@ const SintaxisGame = lazy(() => import('./SintaxisGamen2'));
 import { MousePointer2, Rocket, Search as SearchIcon, Car, Clock, Headphones } from 'lucide-react';
 const InformesJuegos = lazy(() => import('./components/InformesJuegos2'));
 const ComunidadesTab = lazy(() => import('./components/ComunidadesTab'));
-const BancoRecursos = lazy(() => import('./bancoRecursos/BancoRecursos'));
 const CompeticionesTab = lazy(() => import('./components/CompeticionesTab'));
 const TrivialPartidasView = lazy(() => import('./components/TrivialPartidasView'));
 const TrivialRecursosManager = lazy(() => import('./components/TrivialRecursosManager'));
@@ -66,6 +65,9 @@ const EditorSolarSystem = lazy(() => import('./components/EditorSolarSystem'));
 const OmninteractiveApp = lazy(() => import('./OmninteractiveApp'));
 const VideoQuizzApp = lazy(() => import('./VideoQuizzApp'));
 import BuzonNovedades from './components/BuzonNovedades';
+import { mensajeAvisoGuardar } from './utils/encajeTexto';
+const BotonVistaJuegos = lazy(() => import('./components/VistaJuegos'));
+const BotonImportarPreguntas = lazy(() => import('./components/ImportarPreguntas').then(m => ({ default: m.BotonImportarPreguntas })));
 import { interesesCompletos } from './hooks/useNotificacionesProfesor';
 const PresentationEditor = lazy(() => import('./components/PresentationEditor'));
 const PresentationList = lazy(() => import('./components/PresentationList'));
@@ -320,7 +322,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
 
     // Restaura la pestaña desde la URL (?panel=…) al cargar y con atrás/adelante
     useEffect(() => {
-        const PANELES = ['CLASICO', 'PRO', 'LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'PRESENTACIONES', 'MI_PAGINA', 'TRIVIAL', 'TRIVIAL_PARTIDAS', 'TRIVIAL_RECURSOS', 'COMUNIDADES', 'COMPETICIONES', 'INFORMES', 'BANCO_RECURSOS'];
+        const PANELES = ['CLASICO', 'PRO', 'LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'PRESENTACIONES', 'MI_PAGINA', 'TRIVIAL', 'TRIVIAL_PARTIDAS', 'TRIVIAL_RECURSOS', 'COMUNIDADES', 'COMPETICIONES', 'INFORMES'];
         const sync = () => {
             const p = new URLSearchParams(window.location.search).get('panel');
             if (p && PANELES.includes(p.toUpperCase())) aplicarModo(p.toUpperCase());
@@ -648,6 +650,12 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                 return alert("Añade preguntas manuales o configura el generador.");
             }
         }
+
+        // --- AVISO: preguntas que pueden no verse enteras en algún juego ---
+        try {
+            const aviso = mensajeAvisoGuardar({ hojas: datosEditor.hojas }, juegoSeleccionado);
+            if (aviso && !window.confirm(aviso)) return;
+        } catch (e) { console.warn('aviso de encaje', e); }
 
         // --- GUARDADO EN FIREBASE ---
         try {
@@ -1221,7 +1229,6 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                     {/* 📊 Presentaciones → ahora dentro de "Herramientas del Profesor" */}
                     <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
                     {/* 🎯 Trivial → ahora dentro de "Recursos PRO" */}
-                    <li style={styles.menuItem} onClick={() => navegar('BANCO_RECURSOS')}>📚 Banco de recursos</li>
                     <li style={styles.menuItem} onClick={() => navegar('COMUNIDADES')}>👥 Comunidades</li>
                     <li style={styles.menuItem} onClick={() => navegar('COMPETICIONES')}>🏆 Competiciones</li>
 
@@ -1326,7 +1333,6 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} googleToken={googleToken} />}
             {modoDashboard === 'COMUNIDADES' && <ComunidadesTab usuario={usuario} />}
-            {modoDashboard === 'BANCO_RECURSOS' && <BancoRecursos usuario={usuario} />}
             {modoDashboard === 'COMPETICIONES' && <CompeticionesTab usuario={usuario} />}
             {modoDashboard === 'TRIVIAL' && (
                 <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 0' }}>
@@ -1757,6 +1763,21 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                     onSave={guardarRecursoFinal}
                     usuario={perfilProfesor || usuario}
                 />
+            )}
+
+            {/* 👁 Ver cada pregunta en los juegos donde se puede usar (botón flotante sobre el editor) */}
+            {((mostrandoEditorManual && juegoSeleccionado !== 'QUESTION_SENDER') || mostrandoEditorPro || mostrandoEditorBurbujasPikatron) && datosEditor && (
+                <Suspense fallback={null}>
+                    <BotonVistaJuegos recurso={datosEditor} tipoJuego={juegoSeleccionado} />
+                    {/* 📥 Importar preguntas de PiKT, de otros profes o propias a la hoja que se elija */}
+                    <BotonImportarPreguntas tipoJuego={juegoSeleccionado} hojas={datosEditor.hojas || []} maxHojas={mostrandoEditorManual ? 3 : 99}
+                        onImportar={(destino, nombreNueva, preguntas) => setDatosEditor(prev => {
+                            const hojas = [...(prev.hojas || [])];
+                            if (destino === 'nueva') hojas.push({ nombreHoja: nombreNueva || `Hoja ${hojas.length + 1}`, preguntas });
+                            else hojas[destino] = { ...hojas[destino], preguntas: [...(hojas[destino]?.preguntas || []), ...preguntas] };
+                            return { ...prev, hojas };
+                        })} />
+                </Suspense>
             )}
 
             {mostrandoEditorWordle && (

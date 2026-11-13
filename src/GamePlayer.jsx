@@ -1,5 +1,7 @@
 ﻿import { useState, lazy, Suspense } from 'react';
 import CargandoChunk from './components/CargandoChunk';
+import ConAvisoEncaje from './components/ConAvisoEncaje';
+import { juegoDeLanzamiento } from './utils/encajeTexto';
 import { Home, Play } from 'lucide-react';
 
 // ─── PANTALLA DE PRESENTACIÓN PREVIA ─────────────────────────────────────────
@@ -238,5 +240,14 @@ function GamePlayerInterno({ recurso, usuario, alTerminar, autoStart = false, ho
 }
 // Los juegos se cargan con lazy(): el límite de Suspense queda aquí para no ocultar la pantalla que abre el juego.
 export default function GamePlayer(props) {
-    return <Suspense fallback={<CargandoChunk />}><GamePlayerInterno {...props} /></Suspense>;
+    // Antes de empezar avisa si hay preguntas demasiado largas para el juego elegido (y deja excluirlas)
+    let juego = null;
+    try { juego = juegoDeLanzamiento(props.recurso, props.modoInicial); } catch { juego = null; }
+    return (
+        <Suspense fallback={<CargandoChunk />}>
+            <ConAvisoEncaje recurso={props.recurso} juego={juego} onCancelar={props.alTerminar}>
+                {(recurso) => <GamePlayerInterno {...props} recurso={recurso} />}
+            </ConAvisoEncaje>
+        </Suspense>
+    );
 }

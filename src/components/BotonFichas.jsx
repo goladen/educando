@@ -13,7 +13,8 @@ const FichasMaterias = lazy(() => import('../FichasMaterias'));
 const FichasMathWorld = lazy(() => import('../FichasMathWorld'));
 const APPS_FICHAS = { enigmic: lazy(() => import('../FichasEnigmic')) };
 
-export default function BotonFichas({ materia = null, tema = null, app = null, fichaPublicaId = null, abiertoInicial = false, onCerrar = null, color = '#7b1fa2', texto = '🖨️ Fichas para imprimir', subtexto = 'PDF para repartir y corrección en la pizarra', style = {} }) {
+// nuevaInicial: abre directamente el editor con una ficha nueva (en vez del centro de fichas)
+export default function BotonFichas({ materia = null, tema = null, app = null, fichaPublicaId = null, abiertoInicial = false, nuevaInicial = false, onCerrar = null, color = '#7b1fa2', texto = '🖨️ Fichas para imprimir', subtexto = 'PDF para repartir y corrección en la pizarra', style = {} }) {
     const [abierto, setAbierto] = useState(abiertoInicial);
     const FichasApp = app ? APPS_FICHAS[app] : null;
     const cerrar = () => { setAbierto(false); onCerrar?.(); };
@@ -33,10 +34,10 @@ export default function BotonFichas({ materia = null, tema = null, app = null, f
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: '#eef2f7', overflowY: 'auto', padding: 15, boxSizing: 'border-box', fontFamily: "'Segoe UI', Tahoma, sans-serif", textAlign: 'left' }}>
                     <Suspense fallback={<div style={{ textAlign: 'center', color, fontWeight: 800, padding: 40 }}>Cargando fichas…</div>}>
                         {FichasApp
-                            ? <FichasApp isMobile={isMobile} fichaPublicaId={fichaPublicaId} onSalir={cerrar} />
+                            ? <FichasApp isMobile={isMobile} fichaPublicaId={fichaPublicaId} nuevaInicial={nuevaInicial} onSalir={cerrar} />
                             : materia
-                                ? <FichasMaterias materia={materia} isMobile={isMobile} fichaPublicaId={fichaPublicaId} onSalir={cerrar} />
-                                : <FichasMathWorld tema={tema} isMobile={isMobile} fichaPublicaId={fichaPublicaId} onSalir={cerrar} />}
+                                ? <FichasMaterias materia={materia} isMobile={isMobile} fichaPublicaId={fichaPublicaId} nuevaInicial={nuevaInicial} onSalir={cerrar} />
+                                : <FichasMathWorld tema={tema} isMobile={isMobile} fichaPublicaId={fichaPublicaId} nuevaInicial={nuevaInicial} onSalir={cerrar} />}
                     </Suspense>
                 </div>
             )}

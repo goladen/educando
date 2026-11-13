@@ -10,6 +10,7 @@ import {
     updateDoc, deleteDoc, setDoc
 } from 'firebase/firestore';
 import { PASOS, INSTRUMENTOS_SEQ } from '../musicUtils';
+const ComicInformeCard = React.lazy(() => import('../comic/ComicInformeCard'));
 import {
     BarChart2, Users, Calendar, TrendingUp, RefreshCw,
     ChevronDown, ChevronUp, Filter, Save, Edit2, CheckCircle,
@@ -54,8 +55,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { LENGUA:'📖 Lengua', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
-const TIPO_ICON   = { LENGUA:'📖', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
+const TIPO_LABEL  = { HOJA_FQ:'🧪 Hoja de Física y Química', LENGUA:'📖 Lengua', PATIO:'🛝 Patio de Juegos', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
+const TIPO_ICON   = { HOJA_FQ:'🧪', LENGUA:'📖', PATIO:'🛝', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE', 'QUIZ_MANDOS', 'MATES_MANDOS', 'PISTA_ROBOTS', 'ARCADE_MANDOS', 'PLATAFORMAS_MANDOS', 'PIKATRON_MANDOS', 'BUNKER_MANDOS', 'BURBUJAS_MANDOS', 'AHORCADO_MANDOS', 'SIXSEVEN_MANDOS', 'MONEYBOARD_MANDOS', 'TRIVIAL_MANDOS']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -557,6 +558,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'HOJA_FQ') return (
+                                    <HojaFQCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'MINIAPP') return (
                                     <MiniAppCard
                                         key={inf.id} inf={inf}
@@ -773,6 +786,20 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onSeleccionar={()=>toggleSeleccion(inf.id)}
                                         onBuscarJugador={setBusquedaJugador}
                                     />
+                                );
+                                if (tipo === 'COMIC') return (
+                                    <React.Suspense key={inf.id} fallback={<div style={{ padding: 14, color: '#999' }}>Cargando cómic…</div>}>
+                                        <ComicInformeCard
+                                            inf={inf}
+                                            onBorrar={()=>borrar(inf.id)}
+                                            borrando={borrando===inf.id}
+                                            borradoOk={borrandoOk===inf.id}
+                                            modoSeleccion={modoSeleccion}
+                                            seleccionado={selec}
+                                            onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                            onBuscarJugador={setBusquedaJugador}
+                                        />
+                                    </React.Suspense>
                                 );
                                 if (tipo === 'ESCULPIR_3D') return (
                                     <EsculpirCard
@@ -1036,6 +1063,12 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             if (cfg.ejercicio) badges.push(<ConfigBadge key="ej" icon="✏️" label={cfg.ejercicio}/>);
                             if (cfg.modo)      badges.push(<ConfigBadge key="modo" icon="🎮" label={cfg.modo}/>);
                             if (cfg.ajustes)   badges.push(<ConfigBadge key="aj" icon="⚙️" label={cfg.ajustes}/>);
+                        } else if (tipo === 'PATIO') {
+                            if (cfg.juego)     badges.push(<ConfigBadge key="jg" icon="🛝" label={cfg.juego}/>);
+                            if (cfg.materia)   badges.push(<ConfigBadge key="mat" icon="📚" label={cfg.materia}/>);
+                            if (cfg.curso)     badges.push(<ConfigBadge key="cur" icon="🎒" label={cfg.curso}/>);
+                            if (cfg.modo)      badges.push(<ConfigBadge key="modo" icon="🎮" label={cfg.modo}/>);
+                            if (cfg.estrellas) badges.push(<ConfigBadge key="est" icon="⭐" label={'⭐'.repeat(cfg.estrellas)}/>);
                         } else if (tipo === 'PERIMETRO_AREA') {
                             const modo = inf.modoJuego || jugador0.modo;
                             const conf = inf.configuracion || jugador0.configuracion;
@@ -2753,6 +2786,60 @@ const ContabilidadSuperCard = ({ inf, onBorrar, borrando, borradoOk, modoSelecci
                 </div>
             )}
             {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// Hoja interactiva de Física y Química (/?hojafq=ID): resultado con el detalle de cada pregunta
+const HojaFQCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const pct = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos / j.intentos) * 100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const detalle = Array.isArray(j.detalle) ? j.detalle : [];
+    return (
+        <div style={{ background: 'white', borderRadius: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : () => setAbierto(a => !a)} style={{ padding: '11px 15px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', cursor: 'pointer' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e => { e.stopPropagation(); onSeleccionar(); }} onClick={e => e.stopPropagation()} style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#1565C0' }} />}
+                <span style={{ fontSize: '1.4rem' }}>{inf.area === 'Química' ? '🧪' : '⚛️'}</span>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontWeight: 700, color: '#2c3e50', fontSize: '0.92rem' }}>{inf.titulo || 'Hoja de Física y Química'}</div>
+                    <div style={{ fontSize: '0.74rem', color: '#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e => { e.stopPropagation(); onBuscarJugador?.(j.nombre); }} style={{ cursor: 'pointer', borderBottom: '1px dotted #aaa', fontWeight: 600, color: '#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft: 5, color: '#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <span style={{ padding: '2px 8px', borderRadius: 20, background: '#f3f4f6', fontWeight: 700, fontSize: '0.78rem', color: pctColor(pct) }}>{pct}%</span>
+                <span style={{ padding: '2px 8px', borderRadius: 20, background: '#e8f5e9', fontWeight: 700, fontSize: '0.78rem', color: '#27ae60' }}>✓ {j.aciertos ?? 0}/{j.intentos ?? 0}</span>
+                {j.sinMarcar > 0 && <span title="Respuestas abiertas que el alumno no autoevaluó" style={{ padding: '2px 8px', borderRadius: 20, background: '#fef3c7', fontWeight: 700, fontSize: '0.74rem', color: '#92400e' }}>❓ {j.sinMarcar}</span>}
+                {detalle.length > 0 && <span style={{ color: '#95a5a6', fontSize: '0.8rem' }}>{abierto ? '▾' : '▸'} detalle</span>}
+                {!modoSeleccion && <button onClick={e => { e.stopPropagation(); setConfirmar(true); }} style={{ padding: '4px 7px', borderRadius: 7, border: '1px solid #fdd', background: '#fdecea', color: '#e74c3c', cursor: 'pointer' }}><Trash2 size={13} /></button>}
+            </div>
+            {abierto && detalle.length > 0 && (
+                <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 15px 12px', display: 'grid', gap: 6 }}>
+                    {detalle.map((d, i) => (
+                        <div key={i} style={{ fontSize: '0.8rem', padding: '6px 9px', borderRadius: 8, background: d.ok === true ? '#f0fdf4' : d.ok === false ? '#fef2f2' : '#fffbeb' }}>
+                            <div style={{ color: '#2c3e50' }}><b>{d.n}.</b> {d.enunciado}</div>
+                            <div style={{ color: '#555', marginTop: 2 }}>
+                                {d.ok === true ? '✅' : d.ok === false ? '❌' : '❓'} Respuesta: <b>{d.respuesta || '(en blanco)'}</b>
+                                {d.ok !== true && d.correcta && <span style={{ color: '#27ae60' }}> · Correcta: {d.correcta}</span>}
+                                {d.autoevaluada && <span style={{ color: '#95a5a6' }}> · autoevaluada</span>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background: '#fdecea', borderTop: '1px solid #fdd', padding: '10px 15px', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c" />
+                    <span style={{ flex: 1, color: '#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={() => { setConfirmar(false); onBorrar(); }} disabled={borrando} style={{ padding: '4px 12px', borderRadius: 7, border: 'none', background: '#e74c3c', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>{borrando ? 'Borrando…' : 'Eliminar'}</button>
+                    <button onClick={() => setConfirmar(false)} style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background: '#e8f5e9', padding: '8px 15px', fontSize: '0.8rem', color: '#27ae60', display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle size={13} />Eliminado</div>}
         </div>
     );
 };

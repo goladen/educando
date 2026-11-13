@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { factorLetra } from './utils/encajeTexto';
 // AÑADIDO: 'increment' para sumar 1 al playCount
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
@@ -399,7 +400,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar, modoOlimp
                                                 }}
                                             />
                                         ) : (
-                                                <span>{carta.content}</span>
+                                                <span style={factorLetra(carta.content, 18, 0.5) < 1 ? { fontSize: `calc(clamp(10px, 4vmin, 24px) * ${factorLetra(carta.content, 18, 0.5).toFixed(3)})`, lineHeight: 1.1, overflowWrap: 'anywhere' } : undefined}>{carta.content}</span>
                                             )}
                                     </div>
                                     <div className="face back">?</div>

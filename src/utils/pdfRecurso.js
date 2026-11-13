@@ -181,7 +181,17 @@ function cabecera(D, recurso, formato, subtitulo, juego, qrImg) {
         D.fuente('bold', 11.5, MORADO);
         pdf.text('Después lo jugaremos en clase', xt, D.y + 6.5);
         D.fuente('normal', 9.5, [60, 60, 60]);
-        pdf.text(seguro(`Juego: ${juego.label}${recurso.accessCode ? `   ·   Código en pikt.es: ${recurso.accessCode}` : ''}`), xt, D.y + 11.5);
+        if (juego.codigoFicha) {
+            // Código corto de la ficha (utils/fichaCodigo.js): mismas preguntas y mismo orden en el juego
+            pdf.text(seguro(`Juego: ${juego.label}   ·   Escribe el código en pikt.es o escanea el QR`), xt, D.y + 11.5);
+            const xc = MM.margen + ANCHO_UTIL - (qrImg ? 29 : 5);
+            D.fuente('bold', 7, GRIS);
+            pdf.text('CÓDIGO DE LA FICHA', xc, D.y + 5, { align: 'right' });
+            D.fuente('bold', 16, MORADO);
+            pdf.text(juego.codigoFicha, xc, D.y + 11.5, { align: 'right' });
+        } else {
+            pdf.text(seguro(`Juego: ${juego.label}${recurso.accessCode ? `   ·   Código en pikt.es: ${recurso.accessCode}` : ''}`), xt, D.y + 11.5);
+        }
         if (qrImg) {
             D.fuente('normal', 8, GRIS);
             const url = pdf.splitTextToSize(seguro(juego.url), ANCHO_UTIL - 40);

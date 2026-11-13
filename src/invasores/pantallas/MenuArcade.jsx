@@ -7,6 +7,7 @@ import { OPERACIONES_RAPIDAS, BANCOS, hojasDeRecurso, desdeRecurso, jugables } f
 import { BTN, chip, PANEL, TITULO_NEON, NEON, COLORES_JUGADOR } from '../tema';
 import { AlienSVG, NaveSVG } from '../ui/Sprites';
 import BuscadorRecursos from './BuscadorRecursos';
+import { elegirEncaje } from '../../components/ConAvisoEncaje';
 import ModalPdf from './ModalPdf';
 
 // Los generadores de Math World pesan: solo se cargan al abrir esa pestaña
@@ -376,7 +377,7 @@ export default function MenuArcade({
 
       {buscando && (
         <BuscadorRecursos variante={variante} onCerrar={() => setBuscando(false)}
-          onPick={(r) => { setFuente({ recurso: r, hojas: null }); setBuscando(false); }} />
+          onPick={async (r) => { const rr = await elegirEncaje(r, 'INVASORES'); if (!rr) return; setFuente({ recurso: rr, hojas: null }); setBuscando(false); }} />
       )}
     </div>
   );

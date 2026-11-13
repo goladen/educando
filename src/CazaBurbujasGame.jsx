@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy
 import confetti from 'canvas-confetti';
 import ReactionAvatar from './components/ReactionAvatar';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { factorLetra, letraAjustada } from './utils/encajeTexto';
 
 // --- IMPORTACIÓN DE AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -757,7 +758,8 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
         hojasAProcesar.forEach(h => {
             // A) Manuales
             let manuales = [...(h.preguntas || [])];
-            manuales.sort(() => Math.random() - 0.5);
+            // Ficha PDF con código (?fc=): las preguntas en el orden del papel
+            if (!recurso.ordenFicha) manuales.sort(() => Math.random() - 0.5);
             if (manuales.length > maxPreguntas) {
                 manuales = manuales.slice(0, maxPreguntas);
             }
@@ -784,7 +786,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
             }
         });
 
-        pool.sort(() => Math.random() - 0.5);
+        if (!recurso.ordenFicha) pool.sort(() => Math.random() - 0.5);
 
         preguntasJugables.current = pool;
         indiceActual.current = 0;
@@ -974,9 +976,18 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
             const color = cols[Math.floor(Math.random() * 6)];
             el.className = `shape-container ${color}`;
             el.innerHTML = `<span>${op.txt}</span>`;
+            // Textos largos: letra más pequeña y burbuja algo mayor para que se lean enteros
+            const fBurbuja = factorLetra(op.txt, 14, 0.55);
+            if (fBurbuja < 1) {
+                el.style.fontSize = `calc(clamp(0.8rem, 3vw, 1.5rem) * ${fBurbuja.toFixed(3)})`;
+                el.style.lineHeight = '1.1';
+                el.style.overflowWrap = 'anywhere';
+                el.style.padding = '0 6%';
+                el.style.boxSizing = 'border-box';
+            }
 
             // Tamaño dinámico (vmin asegura que no sea gigante en monitores wide)
-            const randomSize = Math.random() * 4 + baseSizeVmin;
+            const randomSize = (Math.random() * 4 + baseSizeVmin) * (fBurbuja < 1 ? 1.2 : 1);
             el.style.width = `${randomSize}vmin`;
             el.style.height = `${randomSize}vmin`;
 
@@ -1071,7 +1082,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
                 </div>
 
                 <div style={{ color: 'white', fontSize: '0.8rem' }}>Pregunta {progreso.actual} / {progreso.total}</div>
-                <div id="question-text">{preguntaActualState?.pregunta || '...'}</div>
+                <div id="question-text" style={factorLetra(preguntaActualState?.pregunta, 90, 0.65) < 1 ? { fontSize: letraAjustada('clamp(0.9rem, 3.5vw, 1.4rem)', preguntaActualState?.pregunta, 90, 0.65), WebkitLineClamp: 3, lineHeight: 1.05 } : undefined}>{preguntaActualState?.pregunta || '...'}</div>
             </div>
 
             {modo === 'Burbujas' ? (
@@ -1079,7 +1090,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
             ) : (
                     <div id="test-area" style={{ zIndex: 10 }}>
                         {opcionesTest.map((op, i) => (
-                            <div key={i} className={`test-option ${indiceFeedback === i ? tipoFeedback : ''}`} onClick={() => clickTest(op, i)}>{op.txt}</div>
+                            <div key={i} className={`test-option ${indiceFeedback === i ? tipoFeedback : ''}`} onClick={() => clickTest(op, i)} style={factorLetra(op.txt, 80, 0.7) < 1 ? { fontSize: letraAjustada('1rem', op.txt, 80, 0.7) } : undefined}>{op.txt}</div>
                         ))}
                     </div>
                 )}

@@ -83,16 +83,25 @@ const CapaSeisSiete = () => {
   );
 };
 
+// Pantalla dividida: cada jugador juega dentro de su zona. El contexto da el elemento raíz de la zona
+// (para que las partículas salgan de su zona y no de la esquina de la pantalla).
+const PanelCtx = React.createContext(null);
+const usePanelRaiz = () => React.useContext(PanelCtx) || { current: null };
+
 // Chorro continuo de 6/7 mientras el componente está montado (victorias y menú).
 const useChorro67 = (cada = 220, cantidad = 2, desdeAbajo = false) => {
+  const panel = React.useContext(PanelCtx);
   useEffect(() => {
     if (movimientoReducido()) return;
     const iv = setInterval(() => {
-      if (desdeAbajo) lanzar67(window.innerWidth * (0.1 + Math.random() * 0.8), window.innerHeight - 20, cantidad);
+      const r = panel?.current?.getBoundingClientRect();
+      const L = r ? r.left : 0, T = r ? r.top : 0, W = r ? r.width : window.innerWidth, H = r ? r.height : window.innerHeight;
+      if (desdeAbajo) lanzar67(L + W * (0.1 + Math.random() * 0.8), T + H - 20, cantidad);
+      else if (r) lanzar67(L + W - 50, T + H - 40, cantidad);
       else lanzar67(undefined, undefined, cantidad);
-    }, cada);
+    }, panel ? cada * 1.6 : cada); // en pantalla dividida hay varios chorros: algo menos de cada uno
     return () => clearInterval(iv);
-  }, [cada, cantidad, desdeAbajo]);
+  }, [cada, cantidad, desdeAbajo, panel]);
 };
 
 const useWindowSize = () => {
@@ -225,7 +234,7 @@ const theme = {
 const styles = {
   wrapper: {
     width: '100%',
-    minHeight: '100vh',
+    minHeight: '100cqh',
     background: `radial-gradient(circle at 50% 0%, #1a1a2e 0%, ${theme.bg} 80%)`,
     color: theme.text,
     fontFamily: '"Inter", "Montserrat", system-ui, sans-serif',
@@ -233,7 +242,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 'clamp(10px, 3vw, 20px)',
+    padding: 'clamp(10px, 3cqw, 20px)',
     boxSizing: 'border-box',
     overflow: 'hidden',
     userSelect: 'none',
@@ -245,7 +254,7 @@ const styles = {
     WebkitBackdropFilter: 'blur(12px)',
     border: `1px solid rgba(255, 255, 255, 0.1)`,
     borderRadius: '24px',
-    padding: 'clamp(20px, 5vw, 40px)',
+    padding: 'clamp(20px, 5cqw, 40px)',
     width: '100%',
     maxWidth: '900px',
     boxShadow: '0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)',
@@ -255,7 +264,7 @@ const styles = {
     position: 'relative',
   },
   glitchTitle: {
-    fontSize: 'clamp(3rem, 10vw, 7rem)',
+    fontSize: 'clamp(3rem, 10cqw, 7rem)',
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: '-2px',
@@ -270,8 +279,8 @@ const styles = {
   btnPrimary: {
     position: 'relative',
     width: '100%',
-    padding: 'clamp(15px, 3vw, 25px)',
-    fontSize: 'clamp(1.2rem, 3vw, 1.8rem)',
+    padding: 'clamp(15px, 3cqw, 25px)',
+    fontSize: 'clamp(1.2rem, 3cqw, 1.8rem)',
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: '2px',
@@ -294,7 +303,7 @@ const styles = {
     color: theme.neonCyan,
     padding: '10px 20px',
     borderRadius: '12px',
-    fontSize: 'clamp(0.9rem, 2vw, 1.2rem)',
+    fontSize: 'clamp(0.9rem, 2cqw, 1.2rem)',
     fontWeight: 'bold',
     textTransform: 'uppercase',
     cursor: 'pointer',
@@ -362,23 +371,23 @@ const WinScreen = ({ score, onMenu, onRestart, message = "GOD TIER", color = the
       }
     `}</style>
     <h2 style={{
-      fontSize: 'clamp(2.5rem, 6vw, 5rem)', color: color, textShadow: `0 0 20px ${color}`,
+      fontSize: 'clamp(2.5rem, 6cqw, 5rem)', color: color, textShadow: `0 0 20px ${color}`,
       textTransform: 'uppercase', margin: '0 0 10px 0', lineHeight: 1.1
     }}>
       {message}
     </h2>
     {score !== undefined && (
-      <div style={{ fontSize: 'clamp(1.5rem, 4vw, 3rem)', color: '#fff', marginBottom: '20px' }}>
+      <div style={{ fontSize: 'clamp(1.5rem, 4cqw, 3rem)', color: '#fff', marginBottom: '20px' }}>
         SCORE: <span style={{color: theme.neonCyan}}>{score}</span>
       </div>
     )}
-    <div style={{ display: 'flex', gap: 'clamp(10px, 4vw, 30px)', margin: '20px 0 40px 0' }}>
+    <div style={{ display: 'flex', gap: 'clamp(10px, 4cqw, 30px)', margin: '20px 0 40px 0' }}>
       <div style={{
-        fontSize: 'clamp(6rem, 15vw, 12rem)', fontWeight: '900', color: theme.neonPink,
+        fontSize: 'clamp(6rem, 15cqw, 12rem)', fontWeight: '900', color: theme.neonPink,
         textShadow: `0 0 30px ${theme.neonPink}`, animation: 'dance6 0.6s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94)'
       }}>6</div>
       <div style={{
-        fontSize: 'clamp(6rem, 15vw, 12rem)', fontWeight: '900', color: theme.neonCyan,
+        fontSize: 'clamp(6rem, 15cqw, 12rem)', fontWeight: '900', color: theme.neonCyan,
         textShadow: `0 0 30px ${theme.neonCyan}`, animation: 'dance7 0.6s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s'
       }}>7</div>
     </div>
@@ -399,7 +408,7 @@ const WinScreen = ({ score, onMenu, onRestart, message = "GOD TIER", color = the
 const SelectorNivel = ({ titulo, normal, dificil, onElegir, onBack }) => (
   <div style={styles.wrapper}>
     <div style={styles.glassCard}>
-      <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6vw, 4rem)', marginBottom: '30px', marginTop: '10px'}}>{titulo}</h2>
+      <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6cqw, 4rem)', marginBottom: '30px', marginTop: '10px'}}>{titulo}</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '400px' }}>
         <button style={{...styles.btnPrimary, background: `linear-gradient(90deg, #0072FF, ${theme.neonCyan})`, boxShadow: `0 0 20px rgba(0,240,255,0.4)`}} onClick={() => { audioManager.init(); onElegir('normal'); }}>
           <span>Normal</span>
@@ -512,8 +521,8 @@ const RankingSixSeven = ({ juegoInicial = 'arcade', selInicial = null, jugada = 
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
-      <div style={{ ...styles.glassCard, maxWidth: '520px', border: `2px solid ${theme.neonPurple}`, boxShadow: `0 0 30px ${theme.neonPurple}`, padding: 'clamp(18px, 4vw, 30px)' }}>
-        <h2 style={{ color: theme.neonCyan, margin: '0 0 14px', fontSize: 'clamp(1.5rem, 5vw, 2rem)', textTransform: 'uppercase', textShadow: `0 0 12px ${theme.neonCyan}` }}>🏆 Ranking</h2>
+      <div style={{ ...styles.glassCard, maxWidth: '520px', border: `2px solid ${theme.neonPurple}`, boxShadow: `0 0 30px ${theme.neonPurple}`, padding: 'clamp(18px, 4cqw, 30px)' }}>
+        <h2 style={{ color: theme.neonCyan, margin: '0 0 14px', fontSize: 'clamp(1.5rem, 5cqw, 2rem)', textTransform: 'uppercase', textShadow: `0 0 12px ${theme.neonCyan}` }}>🏆 Ranking</h2>
 
         {!jugada && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -787,10 +796,10 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = 
               <button style={styles.btnSecondary} onClick={onBack}>← ABORT</button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: theme.neonCyan, fontWeight: '900', fontSize: 'clamp(1.5rem, 4vw, 2.5rem)', letterSpacing: '2px', lineHeight: 1.1 }}>
+                  <div style={{ color: theme.neonCyan, fontWeight: '900', fontSize: 'clamp(1.5rem, 4cqw, 2.5rem)', letterSpacing: '2px', lineHeight: 1.1 }}>
                     {hard ? 'HARD · ' : ''}LVL {round}/6
                   </div>
-                  <div style={{ color: theme.neonPink, fontWeight: '900', fontSize: 'clamp(1rem, 2.5vw, 1.4rem)', textShadow: `0 0 10px ${theme.neonPink}` }}>{score} PTS</div>
+                  <div style={{ color: theme.neonPink, fontWeight: '900', fontSize: 'clamp(1rem, 2.5cqw, 1.4rem)', textShadow: `0 0 10px ${theme.neonPink}` }}>{score} PTS</div>
                 </div>
                 <button style={styles.btnInfo} onClick={() => { audioManager.init(); setShowInfo(true); }}>?</button>
               </div>
@@ -801,7 +810,7 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = 
                 <style>{`@keyframes popPts67 { 0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; } 15% { transform: translate(-50%, -10px) scale(1.15); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -40px) scale(1); opacity: 0; } }`}</style>
                 <div style={{
                   position: 'absolute', left: '50%', top: '-24px', whiteSpace: 'nowrap', pointerEvents: 'none',
-                  fontWeight: 900, fontSize: 'clamp(1.1rem, 3vw, 1.6rem)', color: ultimo.color, textShadow: `0 0 12px ${ultimo.color}`,
+                  fontWeight: 900, fontSize: 'clamp(1.1rem, 3cqw, 1.6rem)', color: ultimo.color, textShadow: `0 0 12px ${ultimo.color}`,
                   animation: 'popPts67 1.3s ease-out forwards',
                 }}>
                   {ultimo.texto} +{ultimo.pts} <span style={{ opacity: 0.7, fontSize: '0.75em' }}>({ultimo.seg.toFixed(1)} s)</span>
@@ -824,7 +833,7 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = 
                 )}
                 
                 <div style={{ 
-                  fontSize: 'clamp(3rem, 10vw, 7rem)', 
+                  fontSize: 'clamp(3rem, 10cqw, 7rem)', 
                   fontWeight: '900', 
                   color: '#fff',
                   textShadow: `0 0 20px ${theme.neonPurple}`,
@@ -846,7 +855,7 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = 
                     })}
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(15px, 4vw, 30px)', width: '100%' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(15px, 4cqw, 30px)', width: '100%' }}>
                   {question.options.map((opt, i) => (
                     <button
                       key={i}
@@ -854,9 +863,9 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = 
                         background: 'rgba(255,255,255,0.05)',
                         border: `1px solid rgba(255,255,255,0.2)`,
                         color: '#fff',
-                        fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                        fontSize: 'clamp(2rem, 5cqw, 3.5rem)',
                         fontWeight: 'bold',
-                        padding: 'clamp(15px, 4vw, 30px)',
+                        padding: 'clamp(15px, 4cqw, 30px)',
                         borderRadius: '20px',
                         cursor: 'pointer',
                         touchAction: 'manipulation',
@@ -882,16 +891,16 @@ const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario, mandosApi = 
             {status === 'lost' && (
               <div style={{ textAlign: 'center', padding: '40px 0', width: '100%' }}>
                 <h2 style={{ 
-                  fontSize: 'clamp(3rem, 8vw, 6rem)', color: theme.neonPink, textShadow: `0 0 20px ${theme.neonPink}`,
+                  fontSize: 'clamp(3rem, 8cqw, 6rem)', color: theme.neonPink, textShadow: `0 0 20px ${theme.neonPink}`,
                   textTransform: 'uppercase', margin: '0 0 10px 0', lineHeight: 1.1
                 }}>WASTED</h2>
-                <div style={{ fontSize: 'clamp(1.5rem, 3vw, 2.5rem)', color: '#fff', marginBottom: '40px' }}>
+                <div style={{ fontSize: 'clamp(1.5rem, 3cqw, 2.5rem)', color: '#fff', marginBottom: '40px' }}>
                   <span style={{opacity: 0.8}}>La respuesta correcta era:</span><br/>
-                  <span style={{ color: theme.neonCyan, fontSize: 'clamp(3rem, 6vw, 4rem)', fontWeight: '900', textShadow: `0 0 15px ${theme.neonCyan}` }}>
+                  <span style={{ color: theme.neonCyan, fontSize: 'clamp(3rem, 6cqw, 4rem)', fontWeight: '900', textShadow: `0 0 15px ${theme.neonCyan}` }}>
                     {question.ans}
                   </span>
                 </div>
-                <div style={{ fontSize: 'clamp(1.3rem, 3vw, 2rem)', color: '#fff', marginBottom: '25px' }}>
+                <div style={{ fontSize: 'clamp(1.3rem, 3cqw, 2rem)', color: '#fff', marginBottom: '25px' }}>
                   SCORE: <span style={{ color: theme.neonCyan, fontWeight: 900 }}>{score}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -1112,15 +1121,15 @@ const TargetGame = ({ onBack, nivel = 'normal' }) => {
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-              <div style={{ color: theme.muted, textTransform: 'uppercase', letterSpacing: '3px', fontSize: 'clamp(0.9rem, 2vw, 1.2rem)' }}>{hard ? 'Hard · Target Acquired' : 'Target Acquired'}</div>
-              <div style={{ fontSize: 'clamp(5rem, 15vw, 9rem)', fontWeight: '900', color: theme.neonCyan, textShadow: `0 0 30px ${theme.neonCyan}`, lineHeight: 1 }}>
+              <div style={{ color: theme.muted, textTransform: 'uppercase', letterSpacing: '3px', fontSize: 'clamp(0.9rem, 2cqw, 1.2rem)' }}>{hard ? 'Hard · Target Acquired' : 'Target Acquired'}</div>
+              <div style={{ fontSize: 'clamp(5rem, 15cqw, 9rem)', fontWeight: '900', color: theme.neonCyan, textShadow: `0 0 30px ${theme.neonCyan}`, lineHeight: 1 }}>
                 67
               </div>
             </div>
 
             {status === 'lost' ? (
               <div style={{ textAlign: 'center', width: '100%', padding: '20px 0' }}>
-                 <h2 style={{ color: theme.neonPink, fontSize: 'clamp(2.5rem, 6vw, 5rem)', textShadow: `0 0 20px ${theme.neonPink}`, margin: '0 0 30px 0' }}>SYSTEM FAILURE</h2>
+                 <h2 style={{ color: theme.neonPink, fontSize: 'clamp(2.5rem, 6cqw, 5rem)', textShadow: `0 0 20px ${theme.neonPink}`, margin: '0 0 30px 0' }}>SYSTEM FAILURE</h2>
                  <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
                      <button style={{...styles.btnPrimary, background: theme.neonPink, color: '#000', maxWidth: '200px'}} onClick={resetCurrentBoard}>RETRY BOARD</button>
                      <button style={{...styles.btnPrimary, background: theme.neonCyan, color: '#000', maxWidth: '200px'}} onClick={generateNewBoard}>NEW GAME</button>
@@ -1129,7 +1138,7 @@ const TargetGame = ({ onBack, nivel = 'normal' }) => {
               </div>
             ) : (
               <>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(10px, 3vw, 20px)', marginBottom: '40px', width: '100%' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(10px, 3cqw, 20px)', marginBottom: '40px', width: '100%' }}>
                   {nums.map((n, i) => {
                     const isActive = activeNum === i;
                     return (
@@ -1140,9 +1149,9 @@ const TargetGame = ({ onBack, nivel = 'normal' }) => {
                           background: isActive ? `linear-gradient(135deg, ${theme.neonCyan}, ${theme.neonPurple})` : 'rgba(255,255,255,0.05)',
                           border: `2px solid ${isActive ? 'transparent' : 'rgba(255,255,255,0.1)'}`,
                           color: isActive ? '#000' : '#fff',
-                          fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                          fontSize: 'clamp(2rem, 5cqw, 3.5rem)',
                           fontWeight: '900',
-                          width: 'clamp(70px, 15vw, 110px)',
+                          width: 'clamp(70px, 15cqw, 110px)',
                           aspectRatio: '1',
                           display: 'flex',
                           alignItems: 'center',
@@ -1160,7 +1169,7 @@ const TargetGame = ({ onBack, nivel = 'normal' }) => {
                   })}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(10px, 3vw, 20px)' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 'clamp(10px, 3cqw, 20px)' }}>
                   {['+', '-', '×', '÷'].map((op) => {
                     const isActiveOp = activeOp === op;
                     return (
@@ -1174,8 +1183,8 @@ const TargetGame = ({ onBack, nivel = 'normal' }) => {
                           background: isActiveOp ? theme.neonPink : 'transparent',
                           border: `2px solid ${activeNum === null ? 'rgba(255,255,255,0.1)' : theme.neonPink}`,
                           color: isActiveOp ? '#000' : (activeNum === null ? theme.muted : theme.neonPink),
-                          fontSize: 'clamp(2rem, 5vw, 3rem)',
-                          width: 'clamp(60px, 12vw, 90px)',
+                          fontSize: 'clamp(2rem, 5cqw, 3rem)',
+                          width: 'clamp(60px, 12cqw, 90px)',
                           aspectRatio: '1',
                           display: 'flex',
                           alignItems: 'center',
@@ -1293,6 +1302,7 @@ const asegurarJugadas = (grid, modo, nuevos, objetivo = JUGADAS_MIN, probNatural
 };
 
 const MatrixGame = ({ onBack, timeLimit, usuario }) => {
+  const panelRaiz = usePanelRaiz();
   const [verRanking, setVerRanking] = useState(false);
   const [subMode, setSubMode] = useState(null);
   const [grid, setGrid] = useState([]);
@@ -1452,7 +1462,7 @@ const MatrixGame = ({ onBack, timeLimit, usuario }) => {
       stats.current.aciertos++;
       audioManager.play('win');
       const especial = v3 === 6 || v3 === 7 || v3 === 67;
-      lanzar67DesdeElemento(document.querySelector(`[data-idx="${i3}"]`), Math.min((especial ? 8 : 3) + combo, 14));
+      lanzar67DesdeElemento((panelRaiz.current || document).querySelector(`[data-idx="${i3}"]`), Math.min((especial ? 8 : 3) + combo, 14));
       setCombo(c => c + 1);
       setScore(s => s + ((v3 === 6 || v3 === 7 || v3 === 67 ? 50 : 10) * (combo + 1)));
       
@@ -1492,7 +1502,7 @@ const MatrixGame = ({ onBack, timeLimit, usuario }) => {
              } 
            />
 
-           <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6vw, 4rem)', marginBottom: '30px', marginTop: '20px'}}>SELECT PROTOCOL</h2>
+           <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6cqw, 4rem)', marginBottom: '30px', marginTop: '20px'}}>SELECT PROTOCOL</h2>
            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '400px' }}>
               <button style={{...styles.btnPrimary, background: theme.neonCyan, color: '#000'}} onClick={()=>setSubMode('add')}>SUMA (+)</button>
               <button style={{...styles.btnPrimary, background: theme.neonPink, color: '#000'}} onClick={()=>setSubMode('sub')}>RESTA (-)</button>
@@ -1556,7 +1566,7 @@ const MatrixGame = ({ onBack, timeLimit, usuario }) => {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ color: theme.neonCyan, fontSize: 'clamp(1.5rem, 4vw, 2.5rem)', fontWeight: '900', textShadow: `0 0 10px ${theme.neonCyan}` }}>
+            <div style={{ color: theme.neonCyan, fontSize: 'clamp(1.5rem, 4cqw, 2.5rem)', fontWeight: '900', textShadow: `0 0 10px ${theme.neonCyan}` }}>
               {score} PTS
             </div>
             {combo > 1 && <div style={{ color: theme.neonPink, fontSize: '1rem', fontWeight: 'bold' }}>{combo}x COMBO!</div>}
@@ -1570,9 +1580,9 @@ const MatrixGame = ({ onBack, timeLimit, usuario }) => {
         )}
 
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 'clamp(4px, 1vw, 10px)',
+          display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 'clamp(4px, 1cqw, 10px)',
           width: '100%', aspectRatio: '6/7', background: 'rgba(255,255,255,0.02)',
-          padding: 'clamp(10px, 2vw, 20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)',
+          padding: 'clamp(10px, 2cqw, 20px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)',
           boxShadow: 'inset 0 0 30px rgba(0,0,0,0.8)'
         }}>
           {grid.map((val, idx) => {
@@ -1588,7 +1598,7 @@ const MatrixGame = ({ onBack, timeLimit, usuario }) => {
                   border: `1px solid ${isSel ? 'transparent' : 'rgba(255,255,255,0.1)'}`,
                   color: isSel ? '#fff' : theme.text,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 'clamp(1.2rem, 4vw, 2.5rem)', fontWeight: '900', borderRadius: '12px',
+                  fontSize: 'clamp(1.2rem, 4cqw, 2.5rem)', fontWeight: '900', borderRadius: '12px',
                   boxShadow: isSel ? `0 0 15px ${theme.neonPink}` : 'none',
                   transform: isLast ? 'scale(1.15)' : (isSel ? 'scale(1.05)' : 'scale(1)'),
                   transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -1609,7 +1619,7 @@ const MatrixGame = ({ onBack, timeLimit, usuario }) => {
 const SettingsScreen = ({ settings, updateSettings, onBack }) => (
   <div style={styles.wrapper}>
     <div style={styles.glassCard}>
-      <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6vw, 4rem)', marginBottom: '30px'}}>SETTINGS</h2>
+      <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6cqw, 4rem)', marginBottom: '30px'}}>SETTINGS</h2>
       
       <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '30px' }}>
         
@@ -1657,7 +1667,7 @@ const SettingsScreen = ({ settings, updateSettings, onBack }) => (
   </div>
 );
 
-const MainMenu = ({ setMode, onExit, usuario }) => {
+const MainMenu = ({ setMode, onExit, usuario, onDividir = null }) => {
   const [verRanking, setVerRanking] = useState(false);
   useChorro67(900, 1);
 
@@ -1683,8 +1693,8 @@ const MainMenu = ({ setMode, onExit, usuario }) => {
         onPointerDown={(e) => lanzar67(e.clientX, e.clientY, 10)}
       >SIX<br/>SEVEN</h1>
       <p style={{
-          fontSize: 'clamp(1rem, 3vw, 1.5rem)', color: theme.neonCyan, textTransform: 'uppercase',
-          letterSpacing: '4px', marginBottom: 'clamp(30px, 6vw, 50px)', textAlign: 'center', fontWeight: '600'
+          fontSize: 'clamp(1rem, 3cqw, 1.5rem)', color: theme.neonCyan, textTransform: 'uppercase',
+          letterSpacing: '4px', marginBottom: 'clamp(30px, 6cqw, 50px)', textAlign: 'center', fontWeight: '600'
       }}>Select Neural Link</p>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', maxWidth: '400px' }}>
@@ -1706,42 +1716,156 @@ const MainMenu = ({ setMode, onExit, usuario }) => {
         <button style={{...styles.btnSecondary, marginTop: '10px', padding: '14px 20px', borderColor: theme.neonPurple, color: theme.neonPurple, boxShadow: `0 0 12px rgba(176,38,255,0.35)`}} onClick={() => setVerRanking(true)}>
           🏆 RANKINGS
         </button>
+        {onDividir && (
+          <div style={{ border: `2px solid ${theme.neonGreen}`, borderRadius: '14px', padding: '12px', textAlign: 'center', boxShadow: '0 0 12px rgba(57,255,20,0.25)' }}>
+            <div style={{ color: theme.neonGreen, fontWeight: 900, letterSpacing: '1px', marginBottom: '8px' }}>👥 VARIOS A LA VEZ · PANTALLA DIVIDIDA</div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              {[2, 3, 4].map((k) => (
+                <button key={k} onClick={() => { audioManager.init(); onDividir(k); }} style={{ ...styles.btnSecondary, flex: 1, borderColor: theme.neonGreen, color: theme.neonGreen, padding: '10px 6px' }}>{k} 🧑</button>
+              ))}
+            </div>
+            <div style={{ color: theme.muted, fontSize: '0.8rem', marginTop: '6px' }}>Cada uno juega a lo que quiera en su zona (ideal para el monitor táctil).</div>
+          </div>
+        )}
       </div>
       {verRanking && <RankingSixSeven usuario={usuario} onClose={() => setVerRanking(false)} />}
     </div>
   );
 };
 
-export default function SixSeven({ onExit, usuario = null }) {
+// Una partida completa de Six Seven (menú, ajustes, niveles y los 3 juegos). En pantalla dividida
+// hay una por jugador, cada una con su propio estado: uno puede jugar al Speed Run y otro al Neon Grid.
+function SesionSixSeven({ onExit, usuario, mandosApi = null, juegoMandos = null, alCambiar = null, onDividir = null }) {
   const [mode, setMode] = useState('menu');
-  const mandosApi = useRef(null);
-  const juegoMandos = useRef({});
   const [settings, setSettings] = useState({ arcadeTime: 13, matrixTime: 67 });
-  useWindowSize();
-
   const [nivel, setNivel] = useState(null); // 'normal' | 'hard' para Speed Run y Target 67
-  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignorar */ } }, []);
+  useEffect(() => { alCambiar?.(mode, nivel); }, [mode, nivel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const alMenu = () => { setNivel(null); setMode('menu'); };
 
-  let pantalla;
-  if (mode === 'settings') pantalla = <SettingsScreen settings={settings} updateSettings={(k, v) => setSettings(s => ({...s, [k]: v}))} onBack={() => setMode('menu')} />;
-  else if ((mode === 'arcade' || mode === 'target') && !nivel) pantalla = mode === 'arcade'
+  if (mode === 'settings') return <SettingsScreen settings={settings} updateSettings={(k, v) => setSettings(s => ({...s, [k]: v}))} onBack={() => setMode('menu')} />;
+  if ((mode === 'arcade' || mode === 'target') && !nivel) return mode === 'arcade'
     ? <SelectorNivel titulo="SPEED RUN" normal="Como siempre: opciones cercanas a la respuesta" dificil="Todas las opciones acaban en la misma cifra" onElegir={setNivel} onBack={alMenu} />
     : <SelectorNivel titulo="TARGET 67" normal="Como siempre: sumas y restas suelen bastar" dificil="Necesitas × o ÷ y usar casi todos los números" onElegir={setNivel} onBack={alMenu} />;
-  else if (mode === 'arcade') pantalla = <ArcadeGame key={nivel} nivel={nivel} usuario={usuario} timeLimit={settings.arcadeTime} onBack={alMenu} mandosApi={mandosApi} juegoMandos={juegoMandos} />;
-  else if (mode === 'target') pantalla = <TargetGame key={nivel} nivel={nivel} onBack={alMenu} />;
-  else if (mode === 'matrix') pantalla = <MatrixGame usuario={usuario} timeLimit={settings.matrixTime} onBack={() => setMode('menu')} />;
-  else pantalla = <MainMenu setMode={setMode} onExit={onExit} usuario={usuario} />;
+  if (mode === 'arcade') return <ArcadeGame key={nivel} nivel={nivel} usuario={usuario} timeLimit={settings.arcadeTime} onBack={alMenu} mandosApi={mandosApi} juegoMandos={juegoMandos} />;
+  if (mode === 'target') return <TargetGame key={nivel} nivel={nivel} onBack={alMenu} />;
+  if (mode === 'matrix') return <MatrixGame usuario={usuario} timeLimit={settings.matrixTime} onBack={() => setMode('menu')} />;
+  return <MainMenu setMode={setMode} onExit={onExit} usuario={usuario} onDividir={onDividir} />;
+}
+
+const COLORES_ZONA = [theme.neonPink, theme.neonCyan, theme.neonGreen, '#FFB800'];
+
+// Toques en el monitor interactivo: con varios dedos a la vez el navegador suele perder los «click»
+// (los toma como un gesto de varios dedos). Cada zona convierte cada toque (pointerdown + pointerup
+// sobre el mismo botón) en un clic propio, independiente de lo que hagan los demás, y descarta el
+// clic nativo duplicado si llega.
+const useToquesIndependientes = () => {
+  const toques = useRef(new Map());
+  return {
+    onPointerDownCapture: (e) => {
+      if (e.pointerType === 'mouse') return;
+      const b = e.target.closest?.('button');
+      if (b) toques.current.set(e.pointerId, b);
+    },
+    onPointerUpCapture: (e) => {
+      const b = toques.current.get(e.pointerId);
+      toques.current.delete(e.pointerId);
+      if (!b || b.disabled || !b.isConnected) return;
+      const debajo = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('button');
+      if (debajo !== b) return; // ha levantado el dedo fuera del botón
+      b.__piktToque = Date.now();
+      b.click();
+    },
+    onPointerCancelCapture: (e) => { toques.current.delete(e.pointerId); },
+    onClickCapture: (e) => {
+      if (!e.isTrusted) return;
+      const b = e.target.closest?.('button');
+      if (b?.__piktToque && Date.now() - b.__piktToque < 800) { e.stopPropagation(); e.preventDefault(); }
+    },
+  };
+};
+
+// Zona de un jugador. Se escala (zoom) para que el juego quepa: dentro, el juego «cree» que tiene una
+// pantalla de al menos ~760×700. Es contenedor CSS (cqw/cqh) y contiene sus capas fijas (ranking…).
+function ZonaJugador({ i }) {
+  const caja = useRef(null);
+  const raiz = useRef(null);
+  const [tam, setTam] = useState(null);
+  const toques = useToquesIndependientes();
+  useEffect(() => {
+    const el = caja.current;
+    if (!el) return undefined;
+    const medir = () => setTam({ w: el.clientWidth, h: el.clientHeight });
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const z = tam ? Math.max(0.45, Math.min(1, tam.w / 760, tam.h / 700)) : 1;
+  const color = COLORES_ZONA[i];
+  return (
+    <div ref={caja} style={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, border: `3px solid ${color}`, boxShadow: `inset 0 0 18px ${color}55`, background: theme.bg }}>
+      {tam && (
+        <div style={{ position: 'absolute', left: 0, top: 0, width: tam.w / z, height: tam.h / z, zoom: z }}>
+          <div ref={raiz} {...toques} style={{ width: '100%', height: '100%', containerType: 'size', position: 'relative', overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}>
+            <PanelCtx.Provider value={raiz}>
+              <SesionSixSeven usuario={null} />
+            </PanelCtx.Provider>
+          </div>
+        </div>
+      )}
+      <div style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)', background: color, color: '#000', fontWeight: 900, fontSize: '0.8rem', borderRadius: 999, padding: '1px 10px', pointerEvents: 'none', zIndex: 400 }}>J{i + 1}</div>
+    </div>
+  );
+}
+
+function PantallaDividida({ n, onSalir }) {
+  // 2 → dos columnas · 3 → tres columnas · 4 → 2×2
+  const cols = n === 4 ? 2 : n;
+  const filas = n === 4 ? 2 : 1;
+  const [confirmar, setConfirmar] = useState(false);
+  const toques = useToquesIndependientes();
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${filas}, 1fr)`, gap: 4, background: '#000', touchAction: 'none' }}>
+      {Array.from({ length: n }, (_, i) => <ZonaJugador key={i} i={i} />)}
+      <div {...toques} style={{ position: 'absolute', left: '50%', bottom: 6, transform: 'translateX(-50%)', zIndex: 500, display: 'flex', gap: 6 }}>
+        {!confirmar ? (
+          <button onClick={() => setConfirmar(true)} style={{ ...styles.btnSecondary, padding: '4px 12px', fontSize: '0.8rem', background: 'rgba(9,9,14,0.9)' }}>✕ Pantalla dividida</button>
+        ) : (
+          <>
+            <button onClick={onSalir} style={{ ...styles.btnSecondary, padding: '4px 12px', fontSize: '0.8rem', background: 'rgba(9,9,14,0.95)', borderColor: theme.neonPink, color: theme.neonPink }}>¿Salir? Sí</button>
+            <button onClick={() => setConfirmar(false)} style={{ ...styles.btnSecondary, padding: '4px 12px', fontSize: '0.8rem', background: 'rgba(9,9,14,0.95)' }}>No</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function SixSeven({ onExit, usuario = null }) {
+  const mandosApi = useRef(null);
+  const juegoMandos = useRef({});
+  const [estado, setEstado] = useState({ mode: 'menu', nivel: null });
+  const [dividida, setDividida] = useState(0); // 0 = una partida · 2-4 = pantalla dividida
+  useWindowSize();
+  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignorar */ } }, []);
+  const { mode, nivel } = estado;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: theme.bg, overflowY: 'auto', overflowX: 'hidden' }}>
-      {pantalla}
-      {(mode === 'menu' || mode === 'arcade') && ( // también en el menú y al elegir nivel, para conectar los mandos antes de jugar
-        <MandosEnJuego clave="SIXSEVEN" juego="Six Seven · Speed Run" tipo="SIXSEVEN_MANDOS" maxJug={4} apiRef={mandosApi} pausado={mode !== 'arcade' || !nivel}
-          modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras"
-          onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
-          controles={<>Las 4 opciones son <b>A, B, C y D</b> (en orden de lectura). En el mando, <b>A</b> cambia la letra y <b>B</b> o agitar la envía. Con <b>1</b> jugador cada partida la juega un mando (relevos); con <b>2 a 4</b> es una carrera: el primero que acierta se lleva los puntos y quien falla queda fuera de esa pregunta.</>} />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: theme.bg, overflowY: dividida ? 'hidden' : 'auto', overflowX: 'hidden' }}>
+      {dividida ? (
+        <PantallaDividida n={dividida} onSalir={() => { setDividida(0); setEstado({ mode: 'menu', nivel: null }); }} />
+      ) : (
+        <>
+          <SesionSixSeven onExit={onExit} usuario={usuario} mandosApi={mandosApi} juegoMandos={juegoMandos}
+            alCambiar={(m, n) => setEstado((e) => (e.mode === m && e.nivel === n ? e : { mode: m, nivel: n }))} onDividir={setDividida} />
+          {(mode === 'menu' || mode === 'arcade') && ( // también en el menú y al elegir nivel, para conectar los mandos antes de jugar
+            <MandosEnJuego clave="SIXSEVEN" juego="Six Seven · Speed Run" tipo="SIXSEVEN_MANDOS" maxJug={4} apiRef={mandosApi} pausado={mode !== 'arcade' || !nivel} compacto
+              modo={MODOS.LETRAS} acepta={(ev) => ev.tipo === 'letra'} tutorial="letras"
+              onEvento={(i, ev) => juegoMandos.current.onEvento?.(i, ev)}
+              controles={<>Las 4 opciones son <b>A, B, C y D</b> (en orden de lectura). En el mando, <b>A</b> cambia la letra y <b>B</b> o agitar la envía. Con <b>1</b> jugador cada partida la juega un mando (relevos); con <b>2 a 4</b> es una carrera: el primero que acierta se lleva los puntos y quien falla queda fuera de esa pregunta.</>} />
+          )}
+        </>
       )}
       <CapaSeisSiete />
     </div>

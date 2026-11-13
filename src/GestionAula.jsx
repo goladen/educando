@@ -589,13 +589,50 @@ const drawAccidental = (ctx, item) => {
 const COLORES_PARTICIPANTES = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#c0392b'];
 const genCodigo = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
+// Las imágenes con data: URL (mapas, figuras, capturas, fotos pegadas…) son muy
+// pesadas para reenviarlas cada 2 s: viajan una sola vez, comprimidas, en el mapa
+// `imgs.<clave>` del documento y aquí solo queda la referencia `imgRef`.
+const esDataUrl = (s) => typeof s === 'string' && s.startsWith('data:');
+const claveImg = (e) => String(e.id).replace(/[^\w-]/g, '_');
 const serializarElems = (elems) => elems
-    .filter(e => e.t !== 'image')
-    .map(e => JSON.parse(JSON.stringify(e)));
+    .map(e => {
+        if ((e.t === 'image' || e.t === 'music_staff') && esDataUrl(e.src)) {
+            const { src, ...resto } = e; // eslint-disable-line no-unused-vars
+            return JSON.parse(JSON.stringify({ ...resto, imgRef: claveImg(e) }));
+        }
+        return JSON.parse(JSON.stringify(e));
+    });
 
 // Firestore no soporta arrays anidados: cada página se serializa como JSON string
 const serializarPaginas = (pgs) => pgs.map(p => JSON.stringify(serializarElems(p)));
 const deserializarPaginas = (arr) => (arr || []).map(s => { try { return JSON.parse(s); } catch { return []; } });
+// Devuelve a cada imagen su src a partir del mapa `imgs` del documento compartido
+const resolverImgs = (elems, imgs) => (elems || []).map(e =>
+    e && e.imgRef && !e.src && imgs?.[e.imgRef] ? { ...e, src: imgs[e.imgRef] } : e);
+
+// Comprime una data: URL para que quepa en Firestore (límite 1 MB por documento)
+const comprimirDataUrl = (src, maxLado = 1000) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+        const codificar = (lado, tipo, calidad, fondoBlanco) => {
+            const k = Math.min(1, lado / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round((img.naturalWidth || 1) * k));
+            c.height = Math.max(1, Math.round((img.naturalHeight || 1) * k));
+            const ctx = c.getContext('2d');
+            if (fondoBlanco) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height); }
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            return c.toDataURL(tipo, calidad);
+        };
+        let out = codificar(maxLado, 'image/webp', 0.8, false);   // webp conserva la transparencia
+        if (out.length > 250000) out = codificar(800, 'image/jpeg', 0.72, true);
+        if (out.length > 250000) out = codificar(560, 'image/jpeg', 0.6, true);
+        resolve(out);
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+});
+const MAX_BYTES_IMGS = 820000; // margen bajo el 1 MB del documento
 
 // ── España: datos geográficos ────────────────────────────────────────────────
 const ESP_GEOJSON_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
@@ -837,6 +874,33 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
     const codigoRef              = useRef('');
     const modoRef                = useRef(null);
     const paginasRef             = useRef(paginas);
+    const imgsSubidasRef         = useRef(new Set());   // claves de imágenes ya enviadas
+    const imgsBytesRef           = useRef(0);
+    const subiendoImgsRef        = useRef(false);
+    const [avisoImgs,            setAvisoImgs]            = useState('');
+
+    // Envía (una sola vez y comprimidas) las imágenes data: que aún no estén en el documento
+    const subirImagenesNuevas = async (codigo, elems) => {
+        if (subiendoImgsRef.current) return;
+        subiendoImgsRef.current = true;
+        try {
+            for (const e of elems) {
+                if (!e || (e.t !== 'image' && e.t !== 'music_staff') || !esDataUrl(e.src)) continue;
+                const clave = claveImg(e);
+                if (imgsSubidasRef.current.has(clave)) continue;
+                imgsSubidasRef.current.add(clave);
+                const comp = await comprimirDataUrl(e.src);
+                if (!comp) continue;
+                if (imgsBytesRef.current + comp.length > MAX_BYTES_IMGS) {
+                    setAvisoImgs('Hay demasiadas imágenes para compartir: algunas no se verán en los otros dispositivos.');
+                    continue;
+                }
+                await updateDoc(doc(db, 'pizarras_compartidas', codigo), { [`imgs.${clave}`]: comp });
+                imgsBytesRef.current += comp.length;
+            }
+        } catch (_) { /* silencioso */ }
+        subiendoImgsRef.current = false;
+    };
 
     const triggerRedraw = () => setRedrawTick(t => t + 1);
 
@@ -866,7 +930,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
             const id = Date.now();
             imageCacheRef.current[id] = img;
-            setElementos(prev => [...prev, { t: 'image', id, src: dataURL, x: 40, y: 60, w, h }]);
+            setElementos(prev => [...prev, tagElem({ t: 'image', id, src: dataURL, x: 40, y: 60, w, h })]);
         };
         img.src = dataURL;
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -881,7 +945,8 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         syncIntervalRef.current = setInterval(async () => {
             try {
                 if (modo === 'ver' && soyCreador) {
-                    // Creador del modo ver → escribe sus páginas
+                    // Creador del modo ver → escribe sus páginas (y las imágenes nuevas, una vez)
+                    subirImagenesNuevas(codigo, paginasRef.current.flat());
                     await updateDoc(doc(db, 'pizarras_compartidas', codigo), {
                         paginas_sync: serializarPaginas(paginasRef.current),
                         updatedAt: new Date(),
@@ -892,13 +957,15 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                     if (!snap.exists()) return;
                     const datos = snap.data();
                     if (datos.paginas_sync) {
-                        setPaginas(deserializarPaginas(datos.paginas_sync));
+                        setPaginas(deserializarPaginas(datos.paginas_sync).map(p => resolverImgs(p, datos.imgs)));
                     }
                 } else if (modo === 'editar') {
                     // Participante colaborativo
                     const myId = miIdRef.current;
                     const pg = paginasRef.current[0] || [];
-                    const mios = serializarElems(pg.filter(e => e.autorId === myId));
+                    const miosLocal = pg.filter(e => e.autorId === myId);
+                    subirImagenesNuevas(codigo, miosLocal);
+                    const mios = serializarElems(miosLocal);
                     await updateDoc(doc(db, 'pizarras_compartidas', codigo), {
                         [`elems.${myId}`]: mios,
                         updatedAt: new Date(),
@@ -909,7 +976,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                     setParticipantes(datos.participantes || []);
                     const elemsRemotos = Object.entries(datos.elems || {})
                         .filter(([pid]) => pid !== myId)
-                        .flatMap(([, arr]) => arr || []);
+                        .flatMap(([, arr]) => resolverImgs(arr || [], datos.imgs));
                     setPaginas(prev => {
                         const pg0 = prev[0] || [];
                         const miosActuales = pg0.filter(e => e.autorId === myId || !e.autorId);
@@ -930,6 +997,13 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         miColorRef.current = color;
         codigoRef.current = codigo;
         modoRef.current = modo;
+        imgsSubidasRef.current = new Set();
+        imgsBytesRef.current = 0;
+        setAvisoImgs('');
+        // En modo editar, lo que ya había en la pizarra pasa a ser del profesor:
+        // si no, el primer ciclo de sincronización lo borraría de los demás.
+        const pg0 = (paginas[0] || []).map(e => e.autorId ? e : { ...e, autorId: id, autorColor: color });
+        if (modo === 'editar') { paginasRef.current = [pg0, ...paginas.slice(1)]; setPaginas(ps => [ps[0] ? ps[0].map(e => e.autorId ? e : { ...e, autorId: id, autorColor: color }) : [], ...ps.slice(1)]); }
         const data = {
             codigo,
             modo,
@@ -937,12 +1011,14 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             createdAt: new Date(),
             updatedAt: new Date(),
             participantes: [{ id, nombre: 'Profesor', color }],
+            imgs: {},
             ...(modo === 'ver'
                 ? { paginas_sync: serializarPaginas(paginas) }
-                : { elems: { [id]: serializarElems(elementos) } }
+                : { elems: { [id]: serializarElems(pg0) } }
             ),
         };
         await setDoc(doc(db, 'pizarras_compartidas', codigo), data);
+        await subirImagenesNuevas(codigo, modo === 'ver' ? paginas.flat() : pg0);
         setCodigoCompartir(codigo);
         setModoCompartir(modo);
         setEsCreador(true);
@@ -966,6 +1042,8 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             const usedColors = (datos.participantes || []).map(p => p.color);
             const color = COLORES_PARTICIPANTES.find(c => !usedColors.includes(c)) || COLORES_PARTICIPANTES[0];
             const id = 'user_' + Date.now();
+            imgsSubidasRef.current = new Set();
+            imgsBytesRef.current = Object.values(datos.imgs || {}).reduce((s, v) => s + (v?.length || 0), 0);
             miIdRef.current = id;
             miColorRef.current = color;
             codigoRef.current = codigo;
@@ -3205,6 +3283,12 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                     </span>
                     <span style={{ color:'#f8c8ff', fontWeight:900, letterSpacing:3 }}>{codigoCompartir}</span>
                     {esCreador && <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.7rem' }}>· Los espectadores ven con ~2s de retardo</span>}
+                </div>
+            )}
+            {modoCompartir && avisoImgs && (
+                <div style={{ background:'#fef3c7', color:'#92400e', fontSize:'0.75rem', padding:'4px 10px', display:'flex', alignItems:'center', gap:8 }}>
+                    ⚠️ {avisoImgs}
+                    <button onClick={() => setAvisoImgs('')} style={{ marginLeft:'auto', border:'none', background:'transparent', cursor:'pointer', color:'#92400e', fontWeight:700 }}>✕</button>
                 </div>
             )}
 

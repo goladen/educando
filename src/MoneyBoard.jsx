@@ -4,10 +4,13 @@ import {
     Star, Maximize, Minimize, Pause, RotateCcw, Check, X, Eye, Plus, Minus, Edit3, Smartphone, Trash2,
 } from 'lucide-react';
 import { db } from './firebase';
+import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
 import { collection, query, where, getDocs, doc, getDoc, addDoc } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { listarRecursosLocales, borrarRecursoLocal } from './utils/recursosLocales';
 import { categoriasDeRecurso, esRespuestaCorrecta, barajar } from './utils/normalizarPreguntas';
+import { elegirEncaje } from './components/ConAvisoEncaje';
+import { letraAjustada } from './utils/encajeTexto';
 import {
     sonidoCorrecto, sonidoIncorrecto, sonidoPasar, sonidoFinal,
     sonidoActivo, setSonidoActivo, despertarAudio,
@@ -138,7 +141,8 @@ function BuscadorRecursos({ onBack, onPick }) {
         (async () => {
             try {
                 const snap = await getDocs(query(collection(db, 'resources'), where('isPrivate', '==', false)));
-                const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                // Recursos de los profes + preguntas de PiKT por etapa y materia (detrás)
+                const docs = await conRecursosPikt(snap.docs.map(d => ({ ...d.data(), id: d.id })), 'CAZABURBUJAS', {}, { rellenar: true });
                 const jugables = docs
                     .map(r => ({ r, cats: categoriasDeRecurso(r) }))
                     .filter(x => x.cats.length >= 2)
@@ -528,7 +532,7 @@ function ModalPregunta({ casilla, categoria, modo, equipos, turno, segundos, ori
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 22, padding: '14px 0', overflowY: 'auto' }}>
                 <h2 style={{
                     color: 'white', textAlign: 'center', margin: 0, maxWidth: 1100,
-                    fontSize: 'clamp(1.3rem, 3.6vw, 2.6rem)', fontWeight: 800, lineHeight: 1.3,
+                    fontSize: letraAjustada('clamp(1.3rem, 3.6vw, 2.6rem)', pregunta.tipo === 'RELLENAR' ? (pregunta.bloques || []).join(' ') : pregunta.enunciado, 200, 0.65), fontWeight: 800, lineHeight: 1.3,
                 }}>
                     {pregunta.tipo === 'RELLENAR'
                         ? <>{pregunta.bloques[0]} <span style={{ color: '#f5c518' }}>{revelada ? pregunta.correcta : '______'}</span> {pregunta.bloques[2]}</>
@@ -546,7 +550,7 @@ function ModalPregunta({ casilla, categoria, modo, equipos, turno, segundos, ori
                                     disabled={modo === 'MODERADOR' || revelada}
                                     style={{
                                         padding: 'clamp(12px, 2vw, 20px)', borderRadius: 16, fontFamily: 'inherit',
-                                        fontSize: 'clamp(0.95rem, 2vw, 1.3rem)', fontWeight: 700,
+                                        fontSize: letraAjustada('clamp(0.95rem, 2vw, 1.3rem)', op, 50, 0.7), fontWeight: 700,
                                         border: esCorrecta ? '3px solid #2ecc71' : '2px solid rgba(255,255,255,0.2)',
                                         background: esCorrecta ? 'rgba(46,204,113,0.25)' : 'rgba(255,255,255,0.08)',
                                         color: 'white', cursor: (modo === 'AUTO' && !revelada) ? 'pointer' : 'default',
@@ -722,7 +726,7 @@ function RondaFinal({ pregunta, equipos, sonido, estilo = 'MIX', onTerminar }) {
 
             {fase !== 'APUESTAS' && (
                 <>
-                    <h2 style={{ color: 'white', textAlign: 'center', margin: 0, maxWidth: 1000, fontSize: 'clamp(1.2rem, 3.4vw, 2.3rem)', fontWeight: 800, lineHeight: 1.35 }}>
+                    <h2 style={{ color: 'white', textAlign: 'center', margin: 0, maxWidth: 1000, fontSize: letraAjustada('clamp(1.2rem, 3.4vw, 2.3rem)', pregunta.tipo === 'RELLENAR' ? (pregunta.bloques || []).join(' ') : pregunta.enunciado, 200, 0.65), fontWeight: 800, lineHeight: 1.35 }}>
                         {pregunta.tipo === 'RELLENAR'
                             ? <>{pregunta.bloques[0]} <span style={{ color: '#f5c518' }}>{fase === 'RESULTADO' ? pregunta.correcta : '______'}</span> {pregunta.bloques[2]}</>
                             : pregunta.enunciado}
@@ -1339,7 +1343,12 @@ function MoneyBoardJuego({ recurso = null, usuario, onExit, autoStart = false, j
     // ------------------------- PANTALLAS -------------------------
     if (pantalla === 'BUSCADOR') {
         return <BuscadorRecursos onBack={() => setPantalla('MENU')}
-            onPick={(r, cats) => { setRecursoPdf(r); if (preparar(r, cats)) setPantalla('CONFIG'); }} />;
+            onPick={async (r, cats) => {
+                // Aviso si hay preguntas demasiado largas para el tablero (y permite excluirlas)
+                const rr = await elegirEncaje(r, 'MONEYBOARD');
+                if (!rr) return;
+                setRecursoPdf(r); if (preparar(rr, rr === r ? cats : undefined)) setPantalla('CONFIG');
+            }} />;
     }
 
     if (pantalla === 'EDITOR') {

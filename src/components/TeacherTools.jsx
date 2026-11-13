@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor, Mail } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor, Mail, Library } from 'lucide-react';
 import VideoTimelineEditor from '../VideoTimelineEditor';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
@@ -16,6 +16,7 @@ const PresentationEditor = lazy(() => import('./PresentationEditor'));
 const GestionInformatica = lazy(() => import('./GestionInformatica'));
 const PapelInteractivo = lazy(() => import('./PapelInteractivo'));
 const DocumentosPersonalizados = lazy(() => import('./DocumentosPersonalizados'));
+const BancoRecursos = lazy(() => import('../bancoRecursos/BancoRecursos'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -87,6 +88,15 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
         </Suspense>
     );
 
+    // Banco de recursos: mientras está abierto la URL es /banco (su enlace propio)
+    if (herramientaActiva === 'BANCO') return (
+        <div style={{ padding: '20px 16px', maxWidth: 1000, margin: '0 auto' }}>
+            <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando…</div>}>
+                <BancoRecursos usuario={usuario} onVolver={() => { setHerramientaActiva(null); window.history.pushState({}, '', '/?panel=herramientas'); }} />
+            </Suspense>
+        </div>
+    );
+
     if (herramientaActiva === 'VIDEO_EDITOR') return (
         <VideoTimelineEditor onBack={() => setHerramientaActiva(null)} />
     );
@@ -128,7 +138,18 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                 <p style={{ color: '#7f8c8d' }}>Utilidades para gestionar y exportar tus recursos educativos.</p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '20px' }}>
+
+                {/* ── Banco de recursos del profesorado (enlace propio /banco) ── */}
+                <div onClick={() => { setHerramientaActiva('BANCO'); window.history.pushState({}, '', '/banco'); }} style={{ ...cardStyle, borderLeft: '4px solid #3949ab' }}>
+                    <div style={{ background: '#e8eaf6', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Library size={32} color="#3949ab" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#3949ab' }}>Banco de recursos</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Enlaza tus materiales (Drive, webs, vídeos…) por materia, curso y tipo, y encuentra los de otros profes. Comprueba que cada enlace se abre.
+                    </p>
+                </div>
 
                 <div onClick={() => setHerramientaActiva('SHEETS')} style={cardStyle}>
                     <div style={{ background: '#e3f2fd', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>

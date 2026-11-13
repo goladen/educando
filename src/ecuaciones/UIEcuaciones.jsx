@@ -145,13 +145,15 @@ export function SolucionMulti({ eq, oscuro = false, compacto = false, pasosAbier
                     )}
                 </>
             )}
-            <div style={{ textAlign: 'center', marginTop: 4 }}>
-                <button type="button" onClick={() => setGraf((x) => !x)}
-                    style={{ background: 'none', border: 'none', color: oscuro ? '#f1c40f' : '#8e44ad', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                    {graf ? '▲ Ocultar solución gráfica' : '📈 Ver solución gráfica'}
-                </button>
-            </div>
-            {graf && (
+            {!eq?.sinGrafica && (
+                <div style={{ textAlign: 'center', marginTop: 4 }}>
+                    <button type="button" onClick={() => setGraf((x) => !x)}
+                        style={{ background: 'none', border: 'none', color: oscuro ? '#f1c40f' : '#8e44ad', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        {graf ? '▲ Ocultar solución gráfica' : '📈 Ver solución gráfica'}
+                    </button>
+                </div>
+            )}
+            {graf && !eq?.sinGrafica && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 4 }}>
                     <GraficaEcuacion datos={datosGrafica(eq)} oscuro={oscuro} />
                     <div style={{ fontSize: '0.72rem', color: oscuro ? '#ccd' : '#7f8c8d', marginTop: 4, textAlign: 'center' }}>

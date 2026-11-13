@@ -322,14 +322,16 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
       if (configRef.current.variante === 'FILTRO') {
         if (ev.accion === 'V') {
           // volante (mandos v6+): se mueve mientras siga inclinado; si deja de llegar, para solo
-          acciones.input(idx, { izq: ev.dir.includes('I'), der: ev.dir.includes('D'), objetivoX: null });
+          // más inclinado = más rápido: de un 35 % (poco inclinado) al 100 % (muy inclinado) de la velocidad del mando
+          const vel = ev.x == null ? 0.7 : 0.35 + 0.65 * Math.min(1, Math.max(0, (Math.abs(ev.x) - 15) / 60));
+          acciones.input(idx, { izqMando: ev.dir.includes('I'), derMando: ev.dir.includes('D'), velMando: vel, objetivoX: null });
           clearTimeout(paradaRef.current[idx]);
-          paradaRef.current[idx] = setTimeout(() => acciones.input(idx, { izq: false, der: false }), 1200);
+          paradaRef.current[idx] = setTimeout(() => acciones.input(idx, { izqMando: false, derMando: false }), 900);
         } else if (ev.accion === 'P') {
           // fútbol (mandos v5): cada inclinación da un empujón
           const x = mundosRef.current[idx]?.nave.x ?? 0.5;
-          if (ev.dir === 'I') acciones.input(idx, { objetivoX: Math.max(0.05, x - 0.22) });
-          if (ev.dir === 'D') acciones.input(idx, { objetivoX: Math.min(0.95, x + 0.22) });
+          if (ev.dir === 'I') acciones.input(idx, { objetivoX: Math.max(0.05, x - 0.14) });
+          if (ev.dir === 'D') acciones.input(idx, { objetivoX: Math.min(0.95, x + 0.14) });
         } else if (ev.accion === 'S') {
           acciones.input(idx, { toque: true });
         } else if (ev.accion === 'A' || ev.accion === 'B') {
@@ -458,8 +460,9 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
   const [fichas, setFichas] = useState(() => fichasRecientes());
   const [cargandoFicha, setCargandoFicha] = useState(false);
 
-  /** Abre una ficha (código del QR o de «fichas impresas»): regenera sus preguntas y las vincula. */
-  const abrirFicha = useCallback(async (codigo) => {
+  /** Abre una ficha (código del QR o de «fichas impresas»): regenera sus preguntas y las vincula.
+   *  corto: código de la ficha (FXXXXXX, utils/fichaCodigo.js) si se abrió con él. */
+  const abrirFicha = useCallback(async (codigo, corto = null) => {
     const ficha = decodificarFicha(codigo);
     if (!ficha) { setError('El código de la ficha no es válido.'); return; }
     setCargandoFicha(true);
@@ -471,7 +474,7 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
       setError('');
       dispatch({ type: 'CONFIG', config: {
         variante: cfg.variante, fuente,
-        ficha: { codigo, semilla: ficha.s, titulo: ficha.t || '', preguntas: numerar(preguntas), enlace: enlaceFicha(codigo) },
+        ficha: { codigo, semilla: ficha.s, titulo: ficha.t || '', preguntas: numerar(preguntas), enlace: enlaceFicha(codigo), codigoCorto: corto || fichasRecientes().find((x) => x.codigo === codigo)?.codigoCorto || null },
       } });
     } catch (e) {
       setError(e?.message || 'No se pudo abrir la ficha.');
@@ -483,7 +486,9 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
   // /invasores?ficha=… (QR de la ficha impresa)
   useEffect(() => {
     const codigo = fichaDeUrl();
-    if (codigo) abrirFicha(codigo);
+    let corto = null;
+    try { corto = new URLSearchParams(window.location.search).get('cf'); } catch { /* nada */ }
+    if (codigo) abrirFicha(codigo, corto);
   }, [abrirFicha]);
 
   const quitarFicha = useCallback(() => dispatch({ type: 'CONFIG', config: { ficha: null } }), [dispatch]);
@@ -507,15 +512,30 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
       }
     }
     if (!preguntas.length) throw new Error('No hay preguntas para la ficha.');
+    // Código corto (FXXXXXX) para escribirlo en pikt.es en cualquier dispositivo; si falla, solo el QR largo
+    let nuevoCorto = false;
+    if (ficha && !ficha.codigoCorto) {
+      const { crearCodigoFicha } = await import('../utils/fichaCodigo');
+      const largo = ficha.codigo;
+      const corto = await crearCodigoFicha({ juego: 'INVASORES', titulo: ficha.titulo || 'Invasión Pi', enlace: (c) => `/invasores?ficha=${largo}&cf=${c}` });
+      if (corto) { ficha = { ...ficha, codigoCorto: corto }; nuevoCorto = true; }
+    }
     const { generarPdfInvasores } = await import('./pdfInvasores');
+    const { urlCodigoFicha } = await import('../utils/fichaCodigo');
     await generarPdfInvasores({
       preguntas, titulo: tituloPartida(cfg), variante: cfg.variante, oscuro, soluciones,
-      qrUrl: ficha?.enlace || `${window.location.origin}/invasores`, vinculada: !!ficha,
+      qrUrl: ficha?.codigoCorto ? urlCodigoFicha(ficha.codigoCorto) : (ficha?.enlace || `${window.location.origin}/invasores`),
+      vinculada: !!ficha, codigoFicha: ficha?.codigoCorto || null,
     });
+    if (ficha && cfg.ficha && nuevoCorto) {
+      dispatch({ type: 'CONFIG', config: { ficha } });
+      guardarFichaReciente({ codigo: ficha.codigo, titulo: ficha.titulo, n: preguntas.length, codigoCorto: ficha.codigoCorto });
+      setFichas(fichasRecientes());
+    }
     if (ficha && !cfg.ficha) {
       // La partida queda vinculada a la ficha que se acaba de descargar
       dispatch({ type: 'CONFIG', config: { ficha } });
-      guardarFichaReciente({ codigo: ficha.codigo, titulo: ficha.titulo, n: preguntas.length });
+      guardarFichaReciente({ codigo: ficha.codigo, titulo: ficha.titulo, n: preguntas.length, codigoCorto: ficha.codigoCorto || null });
       setFichas(fichasRecientes());
     }
   }, [dispatch]);

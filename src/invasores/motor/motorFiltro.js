@@ -6,7 +6,8 @@ import {
 } from './comun';
 
 const SEGUNDOS_CAIDA = 14;
-const VEL_NAVE = 0.95;          // pantallas por segundo
+const VEL_NAVE = 0.95;          // pantallas por segundo (teclado y botones)
+const VEL_NAVE_MANDO = 0.5;     // con el mando micro:bit, más lento (y según cuánto se incline)
 const VEL_BALA = 1.55;
 const CADENCIA = 0.32;          // s entre disparos
 const MAX_BALAS = 3;
@@ -59,9 +60,13 @@ export function stepFiltro(m0, dt, input = {}, jugador, ctx) {
   let x = m.nave.x;
   if (input.izq) x -= VEL_NAVE * dt;
   if (input.der) x += VEL_NAVE * dt;
-  if (input.objetivoX != null && !input.izq && !input.der) {
+  // mando en volante: velMando de 0 a 1 según la inclinación
+  const vm = VEL_NAVE_MANDO * (input.velMando ?? 1) * dt;
+  if (input.izqMando) x -= vm;
+  if (input.derMando) x += vm;
+  if (input.objetivoX != null && !input.izq && !input.der && !input.izqMando && !input.derMando) {
     const d = input.objetivoX - x;
-    x += Math.sign(d) * Math.min(Math.abs(d), VEL_NAVE * 1.6 * dt);
+    x += Math.sign(d) * Math.min(Math.abs(d), VEL_NAVE_MANDO * 1.2 * dt); // solo lo usan los mandos v5
   }
   m.nave = { x: limitar(x, 0.05, 0.95) };
 

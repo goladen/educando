@@ -25,6 +25,11 @@ import { EditorEscrituraAlumno, FormEscritura, PanelEscrituraProfesor } from './
 import { FormAppAula, AppAulaRunner, APPS_AULA } from './AppsAula';
 import GestionEquipos from './GestionEquipos';
 
+// Cómic (comic/ComicAula.jsx), en diferido para no cargar el editor si no se usa.
+const FormComicAula = lazy(() => import('./comic/ComicAula').then((m) => ({ default: m.FormComicAula })));
+const PanelComicProfesor = lazy(() => import('./comic/ComicAula').then((m) => ({ default: m.PanelComicProfesor })));
+const ComicAlumnoAula = lazy(() => import('./comic/ComicAula').then((m) => ({ default: m.ComicAlumnoAula })));
+
 // Juegos puntuables cargados bajo demanda (comparten el contrato modoOlimpico).
 const PasapalabraGame  = lazy(() => import('./PasapalabraGame'));
 const CazaBurbujasGame = lazy(() => import('./CazaBurbujasGame'));
@@ -165,6 +170,7 @@ export function TeacherControlPanel() {
     const roomRef = useMemo(() => doc(db, 'control_rooms', codigo), [codigo]);
     const game = room?.game || null;
     const escritura = room?.escritura || null;
+    const comicTarea = room?.comic || null;
 
     // Sesión del profesor (crear sala requiere estar autenticado — regla request.auth != null).
     useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
@@ -194,6 +200,7 @@ export function TeacherControlPanel() {
                     currentLabel: null,
                     game: null,
                     escritura: null,
+                    comic: null,
                 }, { merge: true });
                 if (vivo) setSalaAbierta(true);
             } catch (e) { console.error('No se pudo crear la sala', e); }
@@ -307,6 +314,7 @@ export function TeacherControlPanel() {
             await updateDoc(roomRef, {
                 currentRoute: null, currentLabel: null,
                 escritura: deleteField(),
+                comic: deleteField(),
                 game: {
                     launchId, modo: modoSel,
                     recursoId: recursoSel.id,
@@ -328,6 +336,7 @@ export function TeacherControlPanel() {
             await updateDoc(roomRef, {
                 currentRoute: null, currentLabel: null,
                 escritura: deleteField(),
+                comic: deleteField(),
                 game: {
                     launchId: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                     app, config, rondasMax,
@@ -365,6 +374,7 @@ export function TeacherControlPanel() {
             await updateDoc(roomRef, {
                 game: deleteField(),
                 escritura: deleteField(),
+                comic: deleteField(),
                 currentRoute: absoluteUrl(url), currentLabel: label || url,
             });
         } catch (e) { console.error(e); }
@@ -375,6 +385,7 @@ export function TeacherControlPanel() {
         try {
             await updateDoc(roomRef, {
                 game: deleteField(),
+                comic: deleteField(),
                 currentRoute: null, currentLabel: null,
                 escritura: {
                     ...config,
@@ -386,6 +397,30 @@ export function TeacherControlPanel() {
                 },
             });
         } catch (e) { console.error(e); }
+    };
+    // Cómic (comic/ComicAula.jsx): individual o colaborativo (el reparto se hace con los conectados).
+    const lanzarComic = async (config) => {
+        if (escritura && !window.confirm('Hay un trabajo de escritura abierto. ¿Cerrarlo y lanzar el cómic? (Descarga antes los textos)')) return;
+        try {
+            const { prepararTareaComic } = await import('./comic/ComicAula');
+            const tarea = prepararTareaComic(config, conectados);
+            await updateDoc(roomRef, {
+                game: deleteField(),
+                escritura: deleteField(),
+                currentRoute: null, currentLabel: null,
+                comic: {
+                    ...tarea,
+                    codigoProfesor: codigoProfesor || null,
+                    profesorUid: user?.uid || null,
+                    taskId: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    state: 'EDITING',
+                    startedAt: Date.now(),
+                },
+            });
+        } catch (e) { console.error(e); lanzarToast('⚠ No se pudo lanzar el cómic'); }
+    };
+    const cerrarComic = async () => {
+        try { await updateDoc(roomRef, { comic: deleteField() }); } catch (e) { console.error(e); }
     };
     const cerrarEscritura = async () => {
         try { await updateDoc(roomRef, { escritura: deleteField() }); } catch (e) { console.error(e); }
@@ -493,10 +528,22 @@ export function TeacherControlPanel() {
                 <ResumenCard color="#059669" label="Estado sala" valor={salaAbierta ? 'Abierta' : '…'} />
                 {game && <ResumenCard color="#7c3aed" label="Partida" valor={`${game.recursoTitulo} · ${game.modo}`} />}
                 {escritura && <ResumenCard color="#0f766e" label="Escritura" valor={escritura.titulo} />}
+                {comicTarea && <ResumenCard color="#e84393" label="Cómic" valor={comicTarea.titulo} />}
             </div>
 
             {/* ── ZONA DE PARTIDA PUNTUABLE / TRABAJO DE ESCRITURA ── */}
-            {escritura && !game ? (
+            {comicTarea && !game ? (
+                <Suspense fallback={<div style={{ padding: 16, color: '#94a3b8' }}>Cargando el cómic…</div>}>
+                    <PanelComicProfesor
+                        tarea={comicTarea}
+                        alumnos={alumnos}
+                        codigo={codigo}
+                        roomRef={roomRef}
+                        esConectado={(a) => estadoEfectivo(a) !== ESTADO.DESCONECTADO}
+                        onCerrar={cerrarComic}
+                    />
+                </Suspense>
+            ) : escritura && !game ? (
                 <PanelEscrituraProfesor
                     tarea={escritura}
                     alumnos={alumnos}
@@ -605,6 +652,9 @@ export function TeacherControlPanel() {
                 </div>
                 <FormAppAula onLanzar={lanzarApp} numConectados={conectados.length} />
                 <FormEscritura onLanzar={lanzarEscritura} numConectados={conectados.length} codigoProfesor={codigoProfesor} />
+                <Suspense fallback={null}>
+                    <FormComicAula onLanzar={lanzarComic} numConectados={conectados.length} codigoProfesor={codigoProfesor} />
+                </Suspense>
                 </>
             )}
 
@@ -959,8 +1009,13 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
 
             {/* Contenido */}
             <div style={{ flex: 1, position: 'relative' }}>
-                {/* 0) Trabajo de escritura abierto → editor */}
-                {room?.escritura ? (
+                {/* 0) Cómic lanzado → editor de cómic (individual o colaborativo) */}
+                {room?.comic ? (
+                    <Suspense fallback={<CentroMsg emoji="💬" titulo="Cargando el cómic…" />}>
+                        <ComicAlumnoAula key={room.comic.taskId} tarea={room.comic} codigo={codigo} studentId={studentId} nombre={nombre} />
+                    </Suspense>
+                /* 0b) Trabajo de escritura abierto → editor */
+                ) : room?.escritura ? (
                     <EditorEscrituraAlumno key={room.escritura.taskId} tarea={room.escritura} codigo={codigo} studentId={studentId} nombre={nombre} focusLostCount={focusLostCount} />
                 /* 1) Partida puntuable en curso y aún no la he terminado → jugar */
                 /* 1b) App de idiomas con la configuración del profe */

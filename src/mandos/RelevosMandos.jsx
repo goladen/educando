@@ -228,7 +228,7 @@ export default function MandosEnJuego({
     teclas = null, cursor = false, onEvento = null, onClicMira = null, apiRef = null,
     controles = 'Inclina el mando para moverte; A (o agitar) para la acción.',
     tutorial = null, nombresHueco = null, colores = COLORES_HUECO, relevosPorDefecto = true,
-    recursoTitulo = '', hoja = '', config = null, estiloFlot = null, pausado = false,
+    recursoTitulo = '', hoja = '', config = null, estiloFlot = null, pausado = false, compacto = false,
 }) {
     const lsOn = `pikt_relevos_${clave}`;
     // maxJug: el profe elige en el panel cuántos juegan a la vez (1…maxJug)
@@ -355,7 +355,15 @@ export default function MandosEnJuego({
     const contenido = (
         <>
             <div style={{ ...st.flot, ...estiloFlot }}>
-                {!activos ? (
+                {compacto ? (
+                    // Versión pequeña: un botón 🎮 y un punto por jugador (relleno si ya tiene mando)
+                    <button onClick={() => (activos ? setAbierto(true) : cambiarActivos(true))} title={activos ? 'Mandos micro:bit: turnos y marcador' : 'Jugar con los mandos micro:bit'}
+                        style={{ ...st.boton, padding: '3px 8px', fontSize: '0.75rem', opacity: activos ? 0.95 : 0.6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        🎮{activos && Array.from({ length: nJug }, (_, i) => (
+                            <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid ${colores[i]}`, background: ctrl.pilotos[i] != null ? colores[i] : 'transparent' }} />
+                        ))}{activos && relevos && nJug === 1 && <span style={{ color: '#86efac' }}>🔄</span>}
+                    </button>
+                ) : !activos ? (
                     <button style={st.boton} onClick={() => cambiarActivos(true)} title="Jugar con los mandos micro:bit">🎮 Mandos micro:bit</button>
                 ) : (
                     <>

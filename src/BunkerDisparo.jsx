@@ -5,91 +5,22 @@ import { X, Play, Trophy, Search, RefreshCw, Save, Target, ArrowLeft, Volume2, V
 import sndAplausos from './assets/applause-small-audience-97257.mp3';
 import sndGameOver from './assets/gameover.mp3';
 import { db } from './firebase';
+import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
+import { elegirEncaje } from './components/ConAvisoEncaje';
+import { letraAjustada } from './utils/encajeTexto';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
 import FichaFlotante from './components/FichaFlotante';
+import { BANCOS_BUNKER as BANCOS } from './bancoPreguntas/datos/bunker';
 
 // =====================================================================
 //  BANCOS DE PREGUNTAS INTEGRADOS (modo libre, sin recurso de profesor)
 //  q: enunciado · ok: respuesta correcta · mal: tres respuestas incorrectas
 // =====================================================================
-const BANCOS = {
-    MATES: {
-        nombre: 'Matemáticas', emoji: '➗', color: '#3498db',
-        preguntas: [
-            { q: '¿Cuál es un número primo?', ok: '3', mal: ['4', '6', '9'] },
-            { q: '¿Cuánto es 7 × 8?', ok: '56', mal: ['54', '48', '64'] },
-            { q: '¿Raíz cuadrada de 144?', ok: '12', mal: ['11', '14', '24'] },
-            { q: '¿Cuál es múltiplo de 9?', ok: '81', mal: ['82', '76', '93'] },
-            { q: '¿Cuánto es 2⁵?', ok: '32', mal: ['10', '25', '64'] },
-            { q: '¿Cuál es un número par?', ok: '38', mal: ['37', '41', '55'] },
-            { q: '¿Cuánto es 15 % de 200?', ok: '30', mal: ['15', '20', '35'] },
-            { q: '¿Cuál es divisible por 3?', ok: '123', mal: ['124', '125', '127'] },
-            { q: '¿Cuánto es 9 × 9?', ok: '81', mal: ['72', '89', '91'] },
-            { q: '¿Cuál es el mcd de 12 y 18?', ok: '6', mal: ['3', '9', '36'] },
-            { q: '¿Cuánto es 144 ÷ 12?', ok: '12', mal: ['11', '13', '14'] },
-            { q: '¿Cuál es un número primo?', ok: '17', mal: ['15', '21', '27'] },
-            { q: '¿Cuánto es 3⁴?', ok: '81', mal: ['12', '27', '64'] },
-            { q: '¿Cuál es el 25 % de 80?', ok: '20', mal: ['15', '25', '40'] },
-        ],
-    },
-    GEO: {
-        nombre: 'Geografía', emoji: '🌍', color: '#27ae60',
-        preguntas: [
-            { q: '¿Capital de Francia?', ok: 'París', mal: ['Madrid', 'Bruselas', 'Praga'] },
-            { q: '¿Capital de Italia?', ok: 'Roma', mal: ['Milán', 'Lisboa', 'Atenas'] },
-            { q: '¿Capital de Alemania?', ok: 'Berlín', mal: ['Múnich', 'Viena', 'Varsovia'] },
-            { q: '¿Capital de Portugal?', ok: 'Lisboa', mal: ['Oporto', 'Sevilla', 'Madrid'] },
-            { q: '¿Capital de Reino Unido?', ok: 'Londres', mal: ['Dublín', 'Edimburgo', 'Oxford'] },
-            { q: '¿Río más largo del mundo?', ok: 'Amazonas', mal: ['Nilo', 'Misisipi', 'Danubio'] },
-            { q: '¿Continente del Sahara?', ok: 'África', mal: ['Asia', 'Oceanía', 'América'] },
-            { q: '¿Océano más grande?', ok: 'Pacífico', mal: ['Atlántico', 'Índico', 'Ártico'] },
-            { q: '¿Capital de Japón?', ok: 'Tokio', mal: ['Pekín', 'Seúl', 'Bangkok'] },
-            { q: '¿País de la Torre Eiffel?', ok: 'Francia', mal: ['Italia', 'España', 'Bélgica'] },
-            { q: '¿Cordillera de América del Sur?', ok: 'Andes', mal: ['Alpes', 'Himalaya', 'Urales'] },
-            { q: '¿Capital de Egipto?', ok: 'El Cairo', mal: ['Argel', 'Túnez', 'Rabat'] },
-            { q: '¿Isla más grande del mundo?', ok: 'Groenlandia', mal: ['Australia', 'Borneo', 'Madagascar'] },
-        ],
-    },
-    ENG: {
-        nombre: 'Inglés', emoji: '🇬🇧', color: '#e67e22',
-        preguntas: [
-            { q: '"Perro" en inglés', ok: 'Dog', mal: ['Cat', 'Cow', 'Duck'] },
-            { q: '"Rojo" en inglés', ok: 'Red', mal: ['Blue', 'Green', 'Black'] },
-            { q: 'Plural de "child"', ok: 'Children', mal: ['Childs', 'Childes', 'Childrens'] },
-            { q: 'Pasado de "go"', ok: 'Went', mal: ['Goed', 'Gone', 'Goes'] },
-            { q: '"Lunes" en inglés', ok: 'Monday', mal: ['Sunday', 'Manday', 'Moonday'] },
-            { q: '"Manzana" en inglés', ok: 'Apple', mal: ['Orange', 'Grape', 'Pear'] },
-            { q: 'Pasado de "eat"', ok: 'Ate', mal: ['Eated', 'Eaten', 'Eats'] },
-            { q: '"Casa" en inglés', ok: 'House', mal: ['Horse', 'Hose', 'Mouse'] },
-            { q: '"Número 3" en inglés', ok: 'Three', mal: ['Tree', 'Third', 'Thirty'] },
-            { q: 'Artículo antes de "apple"', ok: 'An', mal: ['A', 'The', 'Any'] },
-            { q: '"Feliz" en inglés', ok: 'Happy', mal: ['Angry', 'Hungry', 'Sad'] },
-            { q: 'Pasado de "have"', ok: 'Had', mal: ['Haved', 'Has', 'Haven'] },
-            { q: '"Agua" en inglés', ok: 'Water', mal: ['Wine', 'Milk', 'Water fall'] },
-        ],
-    },
-    CIEN: {
-        nombre: 'Ciencias', emoji: '🔬', color: '#9b59b6',
-        preguntas: [
-            { q: 'Símbolo químico del oro', ok: 'Au', mal: ['Ag', 'Go', 'Or'] },
-            { q: 'Planeta más cercano al Sol', ok: 'Mercurio', mal: ['Venus', 'Marte', 'Tierra'] },
-            { q: 'Gas que respiramos para vivir', ok: 'Oxígeno', mal: ['Nitrógeno', 'CO₂', 'Helio'] },
-            { q: '¿Cuántos huesos tiene el adulto?', ok: '206', mal: ['201', '106', '306'] },
-            { q: 'Órgano que bombea la sangre', ok: 'Corazón', mal: ['Pulmón', 'Hígado', 'Riñón'] },
-            { q: 'Fuerza que nos atrae al suelo', ok: 'Gravedad', mal: ['Fricción', 'Magnetismo', 'Inercia'] },
-            { q: 'Estado del agua a 0 °C', ok: 'Sólido', mal: ['Líquido', 'Gas', 'Plasma'] },
-            { q: 'Animal mamífero', ok: 'Delfín', mal: ['Tiburón', 'Cocodrilo', 'Atún'] },
-            { q: 'Fórmula del agua', ok: 'H₂O', mal: ['CO₂', 'O₂', 'HO₂'] },
-            { q: 'Astro que ilumina el día', ok: 'Sol', mal: ['Luna', 'Marte', 'Venus'] },
-            { q: 'Parte de la planta que hace fotosíntesis', ok: 'Hoja', mal: ['Raíz', 'Tallo', 'Flor'] },
-            { q: 'Velocidad de la luz aprox.', ok: '300.000 km/s', mal: ['3.000 km/s', '30 km/s', '1.000 km/s'] },
-        ],
-    },
-};
+// (BANCOS vive en bancoPreguntas/datos/bunker.js: se comparte con las Preguntas de PiKT)
 
 // =====================================================================
 //  GENERADOR DE OPERACIONES MATEMÁTICAS (recursos PRO / PRO-BURBUJAS)
@@ -253,7 +184,7 @@ function useVRSoportado() {
 //  MOTOR DEL SHOOTER (Three.js) — se monta cuando gameState === 'PLAYING'
 //  Devuelve una función de limpieza.
 // =====================================================================
-function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null }) {
+function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null, ordenFijo = false }) {
     const VEL_ENEMIGO = 0.9;
     const CASTIGO_CORRECTA = 25; // vida que pierdes al disparar a la respuesta correcta
     const CASTIGO_PUNTOS = 10;   // puntos que se restan por lo mismo (una baja suma 10)
@@ -656,14 +587,27 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     function makeLabel(text) {
         const c = document.createElement('canvas'); const g = c.getContext('2d');
         g.font = 'bold 64px Courier New, monospace';
-        const w = Math.max(160, g.measureText(text).width + 60); c.width = w; c.height = 100;
-        g.fillStyle = 'rgba(5,7,10,0.88)'; g.fillRect(0, 0, w, 100);
-        g.strokeStyle = '#7fffb0'; g.lineWidth = 5; g.strokeRect(3, 3, w - 6, 94);
+        // Respuestas largas: en dos líneas para que la etiqueta no salga enorme
+        const t = String(text ?? '');
+        let lineas = [t];
+        if (g.measureText(t).width > 640 && t.includes(' ')) {
+            const mitad = t.length / 2;
+            let corte = -1;
+            for (let i = 0; i < t.length; i++) if (t[i] === ' ' && (corte < 0 || Math.abs(i - mitad) < Math.abs(corte - mitad))) corte = i;
+            lineas = [t.slice(0, corte), t.slice(corte + 1)];
+        }
+        const alto = lineas.length > 1 ? 170 : 100;
+        const w = Math.max(160, Math.max(...lineas.map(l => g.measureText(l).width)) + 60); c.width = w; c.height = alto;
+        g.fillStyle = 'rgba(5,7,10,0.88)'; g.fillRect(0, 0, w, alto);
+        g.strokeStyle = '#7fffb0'; g.lineWidth = 5; g.strokeRect(3, 3, w - 6, alto - 6);
         g.font = 'bold 64px Courier New, monospace'; g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(text, w / 2, 52);
+        if (lineas.length > 1) { g.fillText(lineas[0], w / 2, 50); g.fillText(lineas[1], w / 2, 122); }
+        else g.fillText(t, w / 2, 52);
         const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-        sp.scale.set(w / 100 * 0.9, 0.9, 1); sp.renderOrder = 10;
+        sp.scale.set(w / 100 * 0.9, alto / 100 * 0.9, 1); sp.renderOrder = 10;
+        // Con dos líneas crece hacia arriba: el borde inferior queda donde estaba
+        if (lineas.length > 1) sp.center.set(0.5, 0.294);
         return sp;
     }
     function spawnEnemy(answer, isCorrect, angle) {
@@ -689,10 +633,16 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     // Preparar preguntas (baraja indices, tope 20)
     const PREGUNTAS = preguntasInput.slice(0, 20);
     let orden = PREGUNTAS.map((_, i) => i);
-    for (let i = orden.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [orden[i], orden[j]] = [orden[j], orden[i]]; }
+    // ordenFijo: ficha PDF con código (?fc=) → las preguntas en el orden del papel
+    if (!ordenFijo) for (let i = orden.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [orden[i], orden[j]] = [orden[j], orden[i]]; }
     $('wave-total').textContent = '/' + orden.length;
     let preguntaActual = null, textoPregunta = '';
-    function ponerTexto(t) { textoPregunta = t; qEl.textContent = t; panelSucio = true; }
+    function ponerTexto(t) {
+        textoPregunta = t; qEl.textContent = t; panelSucio = true;
+        // Enunciados largos: letra algo más pequeña para que no tapen la sala
+        const letra = letraAjustada('clamp(14px,3.2vw,22px)', t, 110, 0.7);
+        qEl.style.fontSize = letra.startsWith('calc') ? letra : '';
+    }
 
     function spawnWave() {
         if (wave > orden.length) { winGame(); return; }
@@ -1614,6 +1564,7 @@ function BunkerDisparoJuego({ recurso = null, onExit, usuario, autoStart = false
 
     const rootRef = useRef(null);
     const preguntasRef = useRef([]);
+    const ordenFijoRef = useRef(false); // ficha PDF con código (?fc=): sin barajar
     const cleanupRef = useRef(null);
 
     // Realidad virtual: la sesión se pide en el clic y se entrega al motor al montarse
@@ -1636,10 +1587,11 @@ function BunkerDisparoJuego({ recurso = null, onExit, usuario, autoStart = false
     const ultimoInicioRef = useRef(null); // para reiniciar la misma partida
 
     // Empezar partida con un set de preguntas ya normalizadas
-    const empezar = ({ preguntas, titulo, categoria, recursoId }, saltarTutorial = false) => {
+    const empezar = ({ preguntas, titulo, categoria, recursoId, ordenFijo = false }, saltarTutorial = false) => {
         if (!preguntas || preguntas.length === 0) { alert('Ese conjunto no tiene preguntas jugables (necesitan enunciado, respuesta y al menos una incorrecta).'); return; }
-        ultimoInicioRef.current = { preguntas, titulo, categoria, recursoId };
+        ultimoInicioRef.current = { preguntas, titulo, categoria, recursoId, ordenFijo };
         preguntasRef.current = preguntas;
+        ordenFijoRef.current = !!ordenFijo;
         setFuente({ titulo, categoria, recursoId });
         setScore(0);
         setYaGuardado(false);
@@ -1652,7 +1604,7 @@ function BunkerDisparoJuego({ recurso = null, onExit, usuario, autoStart = false
         if (autoStart && recurso && gameState === 'MENU') {
             const hojas = recursoAHojas(recurso);
             const preguntas = hojas.flatMap(h => h.preguntas);
-            const go = () => empezar({ preguntas, titulo: recurso.titulo || 'Recurso', categoria: 'General', recursoId: recurso.id }, true);
+            const go = () => empezar({ preguntas, titulo: recurso.titulo || 'Recurso', categoria: 'General', recursoId: recurso.id, ordenFijo: !!recurso.ordenFicha }, true);
             if (!esperarMandos('BUNKER', go)) go(); // con mandos, espera a que se conecten
         }
         // eslint-disable-next-line
@@ -1664,6 +1616,7 @@ function BunkerDisparoJuego({ recurso = null, onExit, usuario, autoStart = false
         const cleanup = montarMotor({
             root: rootRef.current,
             preguntasInput: preguntasRef.current,
+            ordenFijo: ordenFijoRef.current,
             xrSession: xrSesionRef.current,
             onScore: (s) => setScore(s),
             onEnd: ({ win, score: sc, alcanzada, total, acertadas, falladas }) => {
@@ -1962,7 +1915,7 @@ function MenuBunker({ recurso, onExit, onEmpezar }) {
             <style>{`.bunker-menu-card{background:rgba(14,20,24,0.96);border:1px solid #263238;border-radius:18px;padding:34px;width:92%;max-width:460px;box-shadow:0 30px 80px rgba(0,0,0,0.6);}`}</style>
 
             {vista === 'BUSCADOR' && (
-                <BuscadorRecursos onBack={() => setVista('INICIO')} onPick={(r) => { setRecursoSel(r); setVista('RECURSO'); }} />
+                <BuscadorRecursos onBack={() => setVista('INICIO')} onPick={async (r) => { const rr = await elegirEncaje(r, 'BUNKER'); if (!rr) return; setRecursoSel(rr); setVista('RECURSO'); }} />
             )}
 
             {vista === 'RECURSO' && recursoSel && (
@@ -2066,7 +2019,8 @@ function BuscadorRecursos({ onBack, onPick }) {
             setCargando(true);
             try {
                 const snap = await getDocs(query(collection(db, 'resources'), where('isPrivate', '==', false)));
-                const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                // Recursos de los profes + preguntas de PiKT por etapa y materia (detrás)
+                const docs = await conRecursosPikt(snap.docs.map(d => ({ ...d.data(), id: d.id })), 'CAZABURBUJAS');
                 // Mismo tipo de recurso que Burbujas y Pikatron (1 correcta + 3 incorrectas);
                 // descartamos los que no tengan al menos una pregunta jugable (p.ej. PRO solo-generadas)
                 const jugables = docs.filter(r => r.tipoJuego === 'CAZABURBUJAS' && recursoAHojas(r).length > 0);

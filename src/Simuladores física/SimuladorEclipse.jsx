@@ -1235,3 +1235,5 @@ const App = () => {
 
 export default App;
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = PREGUNTAS;

@@ -87,9 +87,9 @@ export function fichasRecientes() {
   } catch { return []; }
 }
 
-export function guardarFichaReciente({ codigo, titulo, n }) {
+export function guardarFichaReciente({ codigo, titulo, n, codigoCorto = null }) {
   try {
-    const l = [{ codigo, titulo, n, fecha: Date.now() }, ...fichasRecientes().filter((x) => x.codigo !== codigo)].slice(0, MAX_RECIENTES);
+    const l = [{ codigo, titulo, n, codigoCorto, fecha: Date.now() }, ...fichasRecientes().filter((x) => x.codigo !== codigo)].slice(0, MAX_RECIENTES);
     localStorage.setItem(LS_FICHAS, JSON.stringify(l));
   } catch { /* sin almacenamiento */ }
 }

@@ -1,38 +1,41 @@
 import { useState, useEffect } from 'react';
 
+// Reacciones de la pizarra (también las usa la ficha PDF del simulador)
+export const REACCIONES = [
+  { name: "Síntesis del Agua", reactants: ["H₂", "O₂"], products: ["H₂O"], coefficients: [2, 1, 2] },
+  { name: "Proceso de Haber (Amoniaco)", reactants: ["N₂", "H₂"], products: ["NH₃"], coefficients: [1, 3, 2] },
+  { name: "Síntesis de Cloruro de Sodio", reactants: ["Na", "Cl₂"], products: ["NaCl"], coefficients: [2, 1, 2] },
+  { name: "Combustión del Metano", reactants: ["CH₄", "O₂"], products: ["CO₂", "H₂O"], coefficients: [1, 2, 1, 2] },
+  { name: "Oxidación de Monóxido de Carbono", reactants: ["CO", "O₂"], products: ["CO₂"], coefficients: [2, 1, 2] },
+  { name: "Descomposición del Clorato de Potasio", reactants: ["KClO₃"], products: ["KCl", "O₂"], coefficients: [2, 2, 3] },
+  { name: "Oxidación del Magnesio", reactants: ["Mg", "O₂"], products: ["MgO"], coefficients: [2, 1, 2] },
+  { name: "Combustión del Propano", reactants: ["C₃H₈", "O₂"], products: ["CO₂", "H₂O"], coefficients: [1, 5, 3, 4] },
+  { name: "Hierro y Ácido Sulfúrico", reactants: ["Fe", "H₂SO₄"], products: ["FeSO₄", "H₂"], coefficients: [1, 1, 1, 1] },
+  { name: "Ácido Clorhídrico y Aluminio", reactants: ["Al", "HCl"], products: ["AlCl₃", "H₂"], coefficients: [2, 6, 2, 3] },
+  { name: "Reducción del Óxido de Hierro (III)", reactants: ["Fe₂O₃", "CO"], products: ["Fe", "CO₂"], coefficients: [1, 3, 2, 3] },
+  { name: "Descomposición del Carbonato de Calcio", reactants: ["CaCO₃"], products: ["CaO", "CO₂"], coefficients: [1, 1, 1] },
+  { name: "Descomposición del Peróxido de Hidrógeno", reactants: ["H₂O₂"], products: ["H₂O", "O₂"], coefficients: [2, 2, 1] },
+  { name: "Zinc y Ácido Clorhídrico", reactants: ["Zn", "HCl"], products: ["ZnCl₂", "H₂"], coefficients: [1, 2, 1, 1] },
+  { name: "Formación de Óxido de Hierro (III)", reactants: ["Fe", "O₂"], products: ["Fe₂O₃"], coefficients: [4, 3, 2] },
+  { name: "Precipitación de Hidróxido de Cobre (II)", reactants: ["CuSO₄", "NaOH"], products: ["Cu(OH)₂", "Na₂SO₄"], coefficients: [1, 2, 1, 1] },
+  { name: "Potasio y Agua", reactants: ["K", "H₂O"], products: ["KOH", "H₂"], coefficients: [2, 2, 2, 1] },
+  { name: "Desplazamiento de Bromo por Cloro", reactants: ["Cl₂", "KBr"], products: ["KCl", "Br₂"], coefficients: [1, 2, 2, 1] },
+  { name: "Neutralización Ácido-Base", reactants: ["HCl", "NaOH"], products: ["NaCl", "H₂O"], coefficients: [1, 1, 1, 1] },
+  { name: "Nitrato de Plata y Cobre", reactants: ["AgNO₃", "Cu"], products: ["Cu(NO₃)₂", "Ag"], coefficients: [2, 1, 1, 2] },
+  { name: "Precipitación de Yoduro de Plomo (II)", reactants: ["Pb(NO₃)₂", "KI"], products: ["PbI₂", "KNO₃"], coefficients: [1, 2, 1, 2] },
+  { name: "Combustión del Etanol", reactants: ["C₂H₅OH", "O₂"], products: ["CO₂", "H₂O"], coefficients: [1, 3, 2, 3] },
+  { name: "Síntesis de Trióxido de Azufre", reactants: ["SO₂", "O₂"], products: ["SO₃"], coefficients: [2, 1, 2] },
+  { name: "Formación de Carbonato de Calcio", reactants: ["Ca(OH)₂", "CO₂"], products: ["CaCO₃", "H₂O"], coefficients: [1, 1, 1, 1] },
+  { name: "Precipitación de Sulfato de Bario", reactants: ["BaCl₂", "Na₂SO₄"], products: ["BaSO₄", "NaCl"], coefficients: [1, 1, 1, 2] },
+  { name: "Desplazamiento de Cobre por Aluminio", reactants: ["Al", "CuSO₄"], products: ["Al₂(SO₄)₃", "Cu"], coefficients: [2, 3, 1, 3] },
+  { name: "Oxidación Catalítica del Amoniaco", reactants: ["NH₃", "O₂"], products: ["NO", "H₂O"], coefficients: [4, 5, 4, 6] },
+  { name: "Síntesis de Tricloruro de Fósforo", reactants: ["P", "Cl₂"], products: ["PCl₃"], coefficients: [2, 3, 2] },
+  { name: "Combustión del Etano", reactants: ["C₂H₆", "O₂"], products: ["CO₂", "H₂O"], coefficients: [2, 7, 4, 6] },
+  { name: "Dióxido de Silicio y Ácido Fluorhídrico", reactants: ["SiO₂", "HF"], products: ["SiF₄", "H₂O"], coefficients: [1, 4, 1, 2] }
+];
+
 function App() {
-  const reactions = [
-    { name: "Síntesis del Agua", reactants: ["H₂", "O₂"], products: ["H₂O"], coefficients: [2, 1, 2] },
-    { name: "Proceso de Haber (Amoniaco)", reactants: ["N₂", "H₂"], products: ["NH₃"], coefficients: [1, 3, 2] },
-    { name: "Síntesis de Cloruro de Sodio", reactants: ["Na", "Cl₂"], products: ["NaCl"], coefficients: [2, 1, 2] },
-    { name: "Combustión del Metano", reactants: ["CH₄", "O₂"], products: ["CO₂", "H₂O"], coefficients: [1, 2, 1, 2] },
-    { name: "Oxidación de Monóxido de Carbono", reactants: ["CO", "O₂"], products: ["CO₂"], coefficients: [2, 1, 2] },
-    { name: "Descomposición del Clorato de Potasio", reactants: ["KClO₃"], products: ["KCl", "O₂"], coefficients: [2, 2, 3] },
-    { name: "Oxidación del Magnesio", reactants: ["Mg", "O₂"], products: ["MgO"], coefficients: [2, 1, 2] },
-    { name: "Combustión del Propano", reactants: ["C₃H₈", "O₂"], products: ["CO₂", "H₂O"], coefficients: [1, 5, 3, 4] },
-    { name: "Hierro y Ácido Sulfúrico", reactants: ["Fe", "H₂SO₄"], products: ["FeSO₄", "H₂"], coefficients: [1, 1, 1, 1] },
-    { name: "Ácido Clorhídrico y Aluminio", reactants: ["Al", "HCl"], products: ["AlCl₃", "H₂"], coefficients: [2, 6, 2, 3] },
-    { name: "Reducción del Óxido de Hierro (III)", reactants: ["Fe₂O₃", "CO"], products: ["Fe", "CO₂"], coefficients: [1, 3, 2, 3] },
-    { name: "Descomposición del Carbonato de Calcio", reactants: ["CaCO₃"], products: ["CaO", "CO₂"], coefficients: [1, 1, 1] },
-    { name: "Descomposición del Peróxido de Hidrógeno", reactants: ["H₂O₂"], products: ["H₂O", "O₂"], coefficients: [2, 2, 1] },
-    { name: "Zinc y Ácido Clorhídrico", reactants: ["Zn", "HCl"], products: ["ZnCl₂", "H₂"], coefficients: [1, 2, 1, 1] },
-    { name: "Formación de Óxido de Hierro (III)", reactants: ["Fe", "O₂"], products: ["Fe₂O₃"], coefficients: [4, 3, 2] },
-    { name: "Precipitación de Hidróxido de Cobre (II)", reactants: ["CuSO₄", "NaOH"], products: ["Cu(OH)₂", "Na₂SO₄"], coefficients: [1, 2, 1, 1] },
-    { name: "Potasio y Agua", reactants: ["K", "H₂O"], products: ["KOH", "H₂"], coefficients: [2, 2, 2, 1] },
-    { name: "Desplazamiento de Bromo por Cloro", reactants: ["Cl₂", "KBr"], products: ["KCl", "Br₂"], coefficients: [1, 2, 2, 1] },
-    { name: "Neutralización Ácido-Base", reactants: ["HCl", "NaOH"], products: ["NaCl", "H₂O"], coefficients: [1, 1, 1, 1] },
-    { name: "Nitrato de Plata y Cobre", reactants: ["AgNO₃", "Cu"], products: ["Cu(NO₃)₂", "Ag"], coefficients: [2, 1, 1, 2] },
-    { name: "Precipitación de Yoduro de Plomo (II)", reactants: ["Pb(NO₃)₂", "KI"], products: ["PbI₂", "KNO₃"], coefficients: [1, 2, 1, 2] },
-    { name: "Combustión del Etanol", reactants: ["C₂H₅OH", "O₂"], products: ["CO₂", "H₂O"], coefficients: [1, 3, 2, 3] },
-    { name: "Síntesis de Trióxido de Azufre", reactants: ["SO₂", "O₂"], products: ["SO₃"], coefficients: [2, 1, 2] },
-    { name: "Formación de Carbonato de Calcio", reactants: ["Ca(OH)₂", "CO₂"], products: ["CaCO₃", "H₂O"], coefficients: [1, 1, 1, 1] },
-    { name: "Precipitación de Sulfato de Bario", reactants: ["BaCl₂", "Na₂SO₄"], products: ["BaSO₄", "NaCl"], coefficients: [1, 1, 1, 2] },
-    { name: "Desplazamiento de Cobre por Aluminio", reactants: ["Al", "CuSO₄"], products: ["Al₂(SO₄)₃", "Cu"], coefficients: [2, 3, 1, 3] },
-    { name: "Oxidación Catalítica del Amoniaco", reactants: ["NH₃", "O₂"], products: ["NO", "H₂O"], coefficients: [4, 5, 4, 6] },
-    { name: "Síntesis de Tricloruro de Fósforo", reactants: ["P", "Cl₂"], products: ["PCl₃"], coefficients: [2, 3, 2] },
-    { name: "Combustión del Etano", reactants: ["C₂H₆", "O₂"], products: ["CO₂", "H₂O"], coefficients: [2, 7, 4, 6] },
-    { name: "Dióxido de Silicio y Ácido Fluorhídrico", reactants: ["SiO₂", "HF"], products: ["SiF₄", "H₂O"], coefficients: [1, 4, 1, 2] }
-  ];
+  const reactions = REACCIONES;
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const currentReaction = reactions[currentIdx];

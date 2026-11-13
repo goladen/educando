@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { doc, updateDoc, addDoc, getDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer,increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { factorLetra, letraAjustada } from './utils/encajeTexto';
 
 // --- IMPORTACIÓN DE AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -695,7 +696,7 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
                     )}
                     <div id="timer" className={jugador.tiempo <= 10 ? 'timer-warning' : ''}>{jugador.tiempo}</div>
                     <h2 id="letra-grande">{preguntaActual.letra}</h2>
-                    <div id="pregunta-box">{preguntaActual.pregunta}</div>
+                    <div id="pregunta-box" style={factorLetra(preguntaActual.pregunta, 150, 0.7) < 1 ? { fontSize: letraAjustada('1.1rem', preguntaActual.pregunta, 150, 0.7), height: 115, lineHeight: 1.3 } : undefined}>{preguntaActual.pregunta}</div>
 
                     <input
                         ref={inputRef}

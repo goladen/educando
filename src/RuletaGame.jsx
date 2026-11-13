@@ -5,6 +5,7 @@ import { doc, addDoc, getDoc, collection, query, where, getDocs, updateDoc, getC
 import Confetti from 'react-confetti';
 import { Save, CircleDollarSign, Mic, Type, Skull, Trophy, Crown, Medal, User } from 'lucide-react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { factorLetra, letraAjustada } from './utils/encajeTexto';
 
 // --- IMPORTACIÓN DE AUDIOS LOCALES ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -285,7 +286,8 @@ export default function RuletaGame({ recurso, usuario, alTerminar, hojaInicial =
 
         const poolPreguntas = hojaParaPreguntas?.preguntas || [];
         setTodasLasPreguntas(poolPreguntas);
-        setColaPreguntas([...poolPreguntas].sort(() => Math.random() - 0.5));
+        // Ficha PDF con código (?fc=): las pistas en el orden del papel
+        setColaPreguntas(recurso.ordenFicha ? [...poolPreguntas] : [...poolPreguntas].sort(() => Math.random() - 0.5));
 
         setLetrasDichas([]);
 
@@ -352,7 +354,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar, hojaInicial =
     // --- PREGUNTAS ---
     const cargarNuevaPregunta = () => {
         let nuevaCola = [...colaPreguntas];
-        if (nuevaCola.length === 0) nuevaCola = [...todasLasPreguntas].sort(() => Math.random() - 0.5);
+        if (nuevaCola.length === 0) nuevaCola = recurso.ordenFicha ? [...todasLasPreguntas] : [...todasLasPreguntas].sort(() => Math.random() - 0.5);
 
         const p = nuevaCola[0] || { pregunta: "¿Listo para resolver?", respuesta: "si", incorrectas: [] };
         setColaPreguntas(nuevaCola.slice(1));
@@ -687,11 +689,11 @@ export default function RuletaGame({ recurso, usuario, alTerminar, hojaInicial =
                     <div className="modal-accion">
                         <div className="modal-header" style={{ background: '#3498db' }}>JUEGAS POR {valorActual} €</div>
                         <div className="modal-body">
-                            <p className="pregunta-texto">{preguntaActual.pregunta}</p>
+                            <p className="pregunta-texto" style={factorLetra(preguntaActual.pregunta, 140, 0.7) < 1 ? { fontSize: letraAjustada('1.3rem', preguntaActual.pregunta, 140, 0.7) } : undefined}>{preguntaActual.pregunta}</p>
                             {(preguntaActual.incorrectas && preguntaActual.incorrectas.length > 0 && preguntaActual.incorrectas[0] !== "") ? (
                                 <div className="opciones-grid">
                                     {mezclar(preguntaActual).map((op, k) => (
-                                        <button key={k} className={`btn-opcion ${feedbackPregunta ? (op === (preguntaActual.respuesta || preguntaActual.correcta) ? 'verde' : 'rojo') : ''}`} onClick={() => verificarPregunta(op, true)} disabled={!!feedbackPregunta}>{op}</button>
+                                        <button key={k} className={`btn-opcion ${feedbackPregunta ? (op === (preguntaActual.respuesta || preguntaActual.correcta) ? 'verde' : 'rojo') : ''}`} onClick={() => verificarPregunta(op, true)} disabled={!!feedbackPregunta} style={factorLetra(op, 40, 0.7) < 1 ? { fontSize: letraAjustada('0.95rem', op, 40, 0.7) } : undefined}>{op}</button>
                                     ))}
                                 </div>
                             ) : (

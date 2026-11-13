@@ -4,6 +4,7 @@ import React, { useRef } from 'react';
 import { AlienSVG, NaveSVG } from './Sprites';
 import { SUELO, NAVE_Y } from '../motor/comun';
 import { NEON } from '../tema';
+import { factorLetra } from '../../utils/encajeTexto';
 
 const pct = (v) => `${v * 100}%`;
 
@@ -38,8 +39,8 @@ function Alien({ a, t, resaltado, conEtiqueta }) {
     <div className="absolute flex flex-col items-center" style={caja}>
       <AlienSVG sprite={a.sprite} frame={frame} color={a.color} className="h-[52%] w-full" />
       <div className="mt-[3%] flex max-h-[48%] w-full items-center justify-center overflow-hidden rounded border-2 bg-slate-950/90 px-1 text-center font-pixel leading-none text-slate-50 text-[length:clamp(13px,4.2cqw,30px)]"
-        style={{ borderColor: a.color, boxShadow: `0 0 10px ${a.color}66` }}>
-        <span className="line-clamp-2 break-words">{a.etiqueta}</span>
+        style={{ borderColor: a.color, boxShadow: `0 0 10px ${a.color}66`, ...(factorLetra(a.etiqueta, 10, 0.6) < 1 ? { fontSize: `calc(clamp(13px,4.2cqw,30px) * ${factorLetra(a.etiqueta, 10, 0.6).toFixed(3)})`, lineHeight: 1.05 } : {}) }}>
+        <span className="line-clamp-2 break-words" style={factorLetra(a.etiqueta, 10, 0.6) < 1 ? { WebkitLineClamp: 3 } : undefined}>{a.etiqueta}</span>
       </div>
     </div>
   );

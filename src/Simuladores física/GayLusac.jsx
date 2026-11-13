@@ -1,5 +1,96 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [
+  // Teoría
+  {
+    q: "¿Qué magnitud termodinámica se mantiene constante en la Ley de Gay-Lussac?",
+    options: ["La presión", "La temperatura", "La energía cinética", "La masa y el volumen"],
+    ans: 3
+  },
+  {
+    q: "Según el simulador, al aumentar la temperatura, ¿qué ocurre con las partículas del gas?",
+    options: ["Disminuyen su velocidad", "Se vuelven más pesadas", "Aumentan su energía cinética y velocidad", "Se escapan del recipiente"],
+    ans: 2
+  },
+  {
+    q: "¿En qué escala se debe expresar siempre la temperatura para aplicar las leyes de los gases?",
+    options: ["Celsius (°C)", "Fahrenheit (°F)", "Kelvin (K)", "Rankine (R)"],
+    ans: 2
+  },
+  {
+    q: "Al aumentar la temperatura en un volumen fijo, la presión interna aumenta porque...",
+    options: ["Las partículas se dilatan", "Las partículas chocan con más fuerza y frecuencia contra las paredes", "Se generan nuevas partículas", "El recipiente se encoge"],
+    ans: 1
+  },
+  {
+    q: "¿Cuál es la expresión matemática que define la Ley de Gay-Lussac?",
+    options: ["P₁ · V₁ = P₂ · V₂", "V₁ / T₁ = V₂ / T₂", "P₁ / T₁ = P₂ / T₂", "P = V · T"],
+    ans: 2
+  },
+  {
+    q: "Si la temperatura absoluta (K) de un gas se duplica manteniendo su volumen constante, su presión:",
+    options: ["Se reduce a la mitad", "Se mantiene constante", "Se cuadruplica", "Se duplica"],
+    ans: 3
+  },
+  {
+    q: "¿Por qué el émbolo no sube cuando aumenta la presión interior en este experimento?",
+    options: ["Porque el gas pierde fuerza al calentarse", "Porque el volumen es constante y la fuerza externa contrarresta la presión interna", "Porque está pegado con pegamento", "Porque la masa del gas disminuye"],
+    ans: 1
+  },
+  // Casos reales de cálculo (Nuevas 10 preguntas + 3 anteriores adaptadas)
+  {
+    q: "CASO 1: Un neumático de coche tiene una presión de 2.0 atm a 20°C (293 K). Si después de un viaje la temperatura sube a 50°C (323 K), ¿cuál es la nueva presión suponiendo volumen constante?",
+    options: ["2.2 atm", "3.5 atm", "1.8 atm", "4.0 atm"],
+    ans: 0
+  },
+  {
+    q: "CASO 2: Una lata de aerosol vacía a 25°C (298 K) y 1 atm se arroja al fuego (¡peligroso!). Si la lata puede soportar hasta 3 atm antes de explotar, ¿a qué temperatura estallará?",
+    options: ["150°C", "300°C", "621°C (894 K)", "894°C"],
+    ans: 2
+  },
+  {
+    q: "CASO 3: Un tanque de oxígeno de buceo está a 200 bar y 15°C (288 K). Si se deja al sol y se calienta a 40°C (313 K), ¿qué presión alcanzará?",
+    options: ["200.0 bar", "217.3 bar", "250.5 bar", "180.2 bar"],
+    ans: 1
+  },
+  {
+    q: "CASO 4: Un cilindro de gas a 300 K tiene una presión de 1.5 atm. Se enfría hasta que la presión desciende a 1.0 atm. ¿Cuál es la temperatura final?",
+    options: ["150 K", "200 K", "450 K", "100 K"],
+    ans: 1
+  },
+  {
+    q: "CASO 5: En un laboratorio, un recipiente cerrado contiene nitrógeno a 100 kPa y 27°C (300 K). Se requiere aumentar su presión a 150 kPa. ¿A qué temperatura en °C debe calentarse?",
+    options: ["177°C (450 K)", "450°C", "40°C", "250°C"],
+    ans: 0
+  },
+  {
+    q: "CASO 6: Una olla a presión de paredes rígidas se cierra a 20°C (293 K) y 1 atm. Durante la cocción alcanza los 120°C (393 K). ¿Cuál es la presión en su interior?",
+    options: ["1.34 atm", "2.00 atm", "1.00 atm", "6.00 atm"],
+    ans: 0
+  },
+  {
+    q: "CASO 7: Un extintor de CO₂ marca 50 atm a 22°C (295 K). En invierno se deja a la intemperie a -5°C (268 K). ¿Qué presión marcará el manómetro?",
+    options: ["45.4 atm", "50.0 atm", "55.2 atm", "40.1 atm"],
+    ans: 0
+  },
+  {
+    q: "CASO 8: Un neumático de avión se infla a 15 atm a 15°C (288 K) en la pista. A altitud de crucero, la temperatura es de -40°C (233 K). ¿Cuál será la presión del neumático a esa altura?",
+    options: ["12.1 atm", "18.2 atm", "15.0 atm", "8.5 atm"],
+    ans: 0
+  },
+  {
+    q: "CASO 9: Una bombona de gas industrial a 25°C (298 K) tiene una presión de 2.5 atm. Si hay riesgo crítico de fractura del metal a las 8 atm, ¿a qué temperatura absoluta (K) estallaría?",
+    options: ["953.6 K", "300.0 K", "500.0 K", "1200.5 K"],
+    ans: 0
+  },
+  {
+    q: "CASO 10: Un matraz sellado contiene helio a 300 mm Hg y 10°C (283 K). Se enfría sumergiéndolo en nitrógeno líquido hasta que la presión cae a 50 mm Hg. ¿Cuál es su temperatura final?",
+    options: ["47.1 K", "100.0 K", "273.1 K", "0 K"],
+    ans: 0
+  }
+];
+
 export default function GayLusac() {
   const [tempC, setTempC] = useState(10);
   const [answers, setAnswers] = useState({});
@@ -114,95 +205,7 @@ export default function GayLusac() {
 
   const numArrows = tempC < 30 ? 1 : tempC < 70 ? 2 : 3;
 
-  const questions = [
-    // Teoría
-    {
-      q: "¿Qué magnitud termodinámica se mantiene constante en la Ley de Gay-Lussac?",
-      options: ["La presión", "La temperatura", "La energía cinética", "La masa y el volumen"],
-      ans: 3
-    },
-    {
-      q: "Según el simulador, al aumentar la temperatura, ¿qué ocurre con las partículas del gas?",
-      options: ["Disminuyen su velocidad", "Se vuelven más pesadas", "Aumentan su energía cinética y velocidad", "Se escapan del recipiente"],
-      ans: 2
-    },
-    {
-      q: "¿En qué escala se debe expresar siempre la temperatura para aplicar las leyes de los gases?",
-      options: ["Celsius (°C)", "Fahrenheit (°F)", "Kelvin (K)", "Rankine (R)"],
-      ans: 2
-    },
-    {
-      q: "Al aumentar la temperatura en un volumen fijo, la presión interna aumenta porque...",
-      options: ["Las partículas se dilatan", "Las partículas chocan con más fuerza y frecuencia contra las paredes", "Se generan nuevas partículas", "El recipiente se encoge"],
-      ans: 1
-    },
-    {
-      q: "¿Cuál es la expresión matemática que define la Ley de Gay-Lussac?",
-      options: ["P₁ · V₁ = P₂ · V₂", "V₁ / T₁ = V₂ / T₂", "P₁ / T₁ = P₂ / T₂", "P = V · T"],
-      ans: 2
-    },
-    {
-      q: "Si la temperatura absoluta (K) de un gas se duplica manteniendo su volumen constante, su presión:",
-      options: ["Se reduce a la mitad", "Se mantiene constante", "Se cuadruplica", "Se duplica"],
-      ans: 3
-    },
-    {
-      q: "¿Por qué el émbolo no sube cuando aumenta la presión interior en este experimento?",
-      options: ["Porque el gas pierde fuerza al calentarse", "Porque el volumen es constante y la fuerza externa contrarresta la presión interna", "Porque está pegado con pegamento", "Porque la masa del gas disminuye"],
-      ans: 1
-    },
-    // Casos reales de cálculo (Nuevas 10 preguntas + 3 anteriores adaptadas)
-    {
-      q: "CASO 1: Un neumático de coche tiene una presión de 2.0 atm a 20°C (293 K). Si después de un viaje la temperatura sube a 50°C (323 K), ¿cuál es la nueva presión suponiendo volumen constante?",
-      options: ["2.2 atm", "3.5 atm", "1.8 atm", "4.0 atm"],
-      ans: 0
-    },
-    {
-      q: "CASO 2: Una lata de aerosol vacía a 25°C (298 K) y 1 atm se arroja al fuego (¡peligroso!). Si la lata puede soportar hasta 3 atm antes de explotar, ¿a qué temperatura estallará?",
-      options: ["150°C", "300°C", "621°C (894 K)", "894°C"],
-      ans: 2
-    },
-    {
-      q: "CASO 3: Un tanque de oxígeno de buceo está a 200 bar y 15°C (288 K). Si se deja al sol y se calienta a 40°C (313 K), ¿qué presión alcanzará?",
-      options: ["200.0 bar", "217.3 bar", "250.5 bar", "180.2 bar"],
-      ans: 1
-    },
-    {
-      q: "CASO 4: Un cilindro de gas a 300 K tiene una presión de 1.5 atm. Se enfría hasta que la presión desciende a 1.0 atm. ¿Cuál es la temperatura final?",
-      options: ["150 K", "200 K", "450 K", "100 K"],
-      ans: 1
-    },
-    {
-      q: "CASO 5: En un laboratorio, un recipiente cerrado contiene nitrógeno a 100 kPa y 27°C (300 K). Se requiere aumentar su presión a 150 kPa. ¿A qué temperatura en °C debe calentarse?",
-      options: ["177°C (450 K)", "450°C", "40°C", "250°C"],
-      ans: 0
-    },
-    {
-      q: "CASO 6: Una olla a presión de paredes rígidas se cierra a 20°C (293 K) y 1 atm. Durante la cocción alcanza los 120°C (393 K). ¿Cuál es la presión en su interior?",
-      options: ["1.34 atm", "2.00 atm", "1.00 atm", "6.00 atm"],
-      ans: 0
-    },
-    {
-      q: "CASO 7: Un extintor de CO₂ marca 50 atm a 22°C (295 K). En invierno se deja a la intemperie a -5°C (268 K). ¿Qué presión marcará el manómetro?",
-      options: ["45.4 atm", "50.0 atm", "55.2 atm", "40.1 atm"],
-      ans: 0
-    },
-    {
-      q: "CASO 8: Un neumático de avión se infla a 15 atm a 15°C (288 K) en la pista. A altitud de crucero, la temperatura es de -40°C (233 K). ¿Cuál será la presión del neumático a esa altura?",
-      options: ["12.1 atm", "18.2 atm", "15.0 atm", "8.5 atm"],
-      ans: 0
-    },
-    {
-      q: "CASO 9: Una bombona de gas industrial a 25°C (298 K) tiene una presión de 2.5 atm. Si hay riesgo crítico de fractura del metal a las 8 atm, ¿a qué temperatura absoluta (K) estallaría?",
-      options: ["953.6 K", "300.0 K", "500.0 K", "1200.5 K"],
-      ans: 0
-    },
-    {
-      q: "CASO 10: Un matraz sellado contiene helio a 300 mm Hg y 10°C (283 K). Se enfría sumergiéndolo en nitrógeno líquido hasta que la presión cae a 50 mm Hg. ¿Cuál es su temperatura final?",
-      options: ["47.1 K", "100.0 K", "273.1 K", "0 K"],
-      ans: 0
-    }
-  ];
+  const questions = PREGUNTAS_SIM;
 
   const handleOptionSelect = (qIndex, oIndex) => {
     if (score !== null) return;

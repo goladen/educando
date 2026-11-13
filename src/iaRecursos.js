@@ -11,6 +11,9 @@ export const JUEGOS_IA = {
     THINKHOOT:    { label: 'Pi-Live',              min: 5,  max: 30, def: 10, unidad: 'preguntas' },
     RULETA:       { label: 'La Ruleta',            min: 5,  max: 20, def: 10, unidad: 'preguntas' },
     APAREJADOS:   { label: 'AparejaDOS',           min: 4,  max: 16, def: 8,  unidad: 'parejas' },
+    // Banco de problemas de Física y Química: con texto de referencia EXTRAE todos los ejercicios de la
+    // ficha (n = 1 para que la validación acepte cualquier cantidad); sin texto CREA n problemas del tema.
+    PROBLEMAS_FQ: { label: 'Problemas de Física y Química', min: 1, max: 30, def: 8, unidad: 'problemas' },
 };
 
 export const IDIOMAS_IA = ['Español', 'Inglés', 'Francés', 'Catalán', 'Gallego', 'Euskera', 'Alemán', 'Italiano', 'Portugués'];
@@ -92,6 +95,8 @@ Formato exacto (ordenado por letra, "respuesta" siempre primero):
 [{"respuesta":"Asteroide","letra":"A","pregunta":"Empieza por la A: ..."}]`;
     }
 
+    if (tipo === 'PROBLEMAS_FQ') return promptProblemasFQ(p);
+
     if (tipo === 'APAREJADOS') {
         return `Crea EXACTAMENTE ${n} parejas de conceptos relacionados para un juego de unir parejas.
 ${ctx}
@@ -133,6 +138,49 @@ ${opcionMultiple}
 ${REGLAS_JSON}
 Formato exacto:
 [{"pregunta":"...","correcta":"...","incorrectas":["...","...","..."]}]`;
+}
+
+const FORMATO_PROBLEMAS = `[{"tema":"MRUA","materia":"Física","enunciado":"...","solucion":"t = 3 s","pasos":["Datos: ...","v = v0 + a·t → ...","t = 3 s"]}]`;
+
+/**
+ * Prompt del banco de problemas de Física y Química.
+ * - Con texto (o adjunto: true, cuando el documento se adjunta en la IA): extrae TODOS los ejercicios.
+ * - Sin texto: crea n problemas nuevos del tema.
+ * temas: lista de temas existentes para clasificar (va en observaciones desde el formulario).
+ */
+export function promptProblemasFQ({ n = 8, tema = '', observaciones = '', nivel = '', idioma = 'Español', texto = '' } = {}, { adjunto = false } = {}) {
+    const comun = `- Idioma: ${idioma}
+- Nivel del alumnado: ${nivel || 'Secundaria'}${observaciones ? `
+- ${observaciones}` : ''}
+
+Para cada problema:
+1. "enunciado": el enunciado completo, con todos los datos y sus unidades. Usa · para multiplicar, ² ³ para potencias y notación científica como 3·10⁸.
+2. "solucion": el resultado final con su unidad (si hay varios apartados, sepáralos con ; ).
+3. "pasos": la resolución paso a paso (datos, fórmula, sustitución y resultado), una frase corta por paso.
+4. "tema": el tema del problema (usa uno de la lista si encaja; si no, uno nuevo breve).
+5. "materia": "Física" o "Química".
+Comprueba las cuentas antes de responder.`;
+    if (texto || adjunto) {
+        const fuente = texto ? `TEXTO DE LA FICHA:
+<<<
+${texto}
+>>>` : 'La ficha va ADJUNTA a este mensaje (PDF, documento o foto): léela entera.';
+        return `Un profesor de Física y Química te da una ficha de ejercicios. Extrae TODOS los ejercicios y problemas que contiene (cada apartado independiente puede ir como un problema), copiando el enunciado fielmente: corrige solo errores evidentes de escaneo. Si la ficha trae las soluciones, úsalas; si no, resuélvelos tú.
+${comun}
+
+${fuente}
+
+${REGLAS_JSON}
+Formato exacto:
+${FORMATO_PROBLEMAS}`;
+    }
+    return `Crea EXACTAMENTE ${n} problemas de Física y Química sobre: ${tema || 'un tema de Física y Química'}.
+Varía los datos y la dificultad; que se resuelvan con las fórmulas del tema y den resultados razonables.
+${comun}
+
+${REGLAS_JSON}
+Formato exacto:
+${FORMATO_PROBLEMAS}`;
 }
 
 const SYSTEM = 'Eres un profesor experto que crea recursos educativos de calidad para juegos de clase. Respondes ÚNICAMENTE con JSON válido.';
@@ -263,6 +311,23 @@ function validarOpcionMultiple(crudo) {
     return preguntas;
 }
 
+/** Problemas de FyQ válidos: { tema, materia, enunciado, solucion, pasos[] } */
+export function validarProblemasFQ(crudo) {
+    return (Array.isArray(crudo) ? crudo : []).map(x => {
+        if (!x || typeof x !== 'object') return null;
+        const enunciado = limpiarStr(x.enunciado || x.pregunta).slice(0, 4000);
+        if (enunciado.length < 10) return null;
+        const m = sinTildes(limpiarStr(x.materia)).toLowerCase();
+        return {
+            enunciado,
+            solucion: limpiarStr(x.solucion || x.respuesta || x.resultado).slice(0, 1000),
+            pasos: (Array.isArray(x.pasos) ? x.pasos : []).map(limpiarStr).filter(Boolean).slice(0, 20).map(s => s.slice(0, 500)),
+            tema: limpiarStr(x.tema).slice(0, 80) || 'Sin tema',
+            materia: m.startsWith('quim') ? 'Química' : 'Física',
+        };
+    }).filter(Boolean);
+}
+
 function validarParejas(crudo) {
     const vistosA = new Set();
     const vistosB = new Set();
@@ -286,6 +351,12 @@ function validarParejas(crudo) {
 export function interpretarRespuesta(tipo, texto, params) {
     const p = normalizarParams(tipo, params);
     const crudo = extraerArrayJSON(texto);
+
+    // Banco de problemas de FyQ: sin límite por n (al extraer de una ficha se pide n = 1)
+    if (tipo === 'PROBLEMAS_FQ') {
+        const problemas = validarProblemasFQ(crudo).slice(0, 60);
+        return { problemas, hojas: [], validas: problemas.length };
+    }
 
     let preguntas;
     if (tipo === 'PASAPALABRA') preguntas = validarRosco(crudo);

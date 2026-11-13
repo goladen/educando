@@ -4,6 +4,9 @@ import { db, auth } from '../firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { categoriasDeRecurso } from '../utils/normalizarPreguntas';
+import { mensajeAvisoGuardar } from '../utils/encajeTexto';
+import BotonVistaJuegos from './VistaJuegos';
+import { BotonImportarPreguntas } from './ImportarPreguntas';
 import { guardarRecursoLocal, guardarBorrador, leerBorrador, borrarBorrador } from '../utils/recursosLocales';
 
 // Clave histórica del borrador: NO cambiarla aunque el juego se llame ahora
@@ -316,6 +319,8 @@ export default function EditorMoneyBoard({ usuario, onBack, onJugar }) {
         if (!titulo.trim()) { alert('Ponle un título al tablero.'); return false; }
         const llenas = hojas.filter(h => h.preguntas.some(p => p && p.pregunta));
         if (llenas.length < 2) { alert('Necesitas al menos 2 categorías con preguntas.'); return false; }
+        // Aviso si alguna pregunta puede no verse entera en el tablero o en otros juegos
+        try { const aviso = mensajeAvisoGuardar({ hojas: hojasLimpias() }, 'JEOPARDY'); if (aviso && !window.confirm(aviso)) return false; } catch { /* sin aviso */ }
         return true;
     };
 
@@ -544,6 +549,19 @@ export default function EditorMoneyBoard({ usuario, onBack, onJugar }) {
                     onClose={() => { setDecidirGuardado(false); setErrorLogin(''); }}
                 />
             )}
+            {/* 👁 Cómo se ve cada pregunta en el tablero y en los otros juegos */}
+            <BotonVistaJuegos recurso={{ hojas: hojasLimpias() }} tipoJuego="JEOPARDY" zIndex={50} />
+            {/* 📥 Importar preguntas a una categoría (rellena sus casillas vacías) */}
+            <BotonImportarPreguntas tipoJuego="JEOPARDY" hojas={hojas} maxHojas={MAX_CATS} maxPorHoja={MAX_FILAS} zIndex={50}
+                onImportar={(destino, nombre, ps) => setHojas(hs => {
+                    const n = [...hs];
+                    if (destino === 'nueva') { n.push({ nombreHoja: nombre || `Categoría ${n.length + 1}`, preguntas: ps.slice(0, MAX_FILAS) }); return n; }
+                    const pregs = [...(n[destino]?.preguntas || [])];
+                    let k = 0;
+                    for (let f = 0; f < MAX_FILAS && k < ps.length; f++) if (!pregs[f]?.pregunta) pregs[f] = ps[k++];
+                    n[destino] = { ...n[destino], preguntas: pregs };
+                    return n;
+                })} />
         </div>
     );
 }

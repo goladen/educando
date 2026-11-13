@@ -1251,3 +1251,6 @@ const App = ({ vistaInicial = 'orbitas', tourConfig = null, autoTour = false, on
 };
 
 export default App;
+
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [...PREGUNTAS, ...PROBLEMAS];

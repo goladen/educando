@@ -738,3 +738,6 @@ function QB({ l, bg, c }) {
 }
 
 export default SimuladorAtomos;
+
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = ALL_Q;

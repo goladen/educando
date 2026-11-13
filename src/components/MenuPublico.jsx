@@ -3,6 +3,7 @@
 // Los enlaces externos se abren aquí; las vistas internas se delegan con
 // onNavegar('inicio' | 'populares' | 'paginas-profesores' | 'comunidades').
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Menu, X } from 'lucide-react';
 import KofiBoton from './KofiBoton';
 
@@ -36,7 +37,7 @@ export default function MenuPublico({ onNavegar, botonStyle, iconColor = 'white'
             <button onClick={() => setAbierto(true)} aria-label="Abrir menú" style={{ ...s.boton, ...botonStyle }}>
                 <Menu size={28} color={iconColor} />
             </button>
-            {abierto && (
+            {abierto && createPortal(
                 <div style={s.overlay} onClick={() => setAbierto(false)}>
                     <div style={s.panel} onClick={(e) => e.stopPropagation()}>
                         <div style={s.cabecera}>
@@ -52,7 +53,8 @@ export default function MenuPublico({ onNavegar, botonStyle, iconColor = 'white'
                             <KofiBoton />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
@@ -60,7 +62,7 @@ export default function MenuPublico({ onNavegar, botonStyle, iconColor = 'white'
 
 const s = {
     boton:    { background: 'rgba(255, 255, 255, 0.2)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', backdropFilter: 'blur(5px)', pointerEvents: 'auto', display: 'flex' },
-    overlay:  { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 10000 },
+    overlay:  { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 10000, pointerEvents: 'auto' },
     panel:    { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', display: 'flex', flexDirection: 'column', overflowY: 'auto' },
     cabecera: { display: 'flex', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid #eee', color: '#333' },
     lista:    { listStyle: 'none', padding: 0, margin: 0 },

@@ -5,6 +5,7 @@ import pikatronImg from './assets/pikatron-sprite.png';
 import coinImgFile from './assets/moneda.png'; // <--- AÑADE ESTO
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { dibujarAjustado, letraAjustada } from './utils/encajeTexto';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 // --- IMPORTACIÓN DE FONDOS ---
 import bg1 from './assets/pantalla5.jpeg';
@@ -548,7 +549,8 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                     const nextData = list[gameRef.current.nextAnswerIndex];
                     const color = BLOCK_COLORS[gameRef.current.nextAnswerIndex % BLOCK_COLORS.length];
                     gameRef.current.obstacles.push({
-                        x: canvas.width, y: groundLevel - 40, width: 100, height: 40, data: nextData, color: color
+                        // Respuestas largas: caja algo más ancha (hasta 150 px)
+                        x: canvas.width, y: groundLevel - 40, width: Math.min(150, 100 + Math.max(0, String(nextData?.text ?? '').length - 10) * 4), height: 40, data: nextData, color: color
                     });
                     gameRef.current.nextAnswerIndex = (gameRef.current.nextAnswerIndex + 1) % list.length;
                 }
@@ -563,10 +565,9 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                 ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
                 ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
                 ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
-                let txt = obs.data.text;
-                if (txt.length > 10) txt = txt.substring(0, 9) + '..';
-                ctx.fillText(txt, obs.x + (obs.width / 2), obs.y + 26);
+                ctx.fillStyle = 'white';
+                // Antes se cortaba a 10 letras: ahora se encoge la letra y se parte en dos líneas
+                dibujarAjustado(ctx, String(obs.data.text ?? ''), obs.x + (obs.width / 2), obs.y + (obs.height / 2) + 1, obs.width - 8, obs.height - 4, { maxPx: 16, minPx: 9, maxLineas: 2 });
                 ctx.textAlign = 'start';
 
                 const paddingX = 25; const paddingY = 20;
@@ -930,7 +931,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                         {preguntaActual && (
                             <div style={{
                                 flex: 1, minWidth: 0, textAlign: 'center', lineHeight: '1.2',
-                                fontSize: 'clamp(14px, 2.5vw, 20px)', // Texto responsivo
+                                fontSize: letraAjustada('clamp(14px, 2.5vw, 20px)', preguntaActual, 110, 0.7), // responsivo; más pequeño si es largo
                                 whiteSpace: 'normal',
                                 color: '#333',
                                 padding: '0 10px'

@@ -92,6 +92,7 @@ async function capturarEnunciados(preguntas) {
 // ═════════════════════════════════════════════════════════
 export async function generarPdfInvasores({
   preguntas, titulo = '', variante = 'DISPARA', oscuro = false, soluciones = true, qrUrl = null, descargar = true, vinculada = false,
+  codigoFicha = null, // código corto (FXXXXXX): se escribe en pikt.es en cualquier dispositivo
 }) {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -144,7 +145,7 @@ export async function generarPdfInvasores({
     }
     txt('INVASIÓN PI', A4.m + 7, A4.m + 13, { tam: 26, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[0] });
     txt('MISIÓN DE ENTRENAMIENTO', A4.m + 7.4, A4.m + 24, { tam: 9.5, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[1] });
-    txt(titulo, A4.m + 7.4, A4.m + 29.5, { tam: 8.5, color: [203, 213, 225], max: qrImg ? 118 : 160 });
+    txt(titulo, A4.m + 7.4, A4.m + 29.5, { tam: 8.5, color: [203, 213, 225], max: codigoFicha ? 98 : (qrImg ? 118 : 160) });
 
     // Datos del piloto
     const yP = A4.m + alto - 9;
@@ -158,7 +159,13 @@ export async function generarPdfInvasores({
       const q = 30, xq = A4.w - A4.m - q - 5, yq = A4.m + 5;
       pdf.setFillColor(255, 255, 255); pdf.roundedRect(xq - 1.5, yq - 1.5, q + 3, q + 3, 1.5, 1.5, 'F');
       pdf.addImage(qrImg, 'PNG', xq, yq, q, q);
-      txt(vinculada ? 'JUEGA ESTAS PREGUNTAS' : '¡JUEGA EN PIKT.ES!', xq + q / 2, yq + q + 3, { tam: 6.5, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[3], align: 'center' });
+      txt(vinculada ? 'JUEGA ESTAS PREGUNTAS' : '¡JUEGA EN PIKT.ES!', xq + q / 2, yq + q + (codigoFicha ? 1.6 : 3), { tam: 6.5, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[3], align: 'center' });
+    }
+    if (codigoFicha) {
+      // Código de la ficha: en pikt.es (buscador de códigos) abre estas preguntas en este orden
+      const xc = qrImg ? A4.w - A4.m - 5 - 30 - 6 : A4.w - A4.m - 6;
+      txt('CÓDIGO EN PIKT.ES', xc, A4.m + 30, { tam: 6.5, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[2], align: 'right' });
+      txt(codigoFicha, xc, A4.m + 33.5, { tam: 13, font: 'courier', estilo: 'bold', color: NEON_PANTALLA[3], align: 'right' });
     }
     return A4.m + alto + 5;
   };

@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Test del simulador (también lo usa la ficha PDF de los simuladores)
+export const PREGUNTAS_SIM = [
+  { id: 1, text: "Desde el suelo, ¿qué ángulo de lanzamiento proporciona el alcance horizontal máximo (sin rozamiento)?", options: ["30°", "45°", "60°", "90°"], correct: 1 },
+  { id: 2, text: "En el punto más alto de la trayectoria parabólica, ¿cuál es la velocidad vertical (Vy) del proyectil?", options: ["Máxima", "Cero (0 m/s)", "Igual a la velocidad inicial"], correct: 1 },
+  { id: 3, text: "¿Cómo se comporta la velocidad horizontal (Vx) a lo largo de todo el vuelo?", options: ["Aumenta constantemente", "Disminuye constantemente", "Se mantiene constante (MRU)"], correct: 2 },
+  { id: 4, text: "En el punto más alto, ¿cuál es la aceleración que experimenta el proyectil?", options: ["Cero", "9.81 m/s² hacia abajo", "9.81 m/s² hacia arriba"], correct: 1 },
+  { id: 5, text: "Si un objeto se lanza horizontalmente y otro se deja caer desde la misma altura al mismo tiempo, ¿qué sucede?", options: ["El que cae llega primero", "El lanzado llega primero", "Ambos llegan al suelo al mismo tiempo"], correct: 2 }
+];
+
 const App = () => {
   const [initialVelocity, setInitialVelocity] = useState(20);
   const [angle, setAngle] = useState(45);
@@ -94,13 +103,7 @@ const App = () => {
   const formatNumber = (num) => (isNaN(num) ? "0.00" : num.toFixed(2));
 
   // Preguntas del cuestionario
-  const questions = [
-    { id: 1, text: "Desde el suelo, ¿qué ángulo de lanzamiento proporciona el alcance horizontal máximo (sin rozamiento)?", options: ["30°", "45°", "60°", "90°"], correct: 1 },
-    { id: 2, text: "En el punto más alto de la trayectoria parabólica, ¿cuál es la velocidad vertical (Vy) del proyectil?", options: ["Máxima", "Cero (0 m/s)", "Igual a la velocidad inicial"], correct: 1 },
-    { id: 3, text: "¿Cómo se comporta la velocidad horizontal (Vx) a lo largo de todo el vuelo?", options: ["Aumenta constantemente", "Disminuye constantemente", "Se mantiene constante (MRU)"], correct: 2 },
-    { id: 4, text: "En el punto más alto, ¿cuál es la aceleración que experimenta el proyectil?", options: ["Cero", "9.81 m/s² hacia abajo", "9.81 m/s² hacia arriba"], correct: 1 },
-    { id: 5, text: "Si un objeto se lanza horizontalmente y otro se deja caer desde la misma altura al mismo tiempo, ¿qué sucede?", options: ["El que cae llega primero", "El lanzado llega primero", "Ambos llegan al suelo al mismo tiempo"], correct: 2 }
-  ];
+  const questions = PREGUNTAS_SIM;
 
   const handleAnswer = (qId, optionIdx) => {
     if (!showResults) {

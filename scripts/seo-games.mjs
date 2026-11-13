@@ -119,6 +119,13 @@ export const GAMES = [
     nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'comic', emoji: '💬', color: '#e84393',
+    h1: 'Creador de cómics para clase',
+    title: 'Creador de cómics online para clase, gratis | PiKT',
+    desc: 'Crea cómics con viñetas, fondos, personajes de cuerpo entero, bocadillos y onomatopeyas. Plantillas para completar diálogos y cómics de toda la clase. Gratis.',
+    nivel: 'Primaria y Secundaria', materia: 'Lengua, Idiomas, Historia, Ciencias y Plástica',
+  },
+  {
     slug: 'invasores', emoji: '👾', color: '#22d3ee',
     h1: 'Invasión Pi: arcade retro de preguntas',
     title: 'Invasión Pi: arcade retro de mates y preguntas para 1-4 jugadores | PiKT',

@@ -1,11 +1,11 @@
 import { useRef, useState, useEffect } from 'react';
+import { capturarZona, soportaCapturaPestana } from '../utils/capturaPantalla';
 
 const COLORS = ['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#1abc9c', '#2c3e50', '#ffffff'];
 const SIZES  = [2, 5, 10, 18];
 
-export default function AnnotationOverlay({ onClose, bgDataURL }) {
+export default function AnnotationOverlay({ onClose }) {
     const canvasRef    = useRef(null);
-    const bgImgRef     = useRef(null); // cached background Image object
     const drawingRef   = useRef(false);
     const lastPtRef    = useRef(null);
     const capStartRef  = useRef(null);
@@ -14,14 +14,8 @@ export default function AnnotationOverlay({ onClose, bgDataURL }) {
     const [color,       setColor]       = useState('#e74c3c');
     const [size,        setSize]        = useState(5);
     const [captureRect, setCaptureRect] = useState(null);
-
-    // Pre-load background image
-    useEffect(() => {
-        if (!bgDataURL) return;
-        const img = new Image();
-        img.src = bgDataURL;
-        bgImgRef.current = img;
-    }, [bgDataURL]);
+    const [capturando,  setCapturando]  = useState(false);
+    const [ocultarUI,   setOcultarUI]   = useState(false);
 
     // Size canvas to viewport on mount + resize
     useEffect(() => {
@@ -90,40 +84,40 @@ export default function AnnotationOverlay({ onClose, bgDataURL }) {
         }
     };
 
-    const handleUp = (e) => {
+    const handleUp = async (e) => {
         e.preventDefault();
         drawingRef.current = false;
         if (mode === 'capture') {
             const rect = captureRect;
-            if (rect && rect.w > 10 && rect.h > 10) {
-                const composite = document.createElement('canvas');
-                composite.width  = rect.w;
-                composite.height = rect.h;
-                const ctx = composite.getContext('2d');
-
-                // 1. Draw background crop (captured before overlay appeared)
-                if (bgImgRef.current && bgImgRef.current.complete) {
-                    ctx.drawImage(
-                        bgImgRef.current,
-                        rect.x, rect.y, rect.w, rect.h,
-                        0,      0,      rect.w, rect.h,
-                    );
+            capStartRef.current = null;
+            setCaptureRect(null);
+            if (rect && rect.w > 10 && rect.h > 10 && !capturando) {
+                setCapturando(true);
+                const dosFrames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                // La zona se captura tal como se ve (fondo real + trazos del lápiz)
+                let dataURL = await capturarZona(rect, {
+                    antesDeCapturar: async () => { setOcultarUI(true); await dosFrames(); },
+                    despuesDeCapturar: async () => { setOcultarUI(false); await dosFrames(); },
+                });
+                if (!dataURL) {
+                    // Último recurso: solo los trazos
+                    const c = document.createElement('canvas');
+                    c.width = rect.w; c.height = rect.h;
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, rect.w, rect.h);
+                    ctx.drawImage(canvasRef.current, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+                    dataURL = c.toDataURL('image/jpeg', 0.9);
                 }
-
-                // 2. Draw annotation strokes on top
-                ctx.drawImage(
-                    canvasRef.current,
-                    rect.x, rect.y, rect.w, rect.h,
-                    0,      0,      rect.w, rect.h,
-                );
-
-                const dataURL = composite.toDataURL('image/png');
-                sessionStorage.setItem('pizarraCaptura', dataURL);
+                setCapturando(false);
+                try {
+                    sessionStorage.setItem('pizarraCaptura', dataURL);
+                } catch (_) {
+                    alert('La captura es demasiado grande. Prueba con una zona más pequeña.');
+                    return;
+                }
                 onClose();
                 window.dispatchEvent(new CustomEvent('abrirPizarraConCaptura'));
             }
-            capStartRef.current = null;
-            setCaptureRect(null);
         }
     };
 
@@ -173,7 +167,9 @@ export default function AnnotationOverlay({ onClose, bgDataURL }) {
 
             {/* Floating toolbar */}
             <div
+                data-anotador-ui="1"
                 style={{
+                    visibility: ocultarUI ? 'hidden' : 'visible',
                     position: 'fixed', top: 60, right: 12,
                     background: 'rgba(12,12,12,0.90)', backdropFilter: 'blur(12px)',
                     borderRadius: 14, padding: '10px 8px',
@@ -251,14 +247,18 @@ export default function AnnotationOverlay({ onClose, bgDataURL }) {
             </div>
 
             {/* Capture-mode hint */}
-            {mode === 'capture' && (
-                <div style={{
+            {mode === 'capture' && !ocultarUI && (
+                <div data-anotador-ui="1" style={{
                     position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
                     background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
                     color: '#fff', borderRadius: 10, padding: '8px 18px',
                     fontSize: 13, pointerEvents: 'none', whiteSpace: 'nowrap',
                 }}>
-                    Arrastra para seleccionar una zona · se abrirá en la Pizarra
+                    {capturando
+                        ? 'Capturando…'
+                        : soportaCapturaPestana()
+                            ? 'Arrastra para seleccionar una zona · el navegador pedirá permiso para capturar esta pestaña'
+                            : 'Arrastra para seleccionar una zona · se abrirá en la Pizarra'}
                 </div>
             )}
         </div>

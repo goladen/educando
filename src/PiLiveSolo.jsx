@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { db } from './firebase';
+import { factorLetra } from './utils/encajeTexto';
 import { doc, getDoc, addDoc, updateDoc, increment, collection } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 
@@ -473,7 +474,7 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
 
     return (
         <div className="question-card">
-            <h2>{parseText(data.q || data.pregunta)}</h2>
+            <h2 style={factorLetra(data.q || data.pregunta, 140, 0.65) < 1 ? { fontSize: `min(${(1.6 * factorLetra(data.q || data.pregunta, 140, 0.65)).toFixed(2)}rem, 5vw)` } : undefined}>{parseText(data.q || data.pregunta)}</h2>
             {data.imagenUrl && <img src={data.imagenUrl} className="question-img-small" alt="" />}
 
             {isOrdenar && !isHostView && (

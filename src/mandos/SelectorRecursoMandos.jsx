@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { conRecursosPikt } from '../bancoPreguntas/recursosPikt';
 import { categoriasDeRecurso, limpiar } from '../utils/normalizarPreguntas';
 import { aNumeroMando } from './mandosMicrobit.js';
 import BotonPdfRecurso from '../components/BotonPdfRecurso';
@@ -71,9 +72,11 @@ export default function SelectorRecursoMandos({ seleccionado, onPick, numerico =
         ? query(collection(db, 'resources'), where('profesorUid', '==', uid))
         : query(collection(db, 'resources'), where('isPrivate', '==', false));
     getDocs(q)
-      .then((snap) => {
+      // En «públicos», las preguntas de PiKT por etapa y materia van detrás de las de los profes
+      .then(async (snap) => {
+        const propios = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        const docs = pestana === 'PUBLICOS' ? await conRecursosPikt(propios, 'CAZABURBUJAS') : propios;
         if (!vivo) return;
-        const docs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
         setListas((prev) => ({ ...prev, [pestana]: docs }));
       })
       .catch((e) => {

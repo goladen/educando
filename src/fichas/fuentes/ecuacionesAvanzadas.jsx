@@ -32,6 +32,7 @@ const TITULOS = {
     PROB1: 'Plantea una ecuación de primer grado y resuelve los siguientes problemas.',
     PROB2: 'Plantea una ecuación de segundo grado y resuelve los siguientes problemas.',
     PROBINV: 'Plantea una ecuación (con la incógnita en el denominador) y resuelve los siguientes problemas.',
+    PROBCIEN: 'Plantea una ecuación y resuelve los siguientes problemas de física y otras materias.',
 };
 const TITULO_GRAFICO = 'Resuelve gráficamente: las soluciones son las x de los puntos de corte de las dos gráficas.';
 
@@ -49,10 +50,11 @@ export const apartadoDesdeEcuacion = (eq, grafica = 'sol') => {
     const una = eq.correctAnswers.length === 1;
     ap.r = [{
         etiqueta: prob ? (una ? 'Solución:' : 'Soluciones:') : eq.grados ? 'x (en grados) =' : 'x =',
-        tipo: una ? 'frac' : 'lista', v: una ? eq.correctAnswers[0] : eq.correctAnswers, unidad: eq.unidad || undefined, tol: 1e-4,
+        tipo: una ? 'frac' : 'lista', v: una ? eq.correctAnswers[0] : eq.correctAnswers, unidad: eq.unidad || undefined,
+        tol: eq.tolRel ? Math.min(...eq.correctAnswers.map((v) => Math.abs(v))) * eq.tolRel : Math.max(eq.tol || 0, 1e-4),
         placeholder: una ? undefined : eq.grados ? 'p. ej. 30; 150' : 'sepáralas con ; (p. ej. −2; 3)',
     }];
-    if (grafica !== 'no') ap.v = { g: datosGrafica(eq), enSolucion: true, soloSolucion: grafica !== 'enun' };
+    if (grafica !== 'no' && !eq.sinGrafica) ap.v = { g: datosGrafica(eq), enSolucion: true, soloSolucion: grafica !== 'enun' };
     return ap;
 };
 

@@ -9,6 +9,7 @@ import { AlienSVG, NaveSVG } from '../ui/Sprites';
 import BuscadorRecursos from './BuscadorRecursos';
 import { elegirEncaje } from '../../components/ConAvisoEncaje';
 import ModalPdf from './ModalPdf';
+import BuscarFichaCodigo from '../../components/BuscarFichaCodigo';
 
 // Los generadores de Math World pesan: solo se cargan al abrir esa pestaña
 const SelectorMatesMandos = lazy(() => import('../../mandos/SelectorMatesMandos.jsx'));
@@ -81,6 +82,7 @@ function BannerFicha({ ficha, onQuitar }) {
         <button type="button" onClick={onQuitar} className={`${BTN.menu} text-[9px]`}>✕ DESVINCULAR</button>
       </div>
       <span className="font-pixel text-2xl leading-tight text-slate-100">{ficha.titulo || 'Preguntas de la ficha'}</span>
+      {ficha.codigoCorto && <span className="font-arcade text-[10px] text-amber-300 sm:text-xs">CÓDIGO DE LA FICHA: {ficha.codigoCorto}</span>}
       <span className="font-pixel text-lg leading-tight text-slate-400">
         Salen las {ficha.preguntas.length} preguntas de la ficha en el mismo orden (#01, #02…). Si se acaban, vuelven a empezar.
         Para jugar con otro contenido, desvincula o elige otro modo.
@@ -101,7 +103,7 @@ function FichasImpresas({ fichas, cargando, onAbrir, onOlvidar }) {
             <button type="button" disabled={cargando} onClick={() => onAbrir(f.codigo)}
               title={`Descargada el ${new Date(f.fecha).toLocaleDateString()}`}
               className={`${chip(false)} rounded-r-none disabled:opacity-50`}>
-              {f.titulo || 'Ficha'} · {f.n}
+              {f.titulo || 'Ficha'} · {f.n}{f.codigoCorto ? ` · ${f.codigoCorto}` : ''}
             </button>
             <button type="button" onClick={() => onOlvidar(f.codigo)} title="Quitar de la lista"
               className={`${chip(false)} rounded-l-none border-l-0 px-2`}>✕</button>
@@ -253,6 +255,8 @@ export default function MenuArcade({
           )}
 
           <FichasImpresas fichas={fichas} cargando={cargandoFicha} onAbrir={onAbrirFicha} onOlvidar={onOlvidarFicha} />
+          {/* Código impreso en la ficha (FXXXXXX): en cualquier dispositivo, sin escanear el QR */}
+          <BuscarFichaCodigo oscuro />
           </>)}
 
           {permiteEscribir && (

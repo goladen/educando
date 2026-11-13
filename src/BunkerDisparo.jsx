@@ -13,6 +13,7 @@ import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc 
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import { BANCOS_BUNKER as BANCOS } from './bancoPreguntas/datos/bunker';
 
@@ -2043,6 +2044,7 @@ function BuscadorRecursos({ onBack, onPick }) {
         <div className="bunker-menu-card" style={{ maxWidth: 520 }}>
             <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#8a9aa0', cursor: 'pointer', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}><ArrowLeft size={16} /> Atrás</button>
             <h2 style={{ color: '#7fffb0', fontFamily: 'monospace', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}><Search size={22} /> Buscar recurso</h2>
+            <BuscarFichaCodigo oscuro style={{ marginBottom: 10 }} />
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Título, tema, hoja..."
                 style={{ width: '100%', padding: 11, borderRadius: 8, border: '1px solid #263238', background: '#0a0e11', color: '#e7f3ec', fontFamily: 'monospace', marginBottom: 14, boxSizing: 'border-box' }} />
 

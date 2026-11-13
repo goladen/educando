@@ -10,6 +10,7 @@ import { cargarPalabrasWordle } from './utils/diccionarios';
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto } from './utils/sonidosFeedback';
 import { T, FUENTE, ESTILOS_CSS, CapaLetras, lanzarLetras, sonidoFicha, sonidoPalabra, sonidoTic, Boton, Opciones, Reloj, BotonSonido, Pantalla, Cabecera, Tarjeta, useWindowSize } from './vanila/comun';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 
 // --- CONFIGURACIÓN DE IDIOMAS ---
@@ -744,6 +745,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
                     {message && <div style={{ color: T.rojo, textAlign: 'center', fontWeight: 700 }}>⚠ {message}</div>}
                 </Tarjeta>
 
+                <BuscarFichaCodigo oscuro />
                 {/* CÓDIGO DE PROFE */}
                 <Tarjeta style={{ border: `1px solid ${T.cian}55` }}>
                     <div style={{ ...etq, color: T.cian }}>📘 Jugar desafío del profe</div>

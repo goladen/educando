@@ -1,5 +1,6 @@
 // Recursos públicos del profesor (o por código de acceso) que se pueden jugar en la variante elegida.
 import React, { useEffect, useState } from 'react';
+import BuscarFichaCodigo from '../../components/BuscarFichaCodigo';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { conRecursosPikt } from '../../bancoPreguntas/recursosPikt';
@@ -63,6 +64,7 @@ export default function BuscadorRecursos({ variante, onPick, onCerrar }) {
             className="min-w-0 flex-1 rounded-md border-2 border-slate-600 bg-slate-950 px-3 py-2 font-arcade text-xs tracking-widest text-slate-100 outline-none focus:border-cyan-400" />
           <button type="button" onClick={porCodigo} className={`${BTN.menu} text-[10px]`}>USAR</button>
         </div>
+        <BuscarFichaCodigo oscuro />
         {aviso && <p className="font-pixel text-lg text-amber-300">{aviso}</p>}
         <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por título, tema u hoja…"
           className="rounded-md border-2 border-slate-600 bg-slate-950 px-3 py-2 font-pixel text-xl text-slate-100 outline-none focus:border-cyan-400" />

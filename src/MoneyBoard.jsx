@@ -20,6 +20,7 @@ import {
 import EditorMoneyBoard from './components/EditorMoneyBoard';
 import { useEfectosPuntos, CapaEfectos, ESTILOS_EFECTO } from './components/EfectosPuntos';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego from './mandos/RelevosMandos.jsx';
 import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
@@ -170,6 +171,7 @@ function BuscadorRecursos({ onBack, onPick }) {
                 <p style={{ color: '#90a4c8', fontSize: '0.85rem', margin: '0 0 12px' }}>
                     Cada <b>hoja</b> del recurso será una categoría del tablero. Solo aparecen recursos con 2 o más hojas.
                 </p>
+                <BuscarFichaCodigo oscuro style={{ marginBottom: 10 }} />
                 <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Título, tema, categoría…"
                     style={{ ...inputEstilo, marginBottom: 12 }} />
 

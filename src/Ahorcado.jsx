@@ -8,6 +8,7 @@ import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego, { COLORES_HUECO } from './mandos/RelevosMandos.jsx';
 import { MODOS, feedbackMando } from './mandos/mandosMicrobit.js';
@@ -1000,6 +1001,7 @@ function AhorcadoJuego({ usuario, onExit, recurso, mandosApi, juegoMandos }) {
                 <button style={{ ...styles.btn, background: '#8e44ad', color: 'white' }} onClick={empezarDuelo}>👥 2 Jugadores · Duelo (mejor de 5)</button>
             </div>
 
+            <BuscarFichaCodigo style={{ marginTop: '15px' }} />
             {/* CÓDIGO PROFE */}
             <div style={{ ...styles.card, marginTop: '15px', background: '#e3f2fd', border: '1px solid #90caf9' }}>
                 <label style={{ ...styles.label, color: '#1565c0' }}><BookOpen size={16} style={{ verticalAlign: 'middle' }} /> Jugar Desafío de Profe</label>

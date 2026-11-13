@@ -23,6 +23,7 @@ import {
 import ChipAntena from './mandos/ChipAntena.jsx';
 import { BotonTutorialMandos } from './mandos/TutorialMandos.jsx';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import GuardarResultadosMandos from './mandos/GuardarResultadosMandos.jsx';
 
@@ -1972,6 +1973,7 @@ function BuscadorRecursos({ onBack, onPick }) {
                 <h2 style={{ color: '#e6317f', margin: '6px 0 12px', display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.3rem' }}>
                     <Search size={20} /> Buscar recurso
                 </h2>
+                <BuscarFichaCodigo oscuro style={{ marginBottom: 10 }} />
                 <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Título, tema, hoja…"
                     style={{
                         width: '100%', padding: 11, borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',

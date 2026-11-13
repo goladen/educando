@@ -10,6 +10,7 @@ import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sopa que ya creamos
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 
 // --- DICCIONARIOS (Igual que Wordle) ---
@@ -625,6 +626,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                 <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => cargarDiccionarioYJugar(null, null)}>GENERAR Y JUGAR</button>
             </div>
 
+            <BuscarFichaCodigo style={{ marginTop: '15px' }} />
             {/* CÓDIGO PROFE */}
             <div style={{ ...styles.card, marginTop: '15px', background: '#e3f2fd', border: '1px solid #90caf9' }}>
                 <label style={{ ...styles.label, color: '#1565c0' }}><BookOpen size={16} style={{ verticalAlign: 'middle' }} /> Jugar Desafío de Profe</label>

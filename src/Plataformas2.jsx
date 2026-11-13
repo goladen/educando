@@ -18,6 +18,7 @@ import wrongSoundSrc   from './assets/wrong.mp3';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego from './mandos/RelevosMandos.jsx';
 // Jugar con el cuerpo (webcam): girar la cabeza = andar, saltar = saltar. Se carga al activarlo.
@@ -520,6 +521,7 @@ function BuscadorRecursos({ onSelect }) {
           🔍 USAR UN RECURSO PROPIO (Burbujas / Pikatron)
         </div>
 
+        <BuscarFichaCodigo oscuro style={{ marginBottom: 8 }} />
         {/* Fila 1: Tema + Ciclo */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:6 }}>
           <input style={inp} placeholder="Tema o título…" value={filtros.tema}

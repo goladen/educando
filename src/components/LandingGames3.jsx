@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import CargandoChunk from './CargandoChunk';
 import BotonPdfRecurso from './BotonPdfRecurso';
+import BuscarFichaCodigo from './BuscarFichaCodigo';
 // Preguntas de 4 opciones de las herramientas como recursos por etapa y materia (detrás de los de los profes)
 import { conRecursosPikt, juegoAdmitePikt } from '../bancoPreguntas/recursosPikt';
 import FichaFlotante from './FichaFlotante';
@@ -5257,6 +5258,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
 
                 {tab === 'SEARCH' && (
                     <div style={{ background: '#f5f5f5', padding: '30px', borderRadius: '15px' }}>
+                        <BuscarFichaCodigo style={{ marginBottom: 15 }} />
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                             <input placeholder="Tema o Título..." value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} style={styles.input} />
                             <select value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })} style={styles.input}>

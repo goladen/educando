@@ -9,7 +9,7 @@
 //
 // Fuentes: cálculo rápido (generado), Math World (mandos/preguntasMates.js), bancos propios
 // de otras materias y recursos del profesor (utils/normalizarPreguntas.js).
-import { preguntasDeRecurso, esRespuestaCorrecta, limpiar, barajar } from '../utils/normalizarPreguntas';
+import { preguntasDeRecurso, esRespuestaCorrecta, limpiar, barajar, distractoresSinAzar, opcionesSinAzar } from '../utils/normalizarPreguntas';
 
 let contador = 0;
 const nuevoId = () => `p${++contador}`;
@@ -258,6 +258,23 @@ export function desdeBanco(clave) {
 }
 
 // ── Compatibilidad con cada variante ────────────────────────────────────
+/**
+ * Modo «ELEGIR SIEMPRE» (variante 1): a las preguntas de escribir texto les pone opciones con las
+ * respuestas de las otras preguntas. Sin azar → no cambia las partidas con semilla (fichas PDF).
+ * (Las numéricas ya traen opciones.)
+ */
+export function paraElegir(lista) {
+  const respuestas = lista.map((p) => p.correcta);
+  const tipoDe = (p) => p.orig?.tipo || p.respuesta;
+  return lista.map((p) => {
+    if (p.respuesta !== 'texto' || (p.opciones?.length || 0) >= 2) return p;
+    // Primero respuestas del mismo tipo de pregunta; si faltan, del resto
+    let mal = distractoresSinAzar(p.correcta, lista.filter((q) => tipoDe(q) === tipoDe(p)).map((q) => q.correcta));
+    if (mal.length < 3) mal = [...mal, ...distractoresSinAzar(p.correcta, respuestas.filter((r) => !mal.includes(r)))].slice(0, 3);
+    return mal.length ? { ...p, opciones: opcionesSinAzar(p.correcta, mal) } : p;
+  });
+}
+
 /** Variante 2 necesita al menos 2 opciones; la 1 acepta todo. */
 export function jugables(preguntas, varianteId) {
   if (varianteId === 'FILTRO') return preguntas.filter((p) => (p.opciones?.length || 0) >= 2);
@@ -286,9 +303,11 @@ export function jugablesConMandos(preguntas, varianteId, respuesta) {
  * Cómo se responde en la variante 1: teclado numérico, botones A-D o teclado de letras.
  * `mandos` = 'letras' | 'numero' | null: con mandos en letras, siempre botones A-D (los mismos que el mando).
  */
+// escribir: false = según la pregunta · true = escribir siempre · 'elegir' = botones A-D siempre que haya opciones
 export function modoTeclado(pregunta, escribir, mandos = null) {
   if (!pregunta) return 'numerico';
   if (mandos === 'letras' && pregunta.opciones?.length) return 'opciones';
+  if (escribir === 'elegir' && (pregunta.opciones?.length || 0) >= 2) return 'opciones';
   if (pregunta.respuesta === 'numero') return 'numerico';
   if (pregunta.respuesta === 'texto') return 'letras';
   return escribir ? 'letras' : 'opciones';

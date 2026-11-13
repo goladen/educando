@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { ArrowLeft, Search, Play, Users, Trophy, Volume2, VolumeX, LogOut } from 'lucide-react';
 import { db } from './firebase';
@@ -14,7 +14,7 @@ import QRSalaBoton from './components/QRSalaBoton';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import {
-    limpiar, barajar, normalizarPregunta, preguntasDeRecurso, esRespuestaCorrecta,
+    limpiar, barajar, normalizarPregunta, preguntasDeRecurso, esRespuestaCorrecta, conOpcionesParaElegir,
 } from './utils/normalizarPreguntas';
 const barajarAzar = barajar; // PartidaSolo / SalaMandos lo sustituyen por «sin barajar» con ficha PDF
 import {
@@ -2018,6 +2018,10 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
     const [errorUnir, setErrorUnir] = useState('');
     const [semilla, setSemilla] = useState(0);   // fuerza reinicio de la partida
     const [ordenFijo, setOrdenFijo] = useState(false); // ficha PDF con código: sin barajar
+    // «Elegir»: las preguntas de escribir (respuesta corta / rellenar) se juegan con opciones
+    const [elegir, setElegir] = useState(false);
+    const hayDeEscribir = useMemo(() => preguntas.some(p => p.tipo === 'CORTA' || p.tipo === 'RELLENAR'), [preguntas]);
+    const preguntasJuego = useMemo(() => (elegir && hayDeEscribir ? conOpcionesParaElegir(preguntas) : preguntas), [elegir, hayDeEscribir, preguntas]);
 
     const fuente = useRef({ preguntas: [], titulo: 'Modo libre' });
 
@@ -2045,7 +2049,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <PartidaSolo
                 key={'solo' + semilla}
-                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad} ordenFijo={ordenFijo}
+                preguntas={preguntasJuego} titulo={titulo} meta={meta} dificultad={dificultad} ordenFijo={ordenFijo}
                 nombre={nombre || 'Jugador 456'} usuario={usuario}
                 onSalir={salirAlMenu}
                 onReiniciar={() => setSemilla(s => s + 1)}
@@ -2057,7 +2061,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <SalaHost
                 key={'host' + semilla}
-                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad}
+                preguntas={preguntasJuego} titulo={titulo} meta={meta} dificultad={dificultad}
                 usuario={usuario} onSalir={salirAlMenu}
             />
         );
@@ -2067,7 +2071,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         return (
             <SalaMandos
                 key={'mandos' + semilla}
-                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad} ordenFijo={ordenFijo}
+                preguntas={preguntasJuego} titulo={titulo} meta={meta} dificultad={dificultad} ordenFijo={ordenFijo}
                 onSalir={salirAlMenu}
             />
         );
@@ -2157,6 +2161,14 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
                             <button key={k} onClick={() => setDificultad(k)} style={opcionChip(dificultad === k)}>{v.nombre}</button>
                         ))}
                     </div>
+
+                    {hayDeEscribir && (<>
+                        <label style={{ ...etiquetaCampo, marginTop: 14 }}>Preguntas de escribir la respuesta</label>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button onClick={() => setElegir(false)} style={opcionChip(!elegir)}>⌨️ Escribirla</button>
+                            <button onClick={() => setElegir(true)} style={opcionChip(elegir)}>🔘 Elegir entre opciones</button>
+                        </div>
+                    </>)}
 
                     <button onClick={() => { setSemilla(s => s + 1); setPantalla('SOLO'); }} style={{ ...btnPrincipal, marginTop: 20 }}>
                         <Play size={18} /> Jugar yo solo

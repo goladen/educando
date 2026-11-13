@@ -146,7 +146,8 @@ export default function MenuArcade({
     setFuente({ hojas: nuevas.length && nuevas.length < hojasRecurso.length ? nuevas : null });
   };
   const n = Math.min(config.numJugadores, maxJugadores);
-  const permiteEscribir = variante === 'DISPARA' && (fuente.tipo === 'BANCO' || fuente.tipo === 'RECURSO');
+  // Con ficha vinculada también (Math World / cálculo: los números se pueden elegir A-D)
+  const permiteEscribir = variante === 'DISPARA' && (fuente.tipo === 'BANCO' || fuente.tipo === 'RECURSO' || !!config.ficha);
 
   return (
     <div className="inv-estrellas min-h-0 w-full flex-1 overflow-y-auto">
@@ -262,8 +263,11 @@ export default function MenuArcade({
           {permiteEscribir && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-arcade text-[9px] text-slate-400">RESPONDER</span>
-              <button type="button" onClick={() => setConfig({ escribir: false })} className={chip(!config.escribir)}>ELEGIR A-D</button>
-              <button type="button" onClick={() => setConfig({ escribir: true })} className={chip(config.escribir)}>⌨️ ESCRIBIR</button>
+              <button type="button" onClick={() => setConfig({ escribir: false })} className={chip(!config.escribir)}
+                title="Con opciones se elige A-D; los números y las respuestas escritas se teclean">SEGÚN LA PREGUNTA</button>
+              <button type="button" onClick={() => setConfig({ escribir: 'elegir' })} className={chip(config.escribir === 'elegir')}
+                title="También las preguntas de escribir (y las de la ficha con caja de respuesta) se responden eligiendo A-D">🔘 ELEGIR A-D SIEMPRE</button>
+              <button type="button" onClick={() => setConfig({ escribir: true })} className={chip(config.escribir === true)}>⌨️ ESCRIBIR</button>
             </div>
           )}
         </Seccion>

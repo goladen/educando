@@ -86,3 +86,68 @@ export function esRespuestaCorrecta(pregunta, dada) {
     if (pregunta.tipo === 'ORDENAR') return limpiar(dada) === limpiar(pregunta.bloques.join(' '));
     return limpiar(dada) === limpiar(pregunta.correcta);
 }
+
+// ─── «Elegir» en vez de escribir ─────────────────────────────────────────────
+// Para jugar con opciones una ficha / recurso de respuesta escrita: los distractores salen de
+// las respuestas de las OTRAS preguntas (o de números cercanos) y SIN azar, para que no cambien
+// las preguntas ni el orden de las partidas con semilla (fichas PDF de Invasión Pi).
+const hashTexto = (s) => {
+    let h = 2166136261;
+    for (const c of String(s ?? '')) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+};
+
+/** Hasta n distractores para una respuesta escrita (siempre los mismos para los mismos datos). */
+export function distractoresSinAzar(correcta, otras = [], n = 3) {
+    const txt = String(correcta ?? '').trim();
+    const lc = limpiar(txt);
+    const out = [];
+    const vistos = new Set([lc]);
+    const add = (x) => {
+        const s = String(x ?? '').trim();
+        const k = limpiar(s);
+        if (s && k && !vistos.has(k) && out.length < n) { vistos.add(k); out.push(s); }
+    };
+    // Números: primero los cercanos
+    if (/^-?\d+([.,]\d+)?$/.test(txt)) {
+        const sep = txt.includes(',') ? ',' : '.';
+        const dec = (txt.split(/[.,]/)[1] || '').length;
+        const v = Number(txt.replace(',', '.'));
+        const paso = dec ? 10 ** -dec : 1;
+        [1, -1, 2, 10].forEach((d) => {
+            const x = v + d * paso;
+            if (v >= 0 && x < 0) return;
+            add(dec ? x.toFixed(dec).replace('.', sep) : String(Math.round(x)));
+        });
+        return out;
+    }
+    const h = hashTexto(txt);
+    const cand = [...new Set(otras.map((x) => String(x ?? '').trim()))]
+        .filter((x) => x && limpiar(x) !== lc && !/^-?\d+([.,]\d+)?$/.test(x))
+        // primero las de longitud parecida; a igualdad, un orden fijo que depende de la pregunta
+        .sort((a, b) => Math.abs(a.length - txt.length) - Math.abs(b.length - txt.length) || hashTexto(a + h) - hashTexto(b + h));
+    cand.forEach(add);
+    return out;
+}
+
+/** Correcta + distractores en un orden fijo (depende del texto, no del azar). */
+export function opcionesSinAzar(correcta, mal) {
+    const ops = [correcta, ...mal];
+    const k = hashTexto(correcta) % ops.length;
+    return [...ops.slice(k), ...ops.slice(0, k)];
+}
+
+/** Preguntas normalizadas: las de escribir (CORTA / RELLENAR) pasan a opción múltiple. */
+export function conOpcionesParaElegir(preguntas = []) {
+    const validas = preguntas.filter((p) => p && p.tipo !== 'ORDENAR');
+    const respuestas = validas.map((p) => p.correcta);
+    return preguntas.map((p) => {
+        if (!p || (p.tipo !== 'CORTA' && p.tipo !== 'RELLENAR')) return p;
+        // Primero respuestas de preguntas del mismo tipo (rellenar con rellenar…); si faltan, del resto
+        let mal = distractoresSinAzar(p.correcta, validas.filter((q) => q.tipo === p.tipo).map((q) => q.correcta));
+        if (mal.length < 3) mal = [...mal, ...distractoresSinAzar(p.correcta, respuestas.filter((r) => !mal.includes(r)))].slice(0, 3);
+        if (!mal.length) return p;
+        const enunciado = p.tipo === 'RELLENAR' ? `${p.enunciado}: ${p.bloques[0]} ____ ${p.bloques[2]}`.trim() : p.enunciado;
+        return { tipo: 'MULTIPLE', enunciado, correcta: p.correcta, opciones: opcionesSinAzar(p.correcta, mal), deEscribir: true };
+    });
+}

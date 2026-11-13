@@ -19,7 +19,7 @@ import { useGameLoop } from './motor/useGameLoop';
 import { useLayoutJugadores, claseRejilla } from './hooks/useLayoutJugadores';
 import { useControlesTeclado } from './hooks/useControlesTeclado';
 import {
-  crearMazo, generarRapidas, desdeMates, desdeBanco, desdeRecurso, hojasDeRecurso, jugables, jugablesConMandos, modoTeclado,
+  crearMazo, generarRapidas, desdeMates, desdeBanco, desdeRecurso, hojasDeRecurso, jugables, jugablesConMandos, modoTeclado, paraElegir,
   fmtNum, BANCOS, OPERACIONES_RAPIDAS,
 } from './preguntas';
 import { barajar } from '../utils/normalizarPreguntas';
@@ -65,7 +65,12 @@ const respuestaMandos = (cfg) => {
 function construirMazo(cfg, apiMates) {
   const { fuente, variante } = cfg;
   const resp = respuestaMandos(cfg);
-  const filtrar = (lista) => (resp ? jugablesConMandos(jugables(lista, variante), variante, resp) : jugables(lista, variante));
+  // «Elegir siempre»: las preguntas de escribir también se responden con A-D
+  const elegir = variante === 'DISPARA' && cfg.escribir === 'elegir' && !resp;
+  const filtrar = (lista) => {
+    const l = resp ? jugablesConMandos(jugables(lista, variante), variante, resp) : jugables(lista, variante);
+    return elegir ? paraElegir(l) : l;
+  };
   const aviso = resp ? ' con los mandos' : '';
   // Partida vinculada a una ficha PDF: sus preguntas, en su orden (y al acabarlas, otra vuelta igual)
   if (cfg.ficha?.preguntas?.length) {

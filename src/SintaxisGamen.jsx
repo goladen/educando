@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useRef, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot, addDoc, getDoc } from 'firebase/firestore';
@@ -2354,6 +2355,7 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
 
     const unirse = async () => {
         if (!nombre.trim()) return alert('Introduce tu nombre.');
+        if (!validarNombre(nombre).ok) return alert(validarNombre(nombre).mensaje);
         localStorage.setItem('pikt_guest_name', nombre.trim());
         await updateDoc(doc(db, 'live_games', codigoSala), {
             [`jugadores.${uid}`]: { nombre: nombre.trim(), puntos: 0 }

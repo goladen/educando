@@ -173,7 +173,7 @@ export const resumenEcuaciones = (c) => {
         !preset && cfg.conEnunciados && '🗣️ Enunciados',
         ...(!preset ? TIPOS_AVANZADOS.filter(t => cfg[t.key]).map(t => `${t.icon} ${t.label}`) : []),
         !preset && `🔢 ${cfg.minNum}–${cfg.maxNum}`,
-        `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
+        cfg.tiempo === 0 ? '∞ Sin tiempo' : `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
     ].filter(Boolean);
 };
 
@@ -361,7 +361,7 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
     const [local, setLocal] = useState(config);
     // Cualquier cambio manual deja de ser un modo predefinido
     const set = (k, v) => setLocal(p => ({ ...p, [k]: v, presetId: null, soloBasico: false, forceExperto: false }));
-    const TIEMPOS = [60, 120, 180, 300, 600];
+    const TIEMPOS = [60, 120, 180, 300, 600, 0]; // 0 = sin tiempo
 
     return (
         <div style={mSt.overlay}>
@@ -390,7 +390,7 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
                         {TIEMPOS.map(t => (
                             <button key={t} onClick={() => set('tiempo', t)}
                                 style={{ ...mSt.chip, background: local.tiempo === t ? '#3498db' : '#f0f0f0', color: local.tiempo === t ? 'white' : '#555' }}>
-                                {t < 60 ? `${t}s` : `${t / 60} min`}
+                                {t === 0 ? '∞ Sin tiempo' : t < 60 ? `${t}s` : `${t / 60} min`}
                             </button>
                         ))}
                     </div>
@@ -540,7 +540,8 @@ function EcuacionesGameLocal({ onExit }) {
     const [gameState, setGameState] = useState('START');
     const [config, setConfig] = useState(() => reto ? { ...DEFAULT_CONFIG, ...reto.config, numPantallas: 1, numAlumnos: 1 } : DEFAULT_CONFIG);
     const [showConfig, setShowConfig] = useState(false);
-    const [panelAvz, setPanelAvz] = useState(null); // { sel: [claves], tiempo, numAlumnos } — panel «Avanzadas»
+    const [panelAvz, setPanelAvz] = useState(null);
+    const [inicioSinTiempo, setInicioSinTiempo] = useState(false); // interruptor de la pantalla de inicio (modos rápidos y Avanzadas) // { sel: [claves], tiempo, numAlumnos } — panel «Avanzadas»
     const [timeLeft, setTimeLeft] = useState(DEFAULT_CONFIG.tiempo);
     const [score, setScore] = useState(0);
     const [aciertos, setAciertos] = useState(0);
@@ -600,15 +601,20 @@ function EcuacionesGameLocal({ onExit }) {
     const [drawMode, setDrawMode] = useState(false);
     const [questionKey, setQuestionKey] = useState(0); // para reset del canvas por pregunta
 
+    // Sin tiempo (config.tiempo === 0): timeLeft cuenta el tiempo empleado y se termina con «🏁 Terminar»
+    const sinTiempo = config.tiempo === 0;
     useEffect(() => {
-        if (gameState === 'PLAYING' && timeLeft > 0) {
+        if (gameState === 'PLAYING' && sinTiempo) {
+            timerRef.current = setInterval(() => setTimeLeft(p => p + 1), 1000);
+        } else if (gameState === 'PLAYING' && timeLeft > 0) {
             timerRef.current = setInterval(() => setTimeLeft(p => p - 1), 1000);
         } else if (timeLeft <= 0 && gameState === 'PLAYING') {
             clearInterval(timerRef.current);
             setGameState('END');
         }
         return () => clearInterval(timerRef.current);
-    }, [gameState, timeLeft]);
+    }, [gameState, timeLeft, sinTiempo]);
+    const relojTxt = `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
 
     const startGame = (cfg) => {
         setConfig(cfg);
@@ -918,13 +924,19 @@ function EcuacionesGameLocal({ onExit }) {
                 <button onClick={handleExit} style={st.btnVolver}><RotateCcw size={16} /> Salir</button>
                 {gameState === 'PLAYING' && (
                     <div style={st.scoreFlex}>
-                        <div style={{ ...st.scoreBoard, color: timeLeft <= 10 ? '#e74c3c' : '#333' }}>
-                            <Clock size={16} /> {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                        <div style={{ ...st.scoreBoard, color: !sinTiempo && timeLeft <= 10 ? '#e74c3c' : '#333' }} title={sinTiempo ? 'Tiempo empleado (sin límite)' : 'Tiempo restante'}>
+                            <Clock size={16} /> {sinTiempo ? '∞ ' : ''}{relojTxt}
                         </div>
                         <div style={{ ...st.scoreBoard, color: '#3498db' }}>
                             <Trophy size={16} /> {score}
                         </div>
                         <div style={{ ...st.scoreBoard, color: '#27ae60', fontSize: '0.9rem' }}>✅ {aciertos}</div>
+                        {sinTiempo && (
+                            <button onClick={() => { clearInterval(timerRef.current); setGameState('END'); }}
+                                style={{ ...st.scoreBoard, border: 'none', cursor: 'pointer', background: '#2c3e50', color: 'white', fontSize: '0.9rem' }}>
+                                🏁 Terminar
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -946,10 +958,21 @@ function EcuacionesGameLocal({ onExit }) {
                     <p style={{ color: '#666', marginBottom: 20, fontSize: '1rem', lineHeight: 1.5 }}>
                         Despeja la X antes de que se acabe el tiempo: desde ecuaciones sencillas hasta bicuadradas, racionales, con raíces, exponenciales, logarítmicas, trigonométricas y problemas.
                     </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 14 }}>
+                        {[[false, '⏱ Contrarreloj'], [true, '∞ Sin tiempo']].map(([v, txt]) => (
+                            <button key={txt} onClick={() => setInicioSinTiempo(v)}
+                                style={{ padding: '8px 16px', borderRadius: 20, border: '2px solid #3498db', cursor: 'pointer', fontWeight: 'bold',
+                                    background: inicioSinTiempo === v ? '#3498db' : 'white', color: inicioSinTiempo === v ? 'white' : '#3498db' }}>
+                                {txt}
+                            </button>
+                        ))}
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                         {MODOS_PRESET.map(m => (
                             <button key={m.id}
-                                onClick={() => m.panel ? setPanelAvz({ sel: CLAVES_AVANZADAS.filter(k => m.cfg[k]), tiempo: m.cfg.tiempo, numAlumnos: 1 }) : m.cfg ? startGame(m.cfg) : setShowConfig(true)}
+                                onClick={() => m.panel ? setPanelAvz({ sel: CLAVES_AVANZADAS.filter(k => m.cfg[k]), tiempo: inicioSinTiempo ? 0 : m.cfg.tiempo, numAlumnos: 1 })
+                                    : m.cfg ? startGame(inicioSinTiempo ? { ...m.cfg, tiempo: 0 } : m.cfg)
+                                    : (setConfig(c => (inicioSinTiempo ? { ...c, tiempo: 0 } : c)), setShowConfig(true))}
                                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
                                     background: 'white', border: `2px solid ${m.color}`, borderRadius: 14,
                                     cursor: 'pointer', textAlign: 'left', transition: 'transform 0.15s',
@@ -1121,12 +1144,13 @@ function EcuacionesGameLocal({ onExit }) {
                 <div style={st.centerCard}>
                     {score >= 100 && <Confetti recycle={false} />}
                     <Clock size={70} color="#f1c40f" style={{ marginBottom: 16 }} />
-                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.2rem' }}>¡Tiempo Agotado!</h1>
+                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.2rem' }}>{sinTiempo ? '¡Partida terminada!' : '¡Tiempo Agotado!'}</h1>
                     <div style={{ fontSize: '3.5rem', fontWeight: 'bold', color: '#3498db', margin: '8px 0' }}>{score}</div>
                     <p style={{ color: '#999', marginBottom: 6 }}>Puntos Totales</p>
                     <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 28, flexWrap: 'wrap' }}>
                         <span style={{ color: '#27ae60', fontWeight: 'bold' }}>✅ {aciertos} resueltas</span>
                         <span style={{ color: '#f39c12', fontWeight: 'bold' }}>⏭ {skips} pasadas</span>
+                        {sinTiempo && <span style={{ color: '#34495e', fontWeight: 'bold' }}>⏱ {relojTxt}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => startGame(config)} style={{ ...st.btnPrimary, background: '#3498db' }}>
@@ -1982,10 +2006,10 @@ function PanelAvanzadas({ estado, setEstado, onStart }) {
                 <div style={mSt.section}>
                     <div style={mSt.sTitle}>Tiempo de juego</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                        {[180, 300, 600, 900].map(t => (
+                        {[180, 300, 600, 900, 0].map(t => (
                             <button key={t} onClick={() => setEstado(e => ({ ...e, tiempo: t }))}
                                 style={{ ...mSt.chip, background: tiempo === t ? '#3498db' : '#f0f0f0', color: tiempo === t ? 'white' : '#555' }}>
-                                {t / 60} min
+                                {t === 0 ? '∞ Sin tiempo' : `${t / 60} min`}
                             </button>
                         ))}
                     </div>

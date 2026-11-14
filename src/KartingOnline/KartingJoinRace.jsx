@@ -1,3 +1,4 @@
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -98,6 +99,7 @@ export default function KartingJoinRace({ initialCode, onVolver }) {
   // ── Step 2: Join with name ────────────────────────────────────────────────
   const handleJoin = async () => {
     if (!nombre.trim()) { setErr('Introduce tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setErr(validarNombre(nombre).mensaje); return; }
     setErr(''); setLoading(true);
     try {
       localStorage.setItem('karting_playerName', nombre.trim());

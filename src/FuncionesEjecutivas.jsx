@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -300,6 +301,7 @@ const FuncionesEjecutivas = ({ onBack }) => {
   const enviarResultado = async () => {
     const code = codigoProfe.trim().toUpperCase();
     if (!nombreAlumno.trim()) { setErrorEnvio('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombreAlumno).ok) { setErrorEnvio(validarNombre(nombreAlumno).mensaje); return; }
     if (!code) { setErrorEnvio('Escribe el código del profesor.'); return; }
     setEnviando(true);
     setErrorEnvio('');

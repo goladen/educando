@@ -18,6 +18,7 @@ import { disfrazDe } from './escapeHalloween/avatares3d';
 import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, TarjetaPregunta, mmss, useNarrador, idNarracionFase, Subtitulo, SelectorIdiomaEscape } from './escapeHalloween/comunes';
 import { tr, fijarIdiomaEscape, idiomaEscape } from './escapeHalloween/i18n';
 import { useLanguage } from './i18n/LanguageContext';
+import { validarNombre, nombreSeguro } from './utils/filtroNombres';
 
 /**
  *  ESCAPE ROOM DE HALLOWEEN — «La mansión del zombi»
@@ -1036,7 +1037,7 @@ function PantallaSimple({ titulo, texto, onSalir }) {
 //  COMPONENTE PRINCIPAL
 // =====================================================================
 export default function EscapeHalloween({ usuario, onExit, codigoSala = null, pantallaInicial = 'MENU' }) {
-    const nombreUsuario = usuario?.displayName && usuario.displayName !== 'Profe Invitado' ? usuario.displayName : '';
+    const nombreUsuario = usuario?.displayName && usuario.displayName !== 'Profe Invitado' ? nombreSeguro(usuario.displayName, '') : '';
     const [pantalla, setPantalla] = useState(codigoSala ? (nombreUsuario ? 'DISFRAZ' : 'UNIRSE') : pantallaInicial);
     const [nombre, setNombre] = useState(nombreUsuario);
     const [codigoEntrada, setCodigoEntrada] = useState(String(codigoSala || '').toUpperCase());
@@ -1073,6 +1074,7 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null, pa
         const entrar = async () => {
             const code = codigoEntrada.trim().toUpperCase();
             if (!nombre.trim()) { setErrorUnir(tr("Escribe tu nombre.")); return; }
+            if (!validarNombre(nombre).ok) { setErrorUnir(tr(validarNombre(nombre).mensaje)); return; }
             if (!code) { setErrorUnir(tr("Escribe el código de la sala.")); return; }
             try {
                 const snap = await getDoc(doc(db, 'live_games', code));

@@ -10,6 +10,7 @@ import AdminUsuariosPanel from './AdminUsuariosPanel';
 import PanelConversaciones, { useConversaciones } from './MensajesPrivados';
 
 const ErroresWebPanel = lazy(() => import('./ErroresWebPanel'));
+const RevisarNombresPanel = lazy(() => import('./RevisarNombresPanel'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -36,6 +37,7 @@ export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCo
     const [destino, setDestino]     = useState('todos'); // 'todos' | 'seleccion'
     const [mensajes, setMensajes]   = useState([]);
     const [verErrores, setVerErrores] = useState(false); // panel 🐞 (errores_web)
+    const [verNombres, setVerNombres] = useState(false); // panel 🧹 (revisar nombres de alumnos)
     const [chat, setChat] = useState(null); // null | {} | { convId } | { admin: true } → PanelConversaciones
 
     const esAdmin = usuario?.email === ADMIN_EMAIL;
@@ -299,6 +301,12 @@ export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCo
                                     <button onClick={() => setVerErrores(true)} title="Fallos de los usuarios"
                                         style={{ background: 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 10px', cursor: 'pointer', fontSize: '0.9rem' }}>
                                         🐞
+                                    </button>
+                                )}
+                                {esAdmin && (
+                                    <button onClick={() => setVerNombres(true)} title="Revisar nombres de alumnos (insultos)"
+                                        style={{ background: 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 10px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                        🧹
                                     </button>
                                 )}
                                 {esAdmin && (
@@ -593,6 +601,11 @@ export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCo
             {esAdmin && verErrores && (
                 <Suspense fallback={null}>
                     <ErroresWebPanel onClose={() => setVerErrores(false)} />
+                </Suspense>
+            )}
+            {esAdmin && verNombres && (
+                <Suspense fallback={null}>
+                    <RevisarNombresPanel onClose={() => setVerNombres(false)} />
                 </Suspense>
             )}
         </>

@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -1084,6 +1085,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code)          { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

@@ -15,6 +15,7 @@ import startSoundFile from './assets/inicio-juego.mp3';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import { nombreSeguro } from './utils/filtroNombres';
 
 // --- AUDIOS (PRE-CARGADOS PARA EVITAR LAG) ---
 const _mkAudio = src => { let a; return {
@@ -872,7 +873,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
         return newId;
     }, [usuario, codigoSala]);
     const myUid = usuario?.uid || guestId;
-    const myName = usuario?.displayName || "Invitado";
+    const myName = nombreSeguro(usuario?.displayName, "Invitado");
 
     // (A) Persistencia de la sesión en vivo para auto-reconectar tras recarga.
     const guardarSesionLive = () => {

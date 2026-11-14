@@ -3,6 +3,7 @@
 // gubia, cincel, taladro, cepillo, lija o añadiendo arcilla. Tiene torno, deshacer,
 // medida del volumen en vivo, retos de forma con puntuación (enviable al profesor)
 // y exportación a STL para imprimir en 3D. El motor está en utils/esculturaMotor.js.
+import { validarNombre } from './utils/filtroNombres';
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -919,6 +920,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviarInforme = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

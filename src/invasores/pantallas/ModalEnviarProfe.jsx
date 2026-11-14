@@ -1,5 +1,6 @@
 // Envío del resultado de UN jugador a informes_juegos (tipo INVASORES), o a la competición si el
 // enlace lleva &comp=&cat= (mismo patrón que Calamar / Bunker).
+import { validarNombre } from '../../utils/filtroNombres';
 import React, { useState } from 'react';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -36,6 +37,7 @@ function ModalBase({ datos, onClose }) {
   const enviar = async () => {
     const code = codigo.trim().toUpperCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     if (!code) { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');
     try {

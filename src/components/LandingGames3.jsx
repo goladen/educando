@@ -14,6 +14,7 @@ import ConAvisoEncaje from './ConAvisoEncaje';
 import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
 import { basePublica } from '../utils/urlPublica';
+import { validarNombre } from '../utils/filtroNombres';
 import useAvatarLocal from '../hooks/useAvatarLocal';
 import AvatarSVG from './avatar/AvatarSVG';
 import { useT } from '../i18n/LanguageContext';
@@ -124,6 +125,7 @@ const SimuladorCaidaLibre = lazy(() => import('../Simuladores física/SimuladorC
 const ProblemasSimulador = lazy(() => import('../ecuaciones/ProblemasSimulador'));
 const FichaSimulador = lazy(() => import('../ecuaciones/FichaSimulador'));
 const BancoProblemasFisica = lazy(() => import('../ecuaciones/BancoProblemasFisica'));
+const CambioUnidades = lazy(() => import('../unidades/CambioUnidades'));
 const SimuladorPendulo = lazy(() => import('../Simuladores física/SimuladorPendulo'));
 const SimuladorLeyDeOhm = lazy(() => import('../Simuladores física/SimuladorLeyDeOhm'));
 const EnlaceMoleculas = lazy(() => import('../Simuladores física/EnlaceMoleculas'));
@@ -1234,6 +1236,14 @@ export const GAME_INFO = {
         materias: ['Matemáticas'],
         etapas: ['Primaria', 'ESO'],
     },
+    GEO_UNIDADES: {
+        descripcion: 'Cambio de unidades con explicaciones visuales: la escalera de unidades para contar saltos, los factores de conversión con las unidades que se tachan, termómetros °C/K/°F, grados y radianes en el círculo, y la tabla volumen ↔ capacidad. También está en Física y Química y en Geometrix.',
+        tipoPreguntas: 'Conversiones de longitud, masa, capacidad, superficie, volumen, tiempo, ángulos, temperatura, velocidad, densidad, presión, energía y potencia; formas complejas e incomplejas; ¿qué es mayor?; problemas en los que hay que pasar todo a la misma unidad para operar.',
+        biblioteca: 'No necesita recursos: los ejercicios se generan al azar por magnitud, nivel (Primaria, ESO, Bachillerato) y método (saltos, factores o libre). Fichas PDF con la escalera dibujada, con factores de conversión o el ejercicio típico, y soluciones paso a paso.',
+        multiplayer: 'Individual (con envío al profesor), tirón de cuerda por equipos (también con mandos micro:bit) e Invasión Pi con las magnitudes elegidas.',
+        materias: ['Matemáticas', 'Física y Química'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     GEOMETRIA_PRIMARIA: {
         descripcion: 'Zona de geometría de primaria con dos apps: Perímetros y Áreas en cuadrícula, y el visor 3D de poliedros con la fórmula de Euler.',
         tipoPreguntas: 'Misiones de construcción en cuadrícula y exploración de poliedros en 3D.',
@@ -1844,6 +1854,7 @@ const appsMathWorldCompartir = () => {
         { id: 'DIVISIBILIDAD', label: 'Divisibilidad', emoji: '🔢', ruta: '/primaria/divisibilidad' },
         { id: 'GEO_PERIMETRO_AREA', label: 'Perímetros y Áreas', emoji: '🟩', ruta: '/primaria/geometria/perimetro-area' },
         { id: 'GEO_VISOR_POLIEDROS', label: 'Poliedros 3D', emoji: '🔷', ruta: '/primaria/geometria/poliedros' },
+        { id: 'GEO_UNIDADES', label: 'Cambio de unidades', emoji: '🔁', ruta: '/primaria/geometria/unidades' },
         { id: 'DUELO_PIRATAS', label: 'Duelo de Piratas', emoji: '🏴‍☠️', ruta: '/duelo-piratas' },
     ];
     return { mates, primaria };
@@ -2015,6 +2026,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
             }
             // Física: rutas /fisica y /fisica/<slug>
             if (path === 'fisica') { setSimuladoresFisica(true); return; }
+            if (path === 'fisica/unidades') { setSimuladoresFisica(true); setUnidadesFisica(true); return; }
             if (path.startsWith('fisica/')) {
                 const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION', caidaescalada:'CAIDA_ESCALADA', atomos:'ATOMOS', gaylusac:'GAY_LUSAC', eclipse:'ECLIPSE', sistemasolar:'SISTEMA_SOLAR', lluvia:'LLUVIA' };
                 const key = SLUG_MAP[path.slice(7)];
@@ -2094,6 +2106,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo({ tipoJuego: 'GEO_PERIMETRO_AREA' });
             } else if (path === 'primaria/geometria/poliedros') {
                 setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo({ tipoJuego: 'GEO_VISOR_POLIEDROS' });
+            } else if (path === 'primaria/geometria/unidades') {
+                setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo({ tipoJuego: 'GEO_UNIDADES' });
             } else if (path === 'primaria/geometria') {
                 setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null);
             } else if (path === 'feria') {
@@ -2275,6 +2289,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [simuladoresFisica,   setSimuladoresFisica]   = useState(false);
     const [simuladorFisicaActivo, setSimuladorFisicaActivo] = useState(null);
     const [panelSimFisica, setPanelSimFisica] = useState(null); // 'problemas' | 'ficha' dentro de un simulador de física
+    const [unidadesFisica, setUnidadesFisica] = useState(false); // tarjeta «Cambio de unidades» del menú de Física (/fisica/unidades)
     const [bancoFisica, setBancoFisica] = useState(false); // tarjeta «Banco de problemas» del menú de Física
     const simRaizRef = useRef(null); // contenedor del simulador abierto (captura para su ficha PDF)
 
@@ -2426,7 +2441,10 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                     const salaSnap = await getDoc(salaRef);
                     if (salaSnap.exists()) {
                         const data = salaSnap.data();
-                        const nombre = prompt("¡Sesión en vivo encontrada! Introduce tu nombre para entrar:");
+                        let nombre = prompt("¡Sesión en vivo encontrada! Introduce tu nombre para entrar:");
+                        while (nombre && nombre.trim() !== '' && !validarNombre(nombre).ok) {
+                            nombre = prompt(validarNombre(nombre).mensaje + "\n\nIntroduce tu nombre para entrar:");
+                        }
                         if (nombre && nombre.trim() !== '') {
                             setJoinLiveCode(codigoLimpio);
                             setJoinLiveName(nombre.trim());
@@ -3115,10 +3133,15 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); setPanelSimFisica(null); window.history.pushState({}, '', '/fisica'); };
-        const volverAlInicio = () => { setSimuladoresFisica(false); window.history.pushState({}, '', '/'); };
+        const volverAlInicio = () => { setSimuladoresFisica(false); setUnidadesFisica(false); window.history.pushState({}, '', '/'); };
         const abrirSim = (sim) => { setSimuladorFisicaActivo(sim.key); window.history.pushState({}, '', `/fisica/${sim.slug}`); };
 
         if (bancoFisica) return <Suspense fallback={<CargandoChunk />}><BancoProblemasFisica onVolver={() => setBancoFisica(false)} /></Suspense>;
+        if (unidadesFisica) return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: '#f8fafc' }}>
+                <Suspense fallback={<CargandoChunk />}><CambioUnidades contexto="fisica" onExit={() => { setUnidadesFisica(false); window.history.pushState({}, '', '/fisica'); }} /></Suspense>
+            </div>
+        );
 
         if (simuladorFisicaActivo) {
             const sim = SIMS.find(s => s.key === simuladorFisicaActivo);
@@ -3179,6 +3202,27 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                         </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20 }}>
+                        {/* Cambio de unidades: tarjeta cuadrada como la de los simuladores (/fisica/unidades) */}
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                onClick={e => { e.stopPropagation(); setShareModal({ url: `${window.location.origin}/fisica/unidades`, titulo: 'Cambio de unidades' }); }}
+                                title={`${window.location.origin}/fisica/unidades`}
+                                style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 7, padding: '4px 7px', cursor: 'pointer', color: '#22d3ee', display: 'flex', alignItems: 'center' }}
+                            >
+                                <Share2 size={13}/>
+                            </button>
+                            <div
+                                onClick={() => { setUnidadesFisica(true); window.history.pushState({}, '', '/fisica/unidades'); }}
+                                style={{ background: 'rgba(255,255,255,0.07)', border: '2px solid #22d3ee55', borderRadius: 16, padding: '28px 16px', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s, background 0.2s', height: '100%', boxSizing: 'border-box' }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.background = '#22d3ee22'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+                            >
+                                <div style={{ fontSize: 44, marginBottom: 10 }}>🔁</div>
+                                <h3 style={{ color: '#22d3ee', margin: '0 0 6px', fontSize: '1rem', fontWeight: 800 }}>Cambio de unidades</h3>
+                                <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', margin: 0 }}>{t('Saltos y factores de conversión: velocidad, densidad, temperatura, radianes…')}</p>
+                                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', margin: '8px 0 0', fontFamily: 'monospace' }}>pikt.es/fisica/unidades</p>
+                            </div>
+                        </div>
                         {SIMS.map(sim => {
                             const simUrl = `${window.location.origin}/fisica/${sim.slug}`;
                             return (
@@ -3296,6 +3340,11 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 <button onClick={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#2E7D32', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
                 <PerimetroArea />
                 <FichaFlotante tema="geometria" alAbrir="usar" arriba={12} />
+            </div>
+        );
+        if (juegoActivo.tipoJuego === 'GEO_UNIDADES') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f8fafc', overflowY: 'auto' }}>
+                <Suspense fallback={<CargandoChunk />}><CambioUnidades contexto="primaria" onExit={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }} /></Suspense>
             </div>
         );
         if (juegoActivo.tipoJuego === 'GEO_VISOR_POLIEDROS') return (
@@ -3562,6 +3611,18 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔷</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#5E35B1', fontSize: '1.4rem' }}>Poliedros 3D · Euler</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Gira poliedros en 3D y comprueba la fórmula de Euler: V − A + C = 2.</p>
+                        </div>
+                        <div
+                            onClick={() => { window.history.pushState({}, '', '/primaria/geometria/unidades'); setJuegoActivo({ tipoJuego: 'GEO_UNIDADES' }); }}
+                            style={{ position: 'relative', background: '#ECFEFF', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #0891b2' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            {btnInfoMath('GEO_UNIDADES', 'Cambio de unidades', '#0891b2', '🔁')}
+                            {btnCompartirPrimaria('GEO_UNIDADES', '/primaria/geometria/unidades', 'Cambio de unidades', '#0891b2')}
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔁</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#0891b2', fontSize: '1.4rem' }}>Cambio de unidades</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>La escalera de las medidas: longitud, masa, capacidad, superficie y tiempo contando saltos. Problemas, juegos y fichas.</p>
                         </div>
                     </div>
                 </div>
@@ -5239,6 +5300,8 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                         <button  disabled={entrando}
             onClick={async () => {
         if (joinCode.length === 6 && joinName) {
+            const vNombre = validarNombre(joinName);
+            if (!vNombre.ok) { alert(vNombre.mensaje); return; }
             setEntrando(true);
             const salaSnap = await getDoc(doc(db, "live_games", joinCode.toUpperCase().trim()));
             if (salaSnap.exists()) {
@@ -5343,8 +5406,11 @@ function UnirseLiveQRModal({ codigo, usuario, onClose, onEntrar }) {
         return () => { vivo = false; };
     }, [codigo]);
 
+    const [errorNombre, setErrorNombre] = useState('');
     const entrar = () => {
         if (!nombre.trim()) return alert('Escribe tu nombre para entrar.');
+        const v = validarNombre(nombre);
+        if (!v.ok) { setErrorNombre(v.mensaje); return; }
         setEntrando(true);
         onEntrar(codigo, nombre.trim(), sala);
     };
@@ -5368,10 +5434,11 @@ function UnirseLiveQRModal({ codigo, usuario, onClose, onEntrar }) {
                         <div style={{ fontSize: '2.4rem', marginBottom: 6 }}>🎮</div>
                         <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem' }}>{sala?.recursoTitulo || 'Sesión en vivo'}</div>
                         <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, letterSpacing: 2, margin: '6px 0 18px' }}>SALA {codigo}</div>
-                        <input autoFocus value={nombre} onChange={e => setNombre(e.target.value)}
+                        <input autoFocus value={nombre} onChange={e => { setNombre(e.target.value); setErrorNombre(''); }}
                             onKeyDown={e => { if (e.key === 'Enter') entrar(); }}
                             placeholder="Tu nombre"
-                            style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: '1.05rem', textAlign: 'center', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                            style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `2px solid ${errorNombre ? '#e74c3c' : '#e2e8f0'}`, fontSize: '1.05rem', textAlign: 'center', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                        {errorNombre && <div style={{ color: '#e74c3c', fontSize: '0.85rem', fontWeight: 700, marginTop: 8 }}>⚠ {errorNombre}</div>}
                         <button onClick={entrar} disabled={entrando}
                             style={{ width: '100%', marginTop: 12, padding: '13px', borderRadius: 12, border: 'none', background: entrando ? '#95a5a6' : 'linear-gradient(135deg,#3498db,#2980b9)', color: 'white', fontWeight: 800, fontSize: '1rem', cursor: entrando ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                             {entrando ? 'Entrando…' : 'ENTRAR AL JUEGO'}
@@ -5443,6 +5510,8 @@ function PictoTabuModal({ usuario, onClose, onEnterRoom, initialCode = '' }) {
     const unirseSala = async () => {
         const code = joinCode.trim().toUpperCase();
         if (!code || !joinName.trim()) return alert('Introduce código y nombre.');
+        const vNombre = validarNombre(joinName);
+        if (!vNombre.ok) return alert(vNombre.mensaje);
         setJoining(true);
         try {
             const snap = await getDoc(doc(db, 'live_games', code));

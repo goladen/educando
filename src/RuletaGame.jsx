@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
+import { validarNombre } from './utils/filtroNombres';
 import { db } from './firebase';
 // AÑADIDO: 'increment' para el contador de partidas
 import { doc, addDoc, getDoc, collection, query, where, getDocs, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
@@ -69,6 +70,7 @@ function ModalEnviarProfeBase({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

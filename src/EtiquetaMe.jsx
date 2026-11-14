@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -493,6 +494,7 @@ function ModalEnviarProfeBase({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

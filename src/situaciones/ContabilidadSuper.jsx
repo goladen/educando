@@ -5,6 +5,7 @@
 // y regularización. Después ve el Libro Mayor, el balance de comprobación, la
 // cuenta de pérdidas y ganancias y el balance de situación.
 // Precios y tipos de IVA: utils/productosSuper.js (compartido con Cálculo con Dinero).
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
@@ -1102,6 +1103,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

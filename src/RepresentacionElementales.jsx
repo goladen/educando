@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, CheckCircle, Send, Eye } from 'lucide-react';
 import { db } from './firebase';
@@ -528,6 +529,7 @@ function ModalEnviarProfe({ porcentaje, tipoFuncion, onClose }) {
 
     const enviar = async () => {
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         const code = codigo.trim().toUpperCase();
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');

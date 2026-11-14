@@ -38,6 +38,9 @@ Blockly.setLocale(Es);
 
 const PENDING_KEY = 'blockly_pending_save'; // proyecto a guardar tras registrarse
 const SERIAL_ENCODER = new TextEncoder(); // texto → bytes para el puerto serie
+// Primera línea de los programas que el editor guarda en las ranuras del CyberPi
+// (así sabemos que la ranura es nuestra y no un programa de mBlock).
+const MARCA_BLOQUES = '# PIKT BLOQUES';
 
 // Construye una trama del protocolo de mBlock para que el CyberPi EJECUTE python.
 // Formato: F3 [id] [len_lo] [len_hi] [28 00 00 00 pylen_lo pylen_hi <python>] [chk] F4
@@ -237,7 +240,7 @@ function generatePython(ws) {
     let c = gen.blockToCode(b);
     if (Array.isArray(c)) c = c[0];
     if (!c) continue;
-    if (b.type === 'microbit_on_start') starts.push(c);
+    if (b.type === 'microbit_on_start' || b.type === 'cyberpi_on_start') starts.push(c);
     else if (b.type === 'microbit_forever' || b.type === 'cyberpi_forever') loops.push(c);
     else rest.push(c);
   }
@@ -519,6 +522,16 @@ function defineBlocksAndGenerators() {
     },
 
     // ===== CYBERPI — loop, botones / joystick =====
+    {
+      type: 'cyberpi_on_start',
+      message0: 'al iniciar %1 %2',
+      args0: [
+        { type: 'input_dummy' },
+        { type: 'input_statement', name: 'DO' },
+      ],
+      colour: 200,
+      tooltip: 'Código que se ejecuta una vez al empezar el programa (antes de «por siempre»)',
+    },
     {
       type: 'cyberpi_forever',
       message0: 'por siempre %1 %2',
@@ -1576,6 +1589,12 @@ function defineBlocksAndGenerators() {
   const cpImport = (gen) => {
     gen.definitions_['import_cyberpi'] = 'import cyberpi';
   };
+  P.forBlock['cyberpi_on_start'] = function (block, gen) {
+    cpImport(gen);
+    let branch = gen.statementToCode(block, 'DO');
+    if (branch) branch = branch.replace(new RegExp('^' + gen.INDENT, 'gm'), '');
+    return branch || '';
+  };
   P.forBlock['cyberpi_forever'] = function (block, gen) {
     cpImport(gen);
     let branch = gen.statementToCode(block, 'DO');
@@ -2125,6 +2144,17 @@ function defineBlocksAndGenerators() {
     }
     return code;
   };
+  A.forBlock['logic_negate'] = function (block) {
+    const a = A.valueToCode(block, 'BOOL', ArdOrder.UNARY) || 'true';
+    return ['!' + a, ArdOrder.UNARY];
+  };
+  A.forBlock['controls_whileUntil'] = function (block) {
+    const until = block.getFieldValue('MODE') === 'UNTIL';
+    let cond = A.valueToCode(block, 'BOOL', until ? ArdOrder.ATOMIC : ArdOrder.NONE) || 'false';
+    if (until) cond = '!' + cond;
+    const branch = indent(A.statementToCode(block, 'DO'));
+    return `while (${cond}) {\n${branch}}\n`;
+  };
   A.forBlock['controls_repeat_ext'] = function (block) {
     const repeats = A.valueToCode(block, 'TIMES', ArdOrder.ATOMIC) || '0';
     const branch = indent(A.statementToCode(block, 'DO'));
@@ -2209,8 +2239,13 @@ const STD_CATEGORIES = [
     colour: '210',
     contents: [
       { kind: 'block', type: 'controls_if' },
+      // «si … si no» y «si … si no si … si no» ya montados (el engranaje del
+      // bloque «si» no lo encuentra casi nadie).
+      { kind: 'block', type: 'controls_if', extraState: { hasElse: true } },
+      { kind: 'block', type: 'controls_if', extraState: { elseIfCount: 1, hasElse: true } },
       { kind: 'block', type: 'logic_compare' },
       { kind: 'block', type: 'logic_operation' },
+      { kind: 'block', type: 'logic_negate' },
       { kind: 'block', type: 'logic_boolean' },
     ],
   },
@@ -2226,6 +2261,7 @@ const STD_CATEGORIES = [
           TIMES: { shadow: { type: 'math_number', fields: { NUM: 10 } } },
         },
       },
+      { kind: 'block', type: 'controls_whileUntil' },
     ],
   },
   {
@@ -2254,6 +2290,36 @@ const STD_CATEGORIES = [
     ],
   },
 ];
+
+// Placas Python (micro:bit, casita, CyberPi): las categorías estándar + bloques que
+// el generador de Python ya sabe traducir (contar, salir del bucle, aleatorio…).
+const numSh = (n) => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
+const PY_STD_CATEGORIES = STD_CATEGORIES.map((cat) => {
+  if (cat.name === 'Bucles') {
+    return {
+      ...cat,
+      contents: [
+        ...cat.contents,
+        { kind: 'block', type: 'controls_for', inputs: { FROM: numSh(1), TO: numSh(10), BY: numSh(1) } },
+        { kind: 'block', type: 'controls_flow_statements' },
+      ],
+    };
+  }
+  if (cat.name === 'Matemáticas') {
+    return {
+      ...cat,
+      contents: [
+        ...cat.contents,
+        { kind: 'block', type: 'math_random_int', inputs: { FROM: numSh(1), TO: numSh(10) } },
+        { kind: 'block', type: 'math_modulo', inputs: { DIVIDEND: numSh(10), DIVISOR: numSh(3) } },
+        { kind: 'block', type: 'math_round' },
+        { kind: 'block', type: 'math_number_property', inputs: { NUMBER_TO_CHECK: numSh(0) } },
+        { kind: 'block', type: 'math_constrain', inputs: { VALUE: numSh(50), LOW: numSh(0), HIGH: numSh(100) } },
+      ],
+    };
+  }
+  return cat;
+});
 
 const blk = (type, inputs) => (inputs ? { kind: 'block', type, inputs } : { kind: 'block', type });
 const mapShadow = { VAL: { shadow: { type: 'math_number', fields: { NUM: 0 } } } };
@@ -2323,7 +2389,7 @@ const TOOLBOXES = {
         contents: [blk('microbit_if_else'), blk('microbit_running_time'), blk('microbit_pause')],
       },
       { kind: 'category', name: 'Variables', colour: '330', custom: 'VARIABLE' },
-      ...STD_CATEGORIES,
+      ...PY_STD_CATEGORIES,
       CODE_PY,
     ],
   },
@@ -2333,7 +2399,7 @@ const TOOLBOXES = {
       {
         kind: 'category', name: 'Pantalla', colour: '200',
         contents: [
-          blk('cyberpi_forever'), blk('cyberpi_show_label'),
+          blk('cyberpi_on_start'), blk('cyberpi_forever'), blk('cyberpi_show_label'),
           blk('cyberpi_show_value'), blk('cyberpi_console_print'),
           blk('cyberpi_display_clear'), blk('cyberpi_wait'),
         ],
@@ -2370,7 +2436,8 @@ const TOOLBOXES = {
         kind: 'category', name: 'mBot2 · Sensores', colour: '15',
         contents: [blk('mbot2_ultrasonic'), blk('mbot2_line_offset'), blk('mbot2_line_state')],
       },
-      ...STD_CATEGORIES,
+      { kind: 'category', name: 'Variables', colour: '330', custom: 'VARIABLE' },
+      ...PY_STD_CATEGORIES,
       CODE_PY,
     ],
   },
@@ -2435,7 +2502,7 @@ const TOOLBOXES = {
         ],
       },
       { kind: 'category', name: 'Variables', colour: '330', custom: 'VARIABLE' },
-      ...STD_CATEGORIES,
+      ...PY_STD_CATEGORIES,
       CODE_PY,
     ],
   },
@@ -2488,22 +2555,60 @@ const BOARD_META = {
 };
 
 // Contexto por placa para el prompt de IA (editar el código con Claude/Gemini).
+// `guide` = las funciones que SÍ funcionan con nuestra placa y nuestro envío. Sin
+// esta lista la IA (sobre todo Gemini) inventa APIs de mBlock (event, mbot2.forward,
+// from cyberpi import *…) que en la placa fallan o no hacen nada.
+const SH = SMARTHOME_PINS;
 const LANG_INFO = {
   microbit: {
     lang: 'MicroPython para la BBC micro:bit V2',
-    notes: 'Usa la librería microbit (from microbit import *) y, si hacen falta, music, radio o speech.',
+    guide: [
+      'Empieza con: from microbit import *  (y import music / radio / speech solo si hacen falta).',
+      'Pantalla: display.scroll("texto"), display.show(Image.HEART), display.show(número), display.clear(), display.set_pixel(x, y, 0-9).',
+      'Botones: button_a.is_pressed(), button_b.was_pressed(), pin_logo.is_touched().',
+      'Sensores: temperature(), display.read_light_level(), microphone.sound_level(), accelerometer.get_x(), accelerometer.was_gesture("shake"), compass.heading().',
+      'Pines: pin0.write_digital(1), pin1.read_digital(), pin2.read_analog() (0-1023), pin0.write_analog(0-1023).',
+      'Sonido: music.play(music.BA_DING), music.pitch(440, 500).',
+      'Esperas: sleep(milisegundos). Bucle principal: while True:',
+    ],
   },
   microbit_smarthome: {
-    lang: 'MicroPython para micro:bit V2 conectada al kit Smart Home (Keyestudio)',
-    notes: 'Usa from microbit import *; lee sensores con pinX.read_analog()/read_digital(), mueve actuadores con write_digital()/write_analog(), el zumbador con music y la LCD 1602 por i2c (SCL=P19, SDA=P20). Respeta los pines del montaje.',
+    lang: 'MicroPython para micro:bit V2 conectada al kit Smart Home de Keyestudio',
+    guide: [
+      'Empieza con: from microbit import *  (import music si hay sonido).',
+      `Entradas del montaje (NO cambies los pines): PIR movimiento = pin${SH.pir}.read_digital(), gas = pin${SH.gas}.read_analog(), humedad del suelo = pin${SH.suelo}.read_analog(), lluvia = pin${SH.vapor}.read_analog(), botón = pin${SH.boton}.read_digital().`,
+      `Salidas: LED = pin${SH.led}.write_digital(1 o 0). Ventilador = pin${SH.ventilador}: write_digital(0) lo ENCIENDE y write_digital(1) lo APAGA (va al revés).`,
+      `LED RGB: tira NeoPixel de 4 LEDs en pin${SH.rgb} → import neopixel; np = neopixel.NeoPixel(pin${SH.rgb}, 4); np[0] = (255, 0, 0); np.show().`,
+      `Servos (puerta = pin${SH.servo}, ventana = pin${SH.servo_ventana}): pinX.set_analog_period(20) y luego pinX.write_analog(round(26 + 102 * grados / 180)).`,
+      'No hay sensor de luz en la casa. Para la temperatura usa temperature() (la interna de la micro:bit), no el DHT11.',
+      'El zumbador es el altavoz de la micro:bit: music.play(...) o music.pitch(...) SIN pin=.',
+      'Esperas: sleep(milisegundos). Bucle principal: while True:',
+    ],
   },
   cyberpi: {
-    lang: 'Python con la librería cyberpi (y mbot2/mbuild para el robot mBot2)',
-    notes: 'Usa cyberpi.* para pantalla, audio, LED y sensores; mbot2.* para los motores.',
+    lang: 'MicroPython para el CyberPi montado en el robot mBot2 (Makeblock)',
+    guide: [
+      'Empieza con: import cyberpi, mbot2, mbuild, time  (solo los que uses).',
+      'PROHIBIDO: from cyberpi import *, el módulo event (@event.start, @event.is_press…), mbot2.forward/backward/turn_left/turn_right, threading, input(). El programa se ejecuta de arriba abajo, sin eventos.',
+      'Pantalla: cyberpi.display.show_label("texto", 16, "center"), cyberpi.console.println("texto"), cyberpi.display.clear().',
+      'LED: cyberpi.led.on(r, g, b) con valores 0-255, cyberpi.led.off().',
+      'Sonido: cyberpi.audio.play_tone(frecuencia, segundos), cyberpi.audio.play("hello"), cyberpi.audio.set_vol(0-100).',
+      'Botones y joystick: cyberpi.controller.is_press("a"), "b", "up", "down", "left", "right" o "middle".',
+      'Sensores del CyberPi: cyberpi.get_loudness(), cyberpi.get_bri(), cyberpi.get_shakeval(), cyberpi.get_pitch(), cyberpi.get_roll(), cyberpi.get_acc("x").',
+      'Motores: mbot2.drive_power(izquierda, derecha) con potencias de -100 a 100. OJO: el motor derecho va en espejo → AVANZAR = mbot2.drive_power(50, -50), RETROCEDER = drive_power(-50, 50), GIRAR A LA IZQUIERDA = drive_power(-50, -50), GIRAR A LA DERECHA = drive_power(50, 50), PARAR = drive_power(0, 0). Para siempre los motores al acabar un movimiento.',
+      'Movimientos medidos: mbot2.straight(centímetros), mbot2.turn(grados).',
+      'Ultrasonidos: mbuild.ultrasonic2.get(1) (distancia en cm). Seguidor de línea: mbuild.quad_rgb_sensor.get_offset_track(1) (desvío de -100 a 100) y mbuild.quad_rgb_sensor.get_line_sta(1) (0-15).',
+      'Esperas: time.sleep(segundos). Bucle principal: while True:  (con un time.sleep pequeño dentro).',
+      'No uses funciones (def) que cambien variables globales: escribe el código directamente en el bucle.',
+    ],
   },
   arduino: {
     lang: 'C++ para Arduino (Uno/Nano)',
-    notes: 'Estructura con setup() y loop(), Serial a 115200 e incluye las librerías necesarias (#include).',
+    guide: [
+      'Estructura con void setup() y void loop(). Serial.begin(115200) en setup si usas el puerto serie.',
+      'Usa pinMode, digitalWrite, digitalRead, analogRead, analogWrite, delay, millis, tone y noTone.',
+      'Para servos: #include <Servo.h>. No uses librerías que no vengan con el IDE de Arduino.',
+    ],
   },
 };
 
@@ -2523,7 +2628,8 @@ const CONNECT_HELP = {
   cyberpi: [
     'CyberPi/mBot2: si no aparece el puerto, instala el driver USB CH340 (el que usa mBlock de Makeblock).',
     'Enciende la placa y usa un cable USB de datos.',
-    'El envío al REPL requiere modo MicroPython; con el firmware estándar, copia/descarga el código y pégalo en mBlock.',
+    'Cierra mBlock (y cualquier otra pestaña conectada): el puerto solo lo puede usar uno a la vez.',
+    'Para que los motores se muevan, enciende también el mBot2 (la batería del chasis, no basta el USB).',
   ],
   arduino: [
     'Arduino Uno oficial: sin driver. Nano/clones: instala el driver CH340 (o FTDI según el chip).',
@@ -2533,20 +2639,41 @@ const CONNECT_HELP = {
 };
 
 // Construye el prompt para pegar en Claude/Gemini y modificar el código por IA.
-function buildAIPrompt(board, code) {
+// Lo que pide el alumno va ARRIBA (antes iba al final como «[ESCRIBE AQUÍ…]» y, si
+// no se rellenaba, Gemini contestaba con preguntas en vez de código).
+const FENCE = '```';
+function buildAIPrompt(board, code, peticion = '') {
   const info = LANG_INFO[board] || LANG_INFO.microbit;
-  return `Eres un experto en robótica educativa. Tengo este programa en ${info.lang} y quiero modificarlo.
+  const lenguaje = board === 'arduino' ? 'cpp' : 'python';
+  const actual = code && code.trim() ? code.trim() : '';
+  const quiero = peticion.trim() || '[ESCRIBE AQUÍ QUÉ QUIERES QUE HAGA EL PROGRAMA]';
+  const partes = [
+    `Eres un profesor experto en robótica educativa. Escribe un programa en ${info.lang}.`,
+    `LO QUE QUIERO QUE HAGA:\n${quiero}`,
+    actual
+      ? `PROGRAMA ACTUAL (modifícalo y conserva lo que no haga falta cambiar):\n${FENCE}${lenguaje}\n${actual}\n${FENCE}`
+      : 'Todavía no hay programa: escríbelo desde cero.',
+    `FUNCIONES QUE PUEDES USAR (son las que funcionan en esta placa; no inventes otras):\n${info.guide.map((g) => '- ' + g).join('\n')}`,
+    [
+      'CÓMO RESPONDER:',
+      `- Responde SOLO con UN bloque de código ${FENCE}${lenguaje} con el programa COMPLETO, de principio a fin.`,
+      '- Sin explicaciones antes ni después, sin varias versiones y sin preguntas: si algo no está claro, elige la opción más sencilla.',
+      '- Comentarios cortos en español dentro del código.',
+      '- Código sencillo, para alumnos: sin clases ni librerías extra.',
+    ].join('\n'),
+  ];
+  return partes.join('\n\n');
+}
 
-REGLAS:
-- Devuelve SOLO el código final completo, listo para pegar, SIN explicaciones, sin texto adicional y sin formato markdown.
-- Mantén el mismo lenguaje y placa (${info.lang}).
-- ${info.notes}
-
-CÓDIGO ACTUAL:
-${code && code.trim() ? code.trim() : '(vacío)'}
-
-CAMBIO QUE QUIERO:
-[ESCRIBE AQUÍ QUÉ QUIERES MODIFICAR O AÑADIR]`;
+// Limpia lo que se pega de la IA: si trae bloques ```…```, se queda con el código
+// (el más largo); quita el texto de alrededor y los caracteres invisibles.
+function limpiarCodigoIA(texto) {
+  if (!texto) return '';
+  let t = texto.replace(/\r\n/g, '\n').replace(/[ ​﻿]/g, (c) => (c === ' ' ? ' ' : ''));
+  const bloques = [...t.matchAll(/```[a-zA-Z+]*[ \t]*\n([\s\S]*?)```/g)].map((m) => m[1]);
+  if (bloques.length) t = bloques.sort((a, b) => b.length - a.length)[0];
+  else t = t.replace(/^```[a-zA-Z+]*[ \t]*$/gm, '');
+  return t.replace(/\s+$/, '') + '\n';
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -2577,6 +2704,181 @@ const ifDo = (cond, doNode) => ({
   inputs: { IF0: { block: cond }, DO0: { block: doNode } },
 });
 const top = (block) => ({ blocks: { languageVersion: 0, blocks: [{ ...block, x: 40, y: 40 }] } });
+
+// Atajos para proyectos con variables y operaciones.
+const nb = (n) => ({ type: 'math_number', fields: { NUM: n } });
+const vget = (name) => ({ type: 'variables_get', fields: { VAR: { id: 'v_' + name } } });
+const vset = (name, val) => ({
+  type: 'variables_set',
+  fields: { VAR: { id: 'v_' + name } },
+  inputs: { VALUE: { block: val } },
+});
+const ar = (op, a, b) => ({
+  type: 'math_arithmetic',
+  fields: { OP: op },
+  inputs: { A: { block: a }, B: { block: b } },
+});
+// Estado con variables y varios bloques sueltos (al iniciar, por siempre…).
+const topV = (vars, blocks) => ({
+  variables: vars.map((n) => ({ name: n, id: 'v_' + n })),
+  blocks: { languageVersion: 0, blocks: blocks.map((b, i) => ({ ...b, x: 40, y: 40 + i * 420 })) },
+});
+// Programa Python escrito a mano → bloques de «código en bruto» que lo reproducen
+// tal cual (para lo que no se puede hacer con bloques, p. ej. teclear con el joystick).
+function rawPyState(code) {
+  const lines = code
+    .split('\n')
+    .map((r) => ({ indent: r.length - r.trimStart().length, text: r.trim() }))
+    .filter((l) => l.text);
+  let pos = 0;
+  const parse = (level) => {
+    const nodes = [];
+    while (pos < lines.length && lines[pos].indent >= level) {
+      const { text } = lines[pos++];
+      if (text.endsWith(':') && !text.startsWith('#')) {
+        const child = pos < lines.length && lines[pos].indent > level ? lines[pos].indent : level + 1;
+        const hijos = parse(child);
+        nodes.push({
+          type: 'raw_block_py',
+          fields: { HEAD: text },
+          ...(hijos.length ? { inputs: { DO: { block: chain(hijos) } } } : {}),
+        });
+      } else nodes.push({ type: 'raw_py', fields: { CODE: text } });
+    }
+    return nodes;
+  };
+  return top(chain(parse(0)));
+}
+
+// Juego de cambio de unidades con el mBot2 (se guarda en una ranura del CyberPi:
+// la consola de pantalla solo se ve desde una ranura, no con ▶ Ejecutar).
+const PY_JUEGO_UNIDADES = `# Juego de unidades con el mBot2 (Pikt)
+# Guardalo con «Guardar en placa» y lanzalo desde el menu del CyberPi
+import cyberpi, mbot2, time, random
+c = cyberpi.console
+j = cyberpi.controller
+# Retos (lugar, unidad en la que hay que escribir). Cambialos por los de tu clase
+RETOS = [('Llega hasta el fondo de la clase', 'mm'), ('Llega hasta la pared de tu izquierda mirando a la pizarra', 'cm'), ('Llega hasta la puerta', 'dm'), ('Llega hasta la pizarra', 'm'), ('Llega hasta la mesa del profe', 'hm'), ('Llega hasta la ventana', 'km')]
+# Centimetros que hay en 1 unidad
+CM = {'km': 100000, 'hm': 10000, 'dam': 1000, 'm': 100, 'dm': 10, 'cm': 1, 'mm': 0.1}
+NOMBRE = {'km': 'kilometros', 'hm': 'hectometros', 'dam': 'decametros', 'm': 'metros', 'dm': 'decimetros', 'cm': 'centimetros', 'mm': 'milimetros'}
+TECLAS = '0123456789.'
+MAXIMO = 1500
+bien = 0
+hechos = 0
+def pulsa(b):
+    if j.is_press(b):
+        while j.is_press(b):
+            time.sleep(0.02)
+        return True
+    return False
+def escribe(t):
+    linea = ''
+    for p in t.split(' '):
+        if linea and len(linea) + len(p) + 1 > 16:
+            c.println(linea)
+            linea = p
+        else:
+            linea = (linea + ' ' + p).strip()
+    if linea:
+        c.println(linea)
+def espera_a():
+    while not pulsa('a'):
+        time.sleep(0.03)
+def objetivo(n, lugar, u):
+    c.clear()
+    c.println('RETO ' + str(n))
+    c.println('')
+    escribe(lugar)
+    c.println('')
+    c.println('Escribelo en')
+    c.println(NOMBRE[u] + ' (' + u + ')')
+    c.println('')
+    c.println('A: empezar')
+    espera_a()
+def pantalla(n, lugar, u, s, sel):
+    c.clear()
+    c.println('Escribe en ' + u + ':')
+    c.println('')
+    c.println(s + '[' + TECLAS[sel] + '] ' + u)
+def pedir(n, lugar, u):
+    s = ''
+    sel = 0
+    pantalla(n, lugar, u, s, sel)
+    while True:
+        if pulsa('up'):
+            sel = (sel + 1) % len(TECLAS)
+        elif pulsa('down'):
+            sel = (sel - 1) % len(TECLAS)
+        elif pulsa('middle'):
+            if len(s) < 8:
+                s = s + TECLAS[sel]
+        elif pulsa('b'):
+            s = s[:-1]
+        elif pulsa('a'):
+            try:
+                return float(s)
+            except Exception:
+                cyberpi.audio.play_tone(200, 0.2)
+        else:
+            time.sleep(0.03)
+            continue
+        pantalla(n, lugar, u, s, sel)
+cyberpi.audio.set_vol(80)
+orden = []
+n = 0
+while True:
+    if not orden:
+        orden = list(range(len(RETOS)))
+        for i in range(len(orden) - 1, 0, -1):
+            k = random.randint(0, i)
+            orden[i], orden[k] = orden[k], orden[i]
+    lugar, u = RETOS[orden.pop()]
+    n = n + 1
+    objetivo(n, lugar, u)
+    while True:
+        valor = pedir(n, lugar, u)
+        cm = round(valor * CM[u], 1)
+        if 0 < cm <= MAXIMO:
+            break
+        c.clear()
+        c.println('Demasiado lejos')
+        c.println('(maximo 15 m)')
+        cyberpi.audio.play_tone(200, 0.4)
+        time.sleep(2)
+    c.clear()
+    c.println(str(valor) + ' ' + u)
+    c.println('')
+    c.println('A: recorrer')
+    espera_a()
+    for f in (440, 440, 880):
+        cyberpi.audio.play_tone(f, 0.15)
+        time.sleep(0.3)
+    mbot2.straight(cm)
+    mbot2.drive_power(0, 0)
+    hechos = hechos + 1
+    c.clear()
+    c.println('He llegado?')
+    c.println('')
+    c.println('A: si   B: no')
+    while True:
+        if pulsa('a'):
+            bien = bien + 1
+            cyberpi.led.on(0, 255, 0)
+            cyberpi.audio.play_tone(988, 0.3)
+            break
+        if pulsa('b'):
+            cyberpi.led.on(255, 0, 0)
+            cyberpi.audio.play_tone(196, 0.5)
+            break
+        time.sleep(0.03)
+    c.clear()
+    c.println('Aciertos: ' + str(bien) + '/' + str(hechos))
+    c.println('')
+    c.println('A: otro reto')
+    espera_a()
+    cyberpi.led.off()
+`;
 
 const PROJECTS = [
   // ───────── MICRO:BIT ─────────
@@ -2801,6 +3103,208 @@ const PROJECTS = [
         { type: 'cyberpi_show_label', fields: { TEXT: 'Fin' } },
       ])
     ),
+  },
+
+  {
+    id: 'mbot_sigue_linea',
+    board: 'cyberpi',
+    emoji: '〰️',
+    title: 'mBot2: sigue la línea',
+    desc: 'El robot sigue una línea negra del suelo corrigiendo el rumbo según lo desviada que esté. Si la pierde, se para.',
+    steps: [
+      '«Al iniciar» guarda dos números: la velocidad base (35 %) y la fuerza de la corrección (0,4).',
+      'En «por siempre» leemos el «desvío de la línea»: negativo = la línea está a la izquierda, positivo = a la derecha.',
+      'SI ninguna sonda ve la línea (sondas = 0), el robot se para y se enciende el LED rojo.',
+      'SI NO, cada rueda va a «base ± corrección × desvío»: si la línea se va a la derecha, la rueda izquierda acelera y la derecha frena → el robot gira hacia la línea.',
+      'Prueba: si da bandazos, baja la corrección (0,3); si se sale en las curvas, súbela (0,6) o baja la velocidad base.',
+    ],
+    state: topV(['base', 'correccion', 'desvio'], [
+      {
+        type: 'cyberpi_on_start',
+        inputs: {
+          DO: {
+            block: chain([
+              vset('base', nb(35)),
+              vset('correccion', nb(0.4)),
+              { type: 'cyberpi_show_label', fields: { TEXT: 'Sigo la linea' } },
+            ]),
+          },
+        },
+      },
+      {
+        type: 'cyberpi_forever',
+        inputs: {
+          DO: {
+            block: chain([
+              vset('desvio', { type: 'mbot2_line_offset' }),
+              {
+                type: 'controls_if',
+                extraState: { hasElse: true },
+                inputs: {
+                  IF0: { block: cmp({ type: 'mbot2_line_state' }, 'EQ', 0) },
+                  DO0: {
+                    block: chain([
+                      { type: 'mbot2_stop' },
+                      { type: 'cyberpi_led_rgb', fields: { R: 255, G: 0, B: 0 } },
+                    ]),
+                  },
+                  ELSE: {
+                    block: chain([
+                      { type: 'cyberpi_led_rgb', fields: { R: 0, G: 255, B: 0 } },
+                      {
+                        type: 'mbot2_motores',
+                        inputs: {
+                          L: { block: ar('ADD', vget('base'), ar('MULTIPLY', vget('correccion'), vget('desvio'))) },
+                          R: { block: ar('MINUS', vget('base'), ar('MULTIPLY', vget('correccion'), vget('desvio'))) },
+                        },
+                      },
+                    ]),
+                  },
+                },
+              },
+              { type: 'cyberpi_wait', fields: { SEC: 0.02 } },
+            ]),
+          },
+        },
+      },
+    ]),
+  },
+
+  {
+    id: 'mbot_recinto',
+    board: 'cyberpi',
+    emoji: '🚜',
+    title: 'mBot2: recorre todo un recinto',
+    desc: 'Barre un rectángulo de LARGO × ANCHO centímetros en zigzag, como un cortacésped o una Roomba, sin dejarse ningún trozo.',
+    steps: [
+      'Coloca el robot en una esquina del recinto, mirando a lo largo y con el recinto a su DERECHA.',
+      'Cambia las medidas en «al iniciar»: largo y ancho del recinto (cm) y el paso entre pasadas (unos 20 cm, el ancho del robot).',
+      'Primero recorre el largo una vez. Después repite «ancho ÷ paso» veces: girar, avanzar un paso, girar otra vez y recorrer el largo de vuelta.',
+      'La variable «giro» vale 90 y en cada pasada se multiplica por −1: así gira una vez a la derecha y la siguiente a la izquierda (zigzag).',
+      'Reto: ¿cuántos cm recorre en total? (largo × (pasadas + 1) + ancho). Compruébalo midiendo. Si quieres solo el perímetro, usa un «repetir 2 veces: avanzar largo, girar 90, avanzar ancho, girar 90».',
+    ],
+    state: topV(['largo', 'ancho', 'paso', 'giro'], [
+      {
+        type: 'cyberpi_on_start',
+        inputs: {
+          DO: {
+            block: chain([
+              vset('largo', nb(200)),
+              vset('ancho', nb(100)),
+              vset('paso', nb(20)),
+              vset('giro', nb(90)),
+              { type: 'cyberpi_show_label', fields: { TEXT: 'Recorro el recinto' } },
+              { type: 'mbot2_straight', inputs: { CM: { block: vget('largo') } } },
+              {
+                type: 'controls_repeat_ext',
+                inputs: {
+                  TIMES: {
+                    block: {
+                      type: 'math_round',
+                      fields: { OP: 'ROUND' },
+                      inputs: { NUM: { block: ar('DIVIDE', vget('ancho'), vget('paso')) } },
+                    },
+                  },
+                  DO: {
+                    block: chain([
+                      { type: 'mbot2_turn', inputs: { DEG: { block: vget('giro') } } },
+                      { type: 'mbot2_straight', inputs: { CM: { block: vget('paso') } } },
+                      { type: 'mbot2_turn', inputs: { DEG: { block: vget('giro') } } },
+                      { type: 'mbot2_straight', inputs: { CM: { block: vget('largo') } } },
+                      vset('giro', ar('MULTIPLY', vget('giro'), nb(-1))),
+                    ]),
+                  },
+                },
+              },
+              { type: 'mbot2_stop' },
+              { type: 'cyberpi_play_tone', fields: { FREQ: 880, SEC: 0.3 } },
+              { type: 'cyberpi_show_label', fields: { TEXT: 'Recinto terminado' } },
+            ]),
+          },
+        },
+      },
+    ]),
+  },
+
+  {
+    id: 'mbot_circulo',
+    board: 'cyberpi',
+    emoji: '⭕',
+    title: 'mBot2: círculo de un radio',
+    desc: 'Dibuja una circunferencia del radio que quieras dando a cada rueda una velocidad distinta. ¡Matemáticas de verdad!',
+    steps: [
+      'Las dos ruedas están separadas unos 12 cm («via»). Para girar en círculo, la rueda de fuera recorre más que la de dentro.',
+      'Rueda de fuera → radio + via/2; rueda de dentro → radio − via/2. Por eso la potencia de dentro = potencia × (radio − 6) ÷ (radio + 6).',
+      'El tiempo de una vuelta = longitud de la circunferencia (2·π·radio) ÷ velocidad. Suponemos 0,55 cm/s por cada 1 % de potencia.',
+      'El robot espera ese tiempo en pasos de 0,1 s y se para. En pantalla ves cuántos segundos tarda.',
+      'Calibra: si se pasa de la vuelta, baja el 0,55; si no llega, súbelo. Prueba radios de 30, 50 y 100 cm. (Gira a la derecha; para la izquierda intercambia las ruedas).',
+    ],
+    state: topV(['radio', 'potencia', 'via', 'interior', 'segundos'], [
+      {
+        type: 'cyberpi_on_start',
+        inputs: {
+          DO: {
+            block: chain([
+              vset('radio', nb(50)),
+              vset('potencia', nb(40)),
+              vset('via', nb(12)),
+              vset(
+                'interior',
+                ar(
+                  'DIVIDE',
+                  ar('MULTIPLY', vget('potencia'), ar('MINUS', vget('radio'), ar('DIVIDE', vget('via'), nb(2)))),
+                  ar('ADD', vget('radio'), ar('DIVIDE', vget('via'), nb(2)))
+                )
+              ),
+              vset(
+                'segundos',
+                ar(
+                  'DIVIDE',
+                  ar('MULTIPLY', ar('MULTIPLY', nb(2), nb(3.1416)), vget('radio')),
+                  ar('MULTIPLY', nb(0.55), ar('DIVIDE', ar('ADD', vget('potencia'), vget('interior')), nb(2)))
+                )
+              ),
+              { type: 'cyberpi_show_value', inputs: { NUM: { block: vget('segundos') } } },
+              { type: 'mbot2_motores', inputs: { L: { block: vget('potencia') }, R: { block: vget('interior') } } },
+              {
+                type: 'controls_repeat_ext',
+                inputs: {
+                  TIMES: {
+                    block: {
+                      type: 'math_round',
+                      fields: { OP: 'ROUND' },
+                      inputs: { NUM: { block: ar('MULTIPLY', vget('segundos'), nb(10)) } },
+                    },
+                  },
+                  DO: { block: { type: 'cyberpi_wait', fields: { SEC: 0.1 } } },
+                },
+              },
+              { type: 'mbot2_stop' },
+              { type: 'cyberpi_play_tone', fields: { FREQ: 880, SEC: 0.3 } },
+            ]),
+          },
+        },
+      },
+    ]),
+  },
+
+  {
+    id: 'mbot_unidades',
+    board: 'cyberpi',
+    emoji: '📏',
+    title: 'mBot2: juego de cambio de unidades',
+    desc: 'El robot propone un reto («llega hasta el fondo de la clase») y pide escribir la distancia en una unidad concreta (mm, cm, dm, m, hm, km). Luego la anda y el profe dice si ha acertado.',
+    steps: [
+      'PREPARAR: conecta el CyberPi, elige una ranura y pulsa «📥 Guardar en placa». En el robot: menú → «Cambiar programa» → esa ranura. (Con ▶ Ejecutar no se vería la pantalla: la tapa el menú del CyberPi).',
+      '1 · OBJETIVO: el robot muestra el reto y la unidad, p. ej. «Llega hasta el fondo de la clase · Escríbelo en milímetros (mm)». El alumno lo lee, estima la distancia y pulsa A.',
+      '2 · ESCRIBIR: en pantalla aparece «Escribe en mm:» y el número que se va formando. Joystick ARRIBA/ABAJO = cambiar la cifra que está entre [ ] (0-9 o el punto decimal) · CENTRO del joystick = añadirla · B = borrar la última · A = terminar.',
+      '   Ejemplo: para escribir 3,5 m → arriba hasta [3], centro, arriba hasta [.], centro, arriba hasta [5], centro, A.',
+      '3 · RECORRER: el robot enseña el valor escrito; al pulsar A pita tres veces y anda esa distancia en línea recta (la convierte a cm: 1 km = 100 000 cm, 1 hm = 10 000 cm, 1 m = 100 cm, 1 dm = 10 cm, 1 mm = 0,1 cm). Máximo 15 m; si se pasa, avisa y se vuelve a escribir.',
+      '4 · VALIDAR (el profe): «¿He llegado?» → A = sí (LED verde) · B = no (LED rojo). El robot lleva la cuenta de aciertos. A → siguiente reto (se devuelve el robot al punto de salida a mano).',
+      'PERSONALIZAR: cambia los lugares y las unidades en la lista RETOS del principio del código (bloques grises), p. ej. («Llega hasta la papelera», \'dm\'). Las unidades válidas son km, hm, dam, m, dm, cm y mm.',
+      'IDEA DIDÁCTICA: antes de pulsar A en el paso 3, que el grupo diga el valor en cm o en m en voz alta: así practican la conversión y comprueban la estimación con el recorrido real.',
+    ],
+    state: rawPyState(PY_JUEGO_UNIDADES),
   },
 
   // ───────── ARDUINO ─────────
@@ -3291,7 +3795,9 @@ function pythonToNodes(board, code) {
   const lines = code
     .split('\n')
     .map((raw) => ({ indent: raw.length - raw.replace(/^\s+/, '').length, text: raw.trim() }))
-    .filter((l) => l.text && !/^(from\s|import\s)/.test(l.text) && l.text !== 'radio.on()');
+    // Solo se quitan los import que los bloques vuelven a poner solos; el resto
+    // (time, random, mbot2…) se conserva: si no, el código convertido fallaba.
+    .filter((l) => l.text && !/^(from microbit import \*|import cyberpi)$/.test(l.text) && l.text !== 'radio.on()');
   let pos = 0;
   const forever = board === 'cyberpi' ? 'cyberpi_forever' : 'microbit_forever';
   function parse(level) {
@@ -3309,7 +3815,9 @@ function pythonToNodes(board, code) {
         const childLevel = pos < lines.length && lines[pos].indent > level ? lines[pos].indent : level + 1;
         const children = parse(childLevel);
         const body = children.length ? { DO: { block: chain(children) } } : undefined;
-        if (text === 'while True:') nodes.push({ type: forever, inputs: body });
+        // «por siempre» solo en el nivel superior: dentro de un if/def no encaja
+        // (no tiene conexión arriba) y la conversión fallaba entera.
+        if (text === 'while True:' && level === 0) nodes.push({ type: forever, inputs: body });
         else {
           const ifm = text.match(/^if (.+):$/);
           const cond = ifm ? pyCond(ifm[1]) : null;
@@ -3384,6 +3892,7 @@ const CONTAINER_TYPES = new Set([
   'microbit_forever',
   'cyberpi_forever',
   'microbit_on_start',
+  'cyberpi_on_start',
   'arduino_setup_loop',
 ]);
 
@@ -3439,6 +3948,15 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
   const [selectedBoard, setSelectedBoard] = useState(initialBoard);
   const [isConnected, setIsConnected] = useState(false);
   const [flashing, setFlashing] = useState(false); // flasheando MicroPython (WebUSB)
+  // CyberPi: ranura del menú del firmware (/flash/mainN.py) donde se guarda el programa.
+  const [ranuraCp, setRanuraCp] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem('pikt_blockly_ranura'));
+      return n >= 1 && n <= 8 ? n : 1;
+    } catch {
+      return 1;
+    }
+  });
   const [showTutorial, setShowTutorial] = useState(() => {
     try {
       return localStorage.getItem('pikt_blockly_tutorial') !== 'oculto';
@@ -3470,9 +3988,11 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
   const [codeEditMode, setCodeEditMode] = useState(false);
   const [editedCode, setEditedCode] = useState('');
   const [promptCopied, setPromptCopied] = useState(false);
+  const [aiPeticion, setAiPeticion] = useState(''); // qué quiere el alumno que haga el programa (va en el prompt)
 
   // Código efectivo: el editado a mano si está en modo edición, si no el de los bloques.
-  const effectiveCode = codeEditMode ? editedCode : generatedCode;
+  // El código pegado de la IA se limpia (```python, textos de alrededor) antes de usarlo.
+  const effectiveCode = codeEditMode ? limpiarCodigoIA(editedCode) : generatedCode;
 
   const log = useCallback((msg, type = 'info') => {
     const time = new Date().toLocaleTimeString();
@@ -3577,13 +4097,30 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     };
   }, [selectedBoard, updateCode]);
 
+  // Pantalla completa. Se usa la página entera (no solo el editor) porque los
+  // desplegables y menús de Blockly se pintan en document.body y no se verían.
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      /* el navegador no lo permite (p. ej. dentro de un iframe sin allowfullscreen) */
+    }
+  }, []);
+
   // Reajusta el lienzo de Blockly cuando cambia el tamaño/visibilidad de los paneles.
   useEffect(() => {
     const ws = workspaceRef.current;
     if (!ws) return;
     const id = requestAnimationFrame(() => Blockly.svgResize(ws));
     return () => cancelAnimationFrame(id);
-  }, [panelWidth, panelCollapsed, terminalCollapsed]);
+  }, [panelWidth, panelCollapsed, terminalCollapsed, fullscreen]);
 
   useEffect(() => {
     panelWidthRef.current = panelWidth;
@@ -4402,6 +4939,88 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     return !!(await waitForRegex(/Type "help/, 15000));
   }, []);
 
+  /* ── CyberPi por tramas: helpers ──
+     Límites del firmware 44.01 (probados en src/robot/cyberpiMbot.js):
+     · una trama con más de ~240 bytes de python se ignora o reinicia el intérprete;
+     · {"ret"} llega ANTES de que la trama termine de ejecutarse (hay que esperar un poco);
+     · las tramas corren en un hilo con 7 KB de pila: importar un programa grande lo
+       desborda → se lanza en un hilo propio con 16 KB. */
+
+  // Deja la placa lista para recibir tramas (reinicia si quedó un «por siempre» corriendo).
+  const cpPreparar = useCallback(async () => {
+    if (cyberpiNeedsResetRef.current) {
+      log('── Reiniciando la placa para cargar el nuevo programa… ──', 'info');
+      await resetCyberpi();
+      cyberpiNeedsResetRef.current = false;
+    }
+    log('── Preparando la placa… ──', 'info');
+    const probe = buildCyberpiFrame('pass');
+    for (let i = 0; i < 24; i++) {
+      serialAccumRef.current = '';
+      await writeBytes(probe);
+      await sleep(500);
+      if (/\{"ret"|\{"err"/.test(serialAccumRef.current)) return true;
+    }
+    log('(la placa tardó en responder; lo intento igualmente)', 'info');
+    return false;
+  }, [resetCyberpi, log]);
+
+  // Envía python en una trama y espera la respuesta; lanza error si la placa se queja.
+  const cpEjecutar = async (py, ms = 3000) => {
+    serialAccumRef.current = '';
+    await writeBytes(buildCyberpiFrame(py));
+    const m = await waitForRegex(/\{"(ret|err)"[^}]*\}|eval immediatly err[^\r\n]*/, ms);
+    if (!m) throw new Error('la placa no responde');
+    if (!m[0].startsWith('{"ret"')) throw new Error(m[0]);
+    await sleep(120);
+    return serialAccumRef.current;
+  };
+
+  // Tamaño de un archivo de la placa (-1 si no existe).
+  const cpTamano = async (ruta) => {
+    const out = await cpEjecutar(
+      `import os\ntry:\n    print('TAM='+str(os.stat('${ruta}')[6]))\nexcept:\n    print('TAM=-1')`
+    );
+    const m = (out.match(/TAM=(-?\d+)/) || (await waitForRegex(/TAM=(-?\d+)/, 1500)));
+    return m ? Number(m[1]) : -1;
+  };
+
+  // Primeros caracteres de un archivo de la placa.
+  const cpInicio = async (ruta, n) => {
+    const out = await cpEjecutar(`f=open('${ruta}')\nprint('INI='+f.read(${n})+'|FIN')\nf.close()`);
+    const m = out.match(/INI=([\s\S]*?)\|FIN/) || (await waitForRegex(/INI=([\s\S]*?)\|FIN/, 1500));
+    return m ? m[1] : '';
+  };
+
+  // Guarda un texto en la placa por trozos (≤ 220 bytes de python por trama) y lo verifica.
+  const cpSubirArchivo = async (ruta, texto) => {
+    const total = SERIAL_ENCODER.encode(texto).length;
+    let pos = 0;
+    let modo = 'w';
+    let trozos = 0;
+    while (pos < texto.length) {
+      let n = Math.min(170, texto.length - pos);
+      let py;
+      for (;;) {
+        py = `f=open('${ruta}','${modo}')\nf.write(${JSON.stringify(texto.slice(pos, pos + n))})\nf.close()`;
+        if (SERIAL_ENCODER.encode(py).length <= 220 || n <= 10) break;
+        n -= 10;
+      }
+      // No partir un carácter de dos mitades (emojis).
+      const c = texto.charCodeAt(pos + n - 1);
+      if (c >= 0xd800 && c <= 0xdbff) n -= 1;
+      py = `f=open('${ruta}','${modo}')\nf.write(${JSON.stringify(texto.slice(pos, pos + n))})\nf.close()`;
+      await cpEjecutar(py);
+      await sleep(250);
+      pos += n;
+      modo = 'a';
+      if (++trozos % 5 === 0) log(`   … ${Math.round((pos / texto.length) * 100)} %`, 'info');
+    }
+    const tam = await cpTamano(ruta);
+    if (tam !== total) throw new Error(`el archivo ha quedado incompleto (${tam} de ${total} bytes)`);
+    return total;
+  };
+
   // Ejecuta pyCode con exec(). En CyberPi reinicia y aprovecha la VENTANA de
   // arranque (antes del menú) inundando el exec; en micro:bit interrumpe y envía.
   const execAndWait = useCallback(
@@ -4473,25 +5092,27 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
         // CyberPi/mBot2: protocolo de mBlock (tramas F3…F4 con python). Un programa
         // con bucle «por siempre» bloquea la placa, así que para PODER cargar otro
         // reiniciamos la placa antes (deja de ejecutar y vuelve a aceptar tramas).
-        if (cyberpiNeedsResetRef.current) {
-          log('── Reiniciando la placa para cargar el nuevo programa… ──', 'info');
-          await resetCyberpi(); // espera el banner de arranque
-        }
-        // Sondea con una mini-trama hasta que el gestor de tramas responda
-        // ({"ret"...}): el arranque tras reset tarda un tiempo variable.
-        log('── Preparando la placa… ──', 'info');
-        const probe = buildCyberpiFrame('pass');
-        let ready = false;
-        for (let i = 0; i < 24 && !ready; i++) {
+        await cpPreparar();
+        if (SERIAL_ENCODER.encode(code).length <= 220) {
+          log('── Enviando al CyberPi (protocolo mBlock)… ──', 'info');
+          await writeBytes(buildCyberpiFrame(code));
+          await sleep(150);
+        } else {
+          // Programa largo: no cabe en una trama (el firmware la ignoraba en silencio).
+          // Se guarda como pikt_blk.py por trozos y se arranca en un hilo propio.
+          log('── Programa largo: subiéndolo al CyberPi por partes… ──', 'info');
+          const n = await cpSubirArchivo('pikt_blk.py', code);
+          log(`── Subido (${n} bytes). Arrancando… ──`, 'info');
           serialAccumRef.current = '';
-          await writeBytes(probe);
-          await sleep(500);
-          if (/\{"ret"|\{"err"/.test(serialAccumRef.current)) ready = true;
+          await writeBytes(
+            buildCyberpiFrame(
+              "import _thread, sys\ndef _r():\n    sys.modules.pop('pikt_blk', None)\n    import pikt_blk\n_thread.stack_size(16384)\n_thread.start_new_thread(_r, ())"
+            )
+          );
+          await sleep(1200);
+          const err = serialAccumRef.current.match(/\{"err"[^}]*\}|stack overflow|Traceback[\s\S]{0,300}/);
+          if (err) log('❌ La placa devolvió un error: ' + err[0], 'error');
         }
-        if (!ready) log('(la placa tardó en responder; lo intento igualmente)', 'info');
-        log('── Enviando al CyberPi (protocolo mBlock)… ──', 'info');
-        await writeBytes(buildCyberpiFrame(code));
-        await sleep(150);
         cyberpiNeedsResetRef.current = true; // el próximo run requerirá reinicio
       } else {
         // micro:bit: RAW REPL (Ctrl-A · código · Ctrl-D). A diferencia del REPL
@@ -4523,7 +5144,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     } finally {
       busyRef.current = false;
     }
-  }, [isConnected, effectiveCode, selectedBoard, resetCyberpi, log]);
+  }, [isConnected, effectiveCode, selectedBoard, cpPreparar, log]);
 
   // Guarda el programa en la placa como main.py para que arranque sola al encender.
   const uploadToBoard = useCallback(async () => {
@@ -4546,19 +5167,35 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     }
     busyRef.current = true;
     try {
-      log('── Guardando el programa en la placa como main.py… ──', 'info');
       if (selectedBoard === 'cyberpi') {
-        // CyberPi: escribimos main.py con una trama del protocolo (sin reiniciar).
-        serialAccumRef.current = '';
-        const py = `f = open('main.py', 'w')\nf.write(${JSON.stringify(code)})\nf.close()`;
-        await writeBytes(buildCyberpiFrame(py));
-        await sleep(700);
-        if (serialAccumRef.current.includes('err')) {
-          log('❌ La placa devolvió un error al guardar (ver «…»).', 'error');
-        } else {
-          log('✅ Programa guardado en la placa como main.py.', 'success');
+        // CyberPi: su firmware NO arranca main.py; arranca su menú, que ejecuta los
+        // programas de las ranuras 1-8 (/flash/mainN.py, las mismas que usa mBlock).
+        // Guardamos ahí, por trozos (una trama no admite más de ~220 bytes).
+        const ruta = `/flash/main${ranuraCp}.py`;
+        log(`── Guardando el programa en la ranura ${ranuraCp} del CyberPi… ──`, 'info');
+        await cpPreparar();
+        const tam = await cpTamano(ruta);
+        if (tam > 0) {
+          const ini = await cpInicio(ruta, MARCA_BLOQUES.length);
+          if (!ini.startsWith(MARCA_BLOQUES)) {
+            const ok = window.confirm(
+              `La ranura ${ranuraCp} del CyberPi ya tiene otro programa (de mBlock o de otra herramienta de Pikt).\n\n¿Sustituirlo por este? Se perderá el que había.`
+            );
+            if (!ok) {
+              log('Guardado cancelado: elige otra ranura.', 'info');
+              return;
+            }
+          }
         }
+        const n = await cpSubirArchivo(ruta, `${MARCA_BLOQUES}\n${code}\n`);
+        log(`✅ GUARDADO en la ranura ${ranuraCp} (${n} bytes).`, 'success');
+        log(
+          `En el menú del CyberPi entra en «Cambiar programa» y elige el ${ranuraCp}. ` +
+            'Desde la ranura el programa usa la pantalla entera y sigue funcionando sin cable.',
+          'info'
+        );
       } else {
+        log('── Guardando el programa en la placa como main.py… ──', 'info');
         // micro:bit: por REPL, verificando el tamaño escrito.
         const py =
           `import os\nf = open('main.py', 'w')\nf.write(${JSON.stringify(code)})\nf.close()\n` +
@@ -4572,7 +5209,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     } finally {
       busyRef.current = false;
     }
-  }, [isConnected, selectedBoard, effectiveCode, execAndWait, log]);
+  }, [isConnected, selectedBoard, effectiveCode, execAndWait, cpPreparar, ranuraCp, log]);
 
   // Borra main.py (quita el autoarranque) para que la placa vuelva a iniciar limpia.
   const deleteMainPy = useCallback(async () => {
@@ -4587,14 +5224,22 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     }
     busyRef.current = true;
     try {
-      log('── Borrando el autoarranque (main.py) de la placa… ──', 'info');
       if (selectedBoard === 'cyberpi') {
-        await writeBytes(
-          buildCyberpiFrame("import os\ntry:\n    os.remove('main.py')\nexcept:\n    pass")
-        );
-        await sleep(500);
-        log('✅ Orden de borrar main.py enviada al CyberPi.', 'success');
+        // Solo vacía ranuras guardadas por este editor (nunca un programa de mBlock).
+        const ruta = `/flash/main${ranuraCp}.py`;
+        log(`── Vaciando la ranura ${ranuraCp} del CyberPi… ──`, 'info');
+        await cpPreparar();
+        if ((await cpTamano(ruta)) <= 0) {
+          log(`La ranura ${ranuraCp} ya estaba vacía.`, 'info');
+        } else if (!(await cpInicio(ruta, MARCA_BLOQUES.length)).startsWith(MARCA_BLOQUES)) {
+          log(`La ranura ${ranuraCp} tiene un programa que no es del editor de bloques: no se toca (bórralo desde mBlock).`, 'error');
+        } else {
+          await cpEjecutar(`import os\nos.remove('${ruta}')`);
+          await sleep(200);
+          log(`✅ Ranura ${ranuraCp} vaciada.`, 'success');
+        }
       } else {
+        log('── Borrando el autoarranque (main.py) de la placa… ──', 'info');
         const py =
           "import os\ntry:\n    os.remove('main.py')\n    print('DEL_RESULT=BORRADO')\nexcept Exception:\n    print('DEL_RESULT=NADA')";
         const m = await execAndWait(py, /DEL_RESULT=(BORRADO|NADA)/, 8);
@@ -4607,17 +5252,22 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     } finally {
       busyRef.current = false;
     }
-  }, [isConnected, selectedBoard, execAndWait, log]);
+  }, [isConnected, selectedBoard, execAndWait, cpPreparar, ranuraCp, log]);
 
   // Copia un prompt (con el código actual) para editarlo con IA en Claude/Gemini.
   const copyAIPrompt = useCallback(() => {
-    const prompt = buildAIPrompt(selectedBoard, effectiveCode);
+    const prompt = buildAIPrompt(selectedBoard, effectiveCode, aiPeticion);
     navigator.clipboard?.writeText(prompt).then(() => {
       setPromptCopied(true);
       setTimeout(() => setPromptCopied(false), 2500);
-      log('Prompt copiado: pégalo en Claude o Gemini, pide tu cambio y pega el código resultante con ✏️ Editar.', 'info');
+      log(
+        aiPeticion.trim()
+          ? 'Prompt copiado: pégalo en Gemini o Claude, copia el código que te devuelva y pégalo con ✏️ Editar (puedes pegar la respuesta entera: se limpia sola).'
+          : 'Prompt copiado, pero sin decir qué quieres: escríbelo en el cuadro de arriba (o cambia «[ESCRIBE AQUÍ…]» en Gemini antes de enviarlo).',
+        aiPeticion.trim() ? 'info' : 'error'
+      );
     });
-  }, [selectedBoard, effectiveCode, log]);
+  }, [selectedBoard, effectiveCode, aiPeticion, log]);
 
   // Activa el modo de edición manual del código (para pegar el código de la IA).
   const enterCodeEdit = useCallback(() => {
@@ -4630,7 +5280,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
   const convertToBlocks = useCallback(() => {
     const ws = workspaceRef.current;
     if (!ws) return;
-    const state = codeToState(selectedBoard, editedCode);
+    const state = codeToState(selectedBoard, limpiarCodigoIA(editedCode));
     if (!state) {
       log('No hay código para convertir a bloques.', 'error');
       return;
@@ -4669,6 +5319,15 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
           <h2 style={styles.title}>Editor de Bloques · Robótica</h2>
         </div>
         <div style={styles.controls}>
+          {typeof document !== 'undefined' && document.fullscreenEnabled && (
+            <button
+              onClick={toggleFullscreen}
+              style={{ ...styles.btn, background: '#334155' }}
+              title={fullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+            >
+              {fullscreen ? '🗗 Salir' : '⛶ Pantalla completa'}
+            </button>
+          )}
           <button
             onClick={() => setShowLibrary(true)}
             style={{ ...styles.btn, background: '#7c3aed' }}
@@ -4777,9 +5436,25 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
             ▶ Ejecutar Código
           </button>
 
-          {/* En CyberPi el firmware siempre arranca a su menú: main.py no autoarranca,
-              así que estos botones solo se ofrecen para micro:bit (donde sí funciona). */}
-          {baseBoard(selectedBoard) === 'microbit' && (
+          {/* micro:bit: main.py autoarranca. CyberPi: su firmware arranca a su menú, así que
+              se guarda en una de sus 8 ranuras («Cambiar programa»). */}
+          {selectedBoard === 'cyberpi' && (
+            <select
+              value={ranuraCp}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setRanuraCp(n);
+                try { localStorage.setItem('pikt_blockly_ranura', String(n)); } catch { /* sin almacenamiento */ }
+              }}
+              style={{ ...styles.btn, background: '#fff7ed', color: '#9a3412', border: '1px solid #fdba74' }}
+              title="Ranura del menú del CyberPi («Cambiar programa») donde se guarda el programa"
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                <option key={n} value={n}>Ranura {n}</option>
+              ))}
+            </select>
+          )}
+          {(baseBoard(selectedBoard) === 'microbit' || selectedBoard === 'cyberpi') && (
             <button
               onClick={uploadToBoard}
               disabled={!isConnected}
@@ -4788,13 +5463,13 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 background: isConnected ? '#ea580c' : '#94a3b8',
                 cursor: isConnected ? 'pointer' : 'not-allowed',
               }}
-              title="Guardar el programa en la placa (main.py) para que arranque sola al encender"
+              title={selectedBoard === 'cyberpi' ? 'Guardar el programa en la ranura elegida del CyberPi (funciona sin cable)' : 'Guardar el programa en la placa (main.py) para que arranque sola al encender'}
             >
               📥 Guardar en placa
             </button>
           )}
 
-          {baseBoard(selectedBoard) === 'microbit' && (
+          {(baseBoard(selectedBoard) === 'microbit' || selectedBoard === 'cyberpi') && (
             <button
               onClick={deleteMainPy}
               disabled={!isConnected}
@@ -4803,9 +5478,9 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 background: isConnected ? '#475569' : '#94a3b8',
                 cursor: isConnected ? 'pointer' : 'not-allowed',
               }}
-              title="Quitar el autoarranque (borrar main.py)"
+              title={selectedBoard === 'cyberpi' ? 'Vaciar la ranura elegida (solo si la guardó este editor)' : 'Quitar el autoarranque (borrar main.py)'}
             >
-              🧹 Borrar autoarranque
+              {selectedBoard === 'cyberpi' ? '🧹 Vaciar ranura' : '🧹 Borrar autoarranque'}
             </button>
           )}
 
@@ -4912,6 +5587,15 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 <textarea
                   value={editedCode}
                   onChange={(e) => setEditedCode(e.target.value)}
+                  onPaste={(e) => {
+                    // Si se pega la respuesta entera de la IA (con ```), se queda solo el código.
+                    const txt = e.clipboardData?.getData('text') || '';
+                    if (txt.includes('```')) {
+                      e.preventDefault();
+                      setEditedCode(limpiarCodigoIA(txt));
+                      log('Código de la IA pegado (he quitado el texto y las marcas ```).', 'info');
+                    }
+                  }}
                   spellCheck={false}
                   style={styles.codeTextarea}
                   placeholder="Pega aquí el código que te ha devuelto la IA…"
@@ -4922,6 +5606,13 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 </pre>
               )}
 
+              <textarea
+                value={aiPeticion}
+                onChange={(e) => setAiPeticion(e.target.value)}
+                rows={2}
+                placeholder="🤖 ¿Qué quieres que haga el programa? Ej.: «si el ultrasonidos ve algo a menos de 15 cm, para, pita y gira a la derecha»"
+                style={{ width: '100%', boxSizing: 'border-box', marginTop: 8, padding: '6px 8px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+              />
               <button onClick={copyAIPrompt} style={styles.promptBtn}>
                 {promptCopied ? '✅ ¡Prompt copiado!' : '🤖 Copiar prompt para editar con IA'}
               </button>
@@ -4942,7 +5633,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
               codigo={generatedCode}
               cargar={cargarEstadoBloques}
               conectada={isConnected}
-              onGuardar={uploadToBoard}
+              onGuardar={runCode}
               recorridos={RECORRIDOS_MBOT2}
               color={COLOR_MBOT2}
               lsKey="pikt_tutorial_mbot2"

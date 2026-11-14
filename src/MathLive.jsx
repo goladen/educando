@@ -14,6 +14,7 @@ import startSoundFile from './assets/inicio-juego.mp3';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import { nombreSeguro } from './utils/filtroNombres';
 
 // --- AUDIOS (PRE-CARGADOS PARA EVITAR LAG) ---
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
@@ -689,7 +690,7 @@ function MathLiveClient({ codigoSala, usuario, onExit }) {
         return newId;
     }, [usuario]);
     const myUid = usuario?.uid || guestId;
-    const myName = usuario?.displayName || "Invitado";
+    const myName = nombreSeguro(usuario?.displayName, "Invitado");
 
     useEffect(() => {
         const unsubscribe = onSnapshot(doc(db, "live_games", codigoSala), async (docSnap) => {

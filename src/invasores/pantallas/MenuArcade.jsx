@@ -210,7 +210,7 @@ export default function MenuArcade({
                   : 'Ejercicios de las fichas de Math World: cada respuesta posible viaja en una nave.'}
               </p>
               <Suspense fallback={<p className="font-arcade text-[10px] text-slate-400">CARGANDO EJERCICIOS…</p>}>
-                <SelectorMatesMandos numerico={variante === 'DISPARA'} apiRef={apiMatesRef} temasIniciales={fuente.temas} nivelInicial={fuente.nivel} />
+                <SelectorMatesMandos numerico={variante === 'DISPARA'} apiRef={apiMatesRef} temasIniciales={fuente.temas} nivelInicial={fuente.nivel} tiposIniciales={fuente.tipos} />
               </Suspense>
             </div>
           )}

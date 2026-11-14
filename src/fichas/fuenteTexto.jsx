@@ -175,6 +175,7 @@ export const crearFuente = (def) => {
     // 'frac' y 'texto' usan una casilla de texto libre; 'num' el teclado numérico
     const respuestas = (ap) => (ap.r || []).map(q => ({
         etiqueta: q.etiqueta, unidad: q.unidad, opciones: q.opciones, comprobar: comprobador(q), v: q.v, clase: q.tipo,
+        vTxt: q.vTxt, distractores: q.distractores, // textos ya formateados (cambio de unidades): mejores opciones en los juegos
         tipo: q.tipo === 'opcion' ? 'opcion' : q.tipo === 'num' ? 'num' : 'frac',
         placeholder: q.placeholder || (q.tipo === 'texto' ? 'escribe aquí' : undefined),
     }));

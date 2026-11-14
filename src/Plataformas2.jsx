@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { db } from './firebase';
 import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
@@ -785,6 +786,7 @@ function ModalEnviarProfeBase({ datos, onClose }) {
   const enviar = async () => {
     const code = codigo.trim().toUpperCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     if (!code) { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');
     try {

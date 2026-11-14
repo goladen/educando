@@ -17,6 +17,7 @@ const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
 const CompeticionPublica = lazy(() => import('./components/CompeticionPublica'));
 const PaginaBanco = lazy(() => import('./bancoRecursos/PaginaBanco'));
 const HojaInteractiva = lazy(() => import('./ecuaciones/HojaInteractiva'));
+const ElegirJuegoFicha = lazy(() => import('./components/ElegirJuegoFicha'));
 const QuienEsQuien = lazy(() => import('./QuienEsQuien'));
 const QuizManos = lazy(() => import('./manos/QuizManos.jsx'));
 const AvatarCuerpo = lazy(() => import('./cuerpo/AvatarCuerpo.jsx'));
@@ -75,6 +76,8 @@ function App() {
     const [rutaPublica, setRutaPublica] = useState(null);
     const [vqRecurso, setVqRecurso] = useState(null); // ?vq=ID deep link for VTE VideoQuizz
     const [hojaFqId, setHojaFqId] = useState(null); // ?hojafq=ID hoja interactiva de Física y Química
+    const [fichaElegir, setFichaElegir] = useState(null); // ?fc=CÓDIGO: elegir a qué jugar con las preguntas de la ficha
+    const [invasoresFicha, setInvasoresFicha] = useState(null); // { recurso, variante } Invasión Pi con las preguntas de una ficha
 
     // ESTADOS PARA UBICACIÓN
     const [pais, setPais] = useState("");
@@ -225,9 +228,7 @@ function App() {
         // Código de una ficha PDF (/?fc=FXXXXXX): mismas preguntas y mismo orden que en el papel
         const codigoFicha = params.get('fc');
         if (codigoFicha) {
-            import('./utils/fichaCodigo').then(m => m.abrirCodigoFicha(codigoFicha)).then(res => {
-                if (res?.recurso) setDeepLinkGame({ recurso: res.recurso, hoja: 'General', modoInicial: res.modo || null });
-            }).catch(e => { console.error('Ficha por código:', e); alert(e.message || 'No se pudo abrir la ficha.'); });
+            import('./utils/fichaCodigo').then(m => m.abrirCodigoFicha(codigoFicha)).then(f => setFichaElegir(f)).catch(e => { console.error('Ficha por código:', e); alert(e.message || 'No se pudo abrir la ficha.'); });
             return;
         }
         const recursoId = params.get('r');
@@ -433,6 +434,15 @@ function App() {
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;
 
+    // Código de una ficha PDF: elegir el juego (mismas preguntas, mismo orden)
+    if (invasoresFicha) return <Suspense fallback={null}><InvasoresArcade recurso={invasoresFicha.recurso} varianteInicial={invasoresFicha.variante} onExit={() => { setInvasoresFicha(null); window.history.pushState({}, '', '/'); }} /></Suspense>;
+    if (fichaElegir && !deepLinkGame) return <Suspense fallback={null}><ElegirJuegoFicha ficha={fichaElegir}
+        onSalir={() => { setFichaElegir(null); window.history.pushState({}, '', '/'); }}
+        onElegir={(a) => {
+            if (a.tipo === 'ENLACE') { import('./utils/fichaCodigo').then(m => m.irAEnlace(a.enlace, a.extra)); return; }
+            if (a.tipo === 'INVASORES') { setInvasoresFicha({ recurso: a.recurso, variante: a.variante }); return; }
+            setDeepLinkGame({ recurso: a.recurso, hoja: 'General', modoInicial: a.modo || null });
+        }} /></Suspense>;
     if (hojaFqId) return <Suspense fallback={null}><HojaInteractiva hojaId={hojaFqId} onSalir={() => { setHojaFqId(null); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (vqRecurso) return <VideoQuizzApp recursoDirecto={vqRecurso} onBack={() => { setVqRecurso(null); window.history.pushState({}, '', '/'); }} />;
 

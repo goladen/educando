@@ -2,6 +2,7 @@
 // Integrar en LandingGames3: import OmninteractiveApp from './OmninteractiveApp';
 // Añadir case 'OMNINTERACTIVE': return <OmninteractiveApp onBack={handleBack} />;
 // El componente acepta prop: onBack (función para volver al menú principal)
+import { validarNombre } from './utils/filtroNombres';
 import FotoARecurso from './FotoARecurso';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -805,6 +806,7 @@ function ModalEnviarOmni({ recurso, resultados, onClose }) {
 
   const enviar = async () => {
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     const code = codigo.trim().toUpperCase();
     if (!code) { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');

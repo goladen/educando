@@ -75,11 +75,15 @@ export function recursoDeFicha(ficha) {
     return { ...r, config: { ...(r.config || {}), aleatorio: false }, ordenFicha: ficha.codigo };
 }
 
-/** Abre la ficha: o el enlace del juego, o el recurso congelado. Devuelve { recurso, modo } o redirige. */
+/** Lee la ficha de un código para elegir a qué jugar (ElegirJuegoFicha). Lanza error si no existe. */
 export async function abrirCodigoFicha(codigo) {
     const f = await leerCodigoFicha(codigo);
     if (!f) throw new Error('No existe ninguna ficha con ese código.');
-    if (f.recurso) return { recurso: recursoDeFicha(f), modo: f.modo || null };
-    if (f.enlace) { window.location.href = `${window.location.origin}${f.enlace.startsWith('/') ? '' : '/'}${f.enlace}`; return null; }
-    throw new Error('Esta ficha no se puede abrir.');
+    if (!f.recurso && !f.enlace) throw new Error('Esta ficha no se puede abrir.');
+    return f;
 }
+
+export const irAEnlace = (enlace, extra = '') => {
+    const ruta = `${enlace.startsWith('/') ? '' : '/'}${enlace}`;
+    window.location.href = `${window.location.origin}${ruta}${extra ? (ruta.includes('?') ? '&' : '?') + extra : ''}`;
+};

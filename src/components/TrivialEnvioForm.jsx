@@ -1,3 +1,4 @@
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, doc, getDoc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -166,6 +167,7 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
     const enviar = async () => {
         setError('');
         if (!nombre.trim()) { setError('Escribe tu nombre antes de enviar.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         for (let i = 0; i < preguntas.length; i++) {
             const p = preguntas[i];
             const n = i + 1;

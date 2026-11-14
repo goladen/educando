@@ -38,7 +38,7 @@ import { TIPO_JUEGO } from './pantallas/ModalEnviarProfe';
 import { conSemilla, nuevaSemilla } from '../utils/semilla';
 import {
   fuenteSerializable, codificarFicha, decodificarFicha, enlaceFicha, fichaDeUrl, resolverFicha,
-  fichasRecientes, guardarFichaReciente, olvidarFichaReciente,
+  fichasRecientes, guardarFichaReciente, olvidarFichaReciente, recursoDePreguntas,
 } from './fichaEnlace';
 import { BTN, NEON, TITULO_NEON } from './tema';
 
@@ -66,10 +66,11 @@ function construirMazo(cfg, apiMates) {
   const { fuente, variante } = cfg;
   const resp = respuestaMandos(cfg);
   // «Elegir siempre»: las preguntas de escribir también se responden con A-D
-  const elegir = variante === 'DISPARA' && cfg.escribir === 'elegir' && !resp;
+  // Con ficha vinculada, el Filtro también admite sus preguntas de escribir (se les ponen opciones sin azar)
+  const elegir = (variante === 'DISPARA' && cfg.escribir === 'elegir' && !resp) || (variante === 'FILTRO' && !!cfg.ficha);
   const filtrar = (lista) => {
-    const l = resp ? jugablesConMandos(jugables(lista, variante), variante, resp) : jugables(lista, variante);
-    return elegir ? paraElegir(l) : l;
+    const l0 = elegir ? paraElegir(lista) : lista;
+    return resp ? jugablesConMandos(jugables(l0, variante), variante, resp) : jugables(l0, variante);
   };
   const aviso = resp ? ' con los mandos' : '';
   // Partida vinculada a una ficha PDF: sus preguntas, en su orden (y al acabarlas, otra vuelta igual)
@@ -155,23 +156,37 @@ function actualizarRecord(cfg, puntos) {
 }
 
 // ?mates=expresiones,polinomios&nivel=2 → arranca con Math World y esos temas (enlace desde Álgebra)
+// ?mates=unidades&nivel=1&tipos=longitud,masa → solo esos tipos (enlace desde Cambio de unidades)
 function configDesdeUrl() {
   try {
     const q = new URLSearchParams(window.location.search);
     const temas = (q.get('mates') || '').split(',').map((t) => t.trim()).filter(Boolean);
     if (!temas.length) return null;
     const nivel = Number(q.get('nivel'));
-    return { fuente: { tipo: 'MATES', temas, ...([1, 2, 3].includes(nivel) ? { nivel } : {}) } };
+    // &tipos=longitud,masa → solo esos tipos de los temas (p. ej. desde Cambio de unidades)
+    const tipos = (q.get('tipos') || '').split(',').map((t) => t.trim()).filter(Boolean);
+    return { fuente: { tipo: 'MATES', temas, ...([1, 2, 3].includes(nivel) ? { nivel } : {}), ...(tipos.length ? { tipos } : {}) } };
   } catch { return null; }
 }
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-export default function InvasoresArcade({ onExit, recurso = null }) {
+// recurso.ordenFicha (código de una ficha PDF, /?fc=): la partida queda vinculada a sus preguntas, en su orden
+function configDeRecurso(recurso, varianteInicial) {
+  const fuente = { tipo: 'RECURSO', recurso };
+  const variante = varianteInicial === 'FILTRO' ? 'FILTRO' : 'DISPARA';
+  if (!recurso.ordenFicha) return { fuente, ...(varianteInicial ? { variante } : {}) };
+  return {
+    fuente, variante,
+    ficha: { codigo: null, codigoCorto: recurso.ordenFicha, semilla: 0, titulo: recurso.titulo || '', preguntas: numerar(desdeRecurso(recurso)), enlace: null },
+  };
+}
+
+export default function InvasoresArcade({ onExit, recurso = null, varianteInicial = null }) {
   useFuentesArcade();
   const raizRef = useRef(null);
   const layout = useLayoutJugadores();
-  const [s, dispatch] = useArcadeState(recurso ? { fuente: { tipo: 'RECURSO', recurso } } : configDesdeUrl());
+  const [s, dispatch] = useArcadeState(recurso ? configDeRecurso(recurso, varianteInicial) : configDesdeUrl());
   const { config, fase, jugadores } = s;
   const variante = VARIANTES[config.variante];
   const respMandos = respuestaMandos(config);
@@ -473,8 +488,12 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
     setCargandoFicha(true);
     try {
       const { fuente, apiMates } = await resolverFicha(ficha);
-      const cfg = { ...configRef.current, variante: ficha.v === 'FILTRO' ? 'FILTRO' : 'DISPARA', fuente, mandos: !!ficha.m, mandosRespuesta: ficha.mr || 'letras' };
-      const preguntas = preguntasConSemilla(cfg, apiMates, ficha.s, ficha.n);
+      // ?var=FILTRO|DISPARA: se eligió otra variante al abrir el código de la ficha (mismas preguntas)
+      let v = ficha.v;
+      try { v = new URLSearchParams(window.location.search).get('var') || v; } catch { /* nada */ }
+      const cfg = { ...configRef.current, variante: v === 'FILTRO' ? 'FILTRO' : 'DISPARA', fuente, mandos: !!ficha.m, mandosRespuesta: ficha.mr || 'letras' };
+      // Las preguntas se regeneran con la variante de la ficha (la semilla las fija); la variante de juego puede ser otra
+      const preguntas = preguntasConSemilla({ ...cfg, variante: ficha.v === 'FILTRO' ? 'FILTRO' : 'DISPARA' }, apiMates, ficha.s, ficha.n);
       if (!preguntas.length) throw new Error('No se han podido recuperar las preguntas de esta ficha.');
       setError('');
       dispatch({ type: 'CONFIG', config: {
@@ -522,7 +541,10 @@ export default function InvasoresArcade({ onExit, recurso = null }) {
     if (ficha && !ficha.codigoCorto) {
       const { crearCodigoFicha } = await import('../utils/fichaCodigo');
       const largo = ficha.codigo;
-      const corto = await crearCodigoFicha({ juego: 'INVASORES', titulo: ficha.titulo || 'Invasión Pi', enlace: (c) => `/invasores?ficha=${largo}&cf=${c}` });
+      // Copia de las preguntas (en orden) para poder jugarlas también en otros juegos (salvo Math World,
+      // cuyos enunciados son dibujos)
+      const copia = cfg.fuente?.tipo === 'MATES' ? null : recursoDePreguntas(preguntas, ficha.titulo || tituloPartida(cfg));
+      const corto = await crearCodigoFicha({ juego: 'INVASORES', titulo: ficha.titulo || 'Invasión Pi', enlace: (c) => `/invasores?ficha=${largo}&cf=${c}`, recurso: copia });
       if (corto) { ficha = { ...ficha, codigoCorto: corto }; nuevoCorto = true; }
     }
     const { generarPdfInvasores } = await import('./pdfInvasores');

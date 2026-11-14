@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { validarNombre } from './utils/filtroNombres';
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Share2, Check } from 'lucide-react';
@@ -43,6 +44,7 @@ function ModalEnviarProfeBase({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {
@@ -491,6 +493,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
     // =========================================================
     const guardarPuntuacion = async () => {
         if (!playerName.trim()) return alert("Escribe tu nombre");
+        if (!validarNombre(playerName).ok) return alert(validarNombre(playerName).mensaje);
         setGuardando(true);
         try {
             const isGuest = !usuario || !usuario.email;

@@ -82,6 +82,8 @@ function distractoresTexto(txt) {
 }
 
 function textoCorrecto(q) {
+  // la fuente ya trae la respuesta escrita como se lee (p. ej. «3 500», «π/3»)
+  if (q.vTxt && aceptada(q, q.vTxt)) return q.vTxt;
   let cands;
   if (q.tipo === 'opcion') cands = (q.opciones || []).filter((o) => o === q.v);
   else if (esTexto(q)) cands = [].concat(q.v).map(String);
@@ -93,6 +95,11 @@ function textoCorrecto(q) {
 
 function opcionesFalsas(q, correcta, pool) {
   let otras;
+  // Distractores propios de la fuente (errores típicos: ×10 en vez de ÷10…) primero
+  if (q.distractores?.length) {
+    const propios = barajar(q.distractores.filter((o) => o !== correcta && !aceptada(q, o)));
+    if (propios.length >= 3) return propios.slice(0, 3);
+  }
   if (q.tipo === 'opcion') otras = barajar((q.opciones || []).filter((o) => o !== correcta));
   else if (esTexto(q)) otras = [...barajar(pool), ...distractoresTexto(correcta)];
   else if (esFraccion(q)) otras = distractoresFrac(aFraccion(q.v));
@@ -127,7 +134,7 @@ function aPregunta(fuente, ap, { numerico, maxNum, pool = [] }) {
   const opciones = barajar([correcta, ...otras]);
   return {
     ...base,
-    opciones: opciones.map((o) => (q.unidad ? `${o} ${q.unidad}` : o)),
+    opciones: opciones.map((o) => (q.unidad ? `${o}${['°', "'", '"'].includes(q.unidad) ? '' : ' '}${q.unidad}` : o)),
     correcta: opciones.indexOf(correcta),
   };
 }

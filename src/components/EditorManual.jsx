@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle, ArrowUp, ArrowDown } from 'lucide-react'; // <--- AÑADIDO HelpCircle
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase'; // Asegúrate de importar db
@@ -142,48 +142,52 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
         }));
     }, []);
     // --- NUEVO: RECOGER PREGUNTAS DEL BUZÓN ---
+    // Ids de mail_questions ya añadidos al editor. NO se borran del buzón al abrir, sino al guardar
+    // con éxito: si el profe cierra sin guardar, las preguntas siguen ahí la próxima vez.
+    const mailsPendientesRef = useRef([]);
     useEffect(() => {
-        const cargarPreguntasDelBuzon = async () => {
-            if (!datos.id) return; // Si es nuevo no tiene ID aún
-
+        if (!datos.id) return; // Si es nuevo no tiene ID aún
+        // En desarrollo (StrictMode) el efecto se ejecuta dos veces: la ejecución anulada no añade nada
+        let cancelado = false;
+        (async () => {
             try {
-                // Buscamos correos pendientes para este recurso
                 const q = query(collection(db, "mail_questions"), where("recursoId", "==", datos.id));
                 const snap = await getDocs(q);
-
-                if (!snap.empty) {
-                    const nuevasHojas = [...datos.hojas];
-                    let seEncontraronCosas = false;
-
-                    // Procesamos cada paquete recibido
-                    for (const docMail of snap.docs) {
-                        const paquete = docMail.data();
-                        const idx = paquete.hojaIndex;
-
-                        if (nuevasHojas[idx]) {
-                            // Añadimos las preguntas al editor visual
-                            nuevasHojas[idx].preguntas.push(...paquete.preguntas);
-                            seEncontraronCosas = true;
-
-                            // Borramos el correo del buzón para no duplicarlo la próxima vez
-                            // (Solo el profesor puede borrar, así que esto es seguro)
-                            await deleteDoc(doc(db, "mail_questions", docMail.id));
-                        }
+                if (cancelado || snap.empty) return;
+                const yaAnadidos = new Set(mailsPendientesRef.current);
+                const nuevos = snap.docs.filter(d => !yaAnadidos.has(d.id) && datos.hojas[parseInt(d.data().hojaIndex)]);
+                if (!nuevos.length) return;
+                mailsPendientesRef.current = [...mailsPendientesRef.current, ...nuevos.map(d => d.id)];
+                // Copia nueva de cada hoja (antes se hacía push sobre el array del estado)
+                setDatos(prev => {
+                    const hojas = prev.hojas.map(h => ({ ...h, preguntas: [...(h.preguntas || [])] }));
+                    for (const d of nuevos) {
+                        const paquete = d.data();
+                        const idx = parseInt(paquete.hojaIndex);
+                        if (hojas[idx]) hojas[idx].preguntas.push(...(paquete.preguntas || []));
                     }
-
-                    if (seEncontraronCosas) {
-                        setDatos(prev => ({ ...prev, hojas: nuevasHojas }));
-                        alert("📬 ¡Has recibido nuevas preguntas de alumnos! Se han añadido a la lista.");
-                    }
-                }
+                    return { ...prev, hojas };
+                });
+                alert("📬 ¡Has recibido nuevas preguntas de alumnos! Se han añadido a la lista. Revísalas y pulsa Guardar para quedártelas.");
             } catch (e) {
                 console.error("Error cargando buzón:", e);
             }
-        };
-
-        cargarPreguntasDelBuzon();
+        })();
+        return () => { cancelado = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [datos.id]); // Se ejecuta al abrir un recurso con ID
+
+    // Guardar y, si fue bien, vaciar del buzón los paquetes que ya están en el recurso
+    const guardar = async (extra) => {
+        const ok = await onSave(extra);
+        if (ok && mailsPendientesRef.current.length) {
+            const ids = mailsPendientesRef.current;
+            mailsPendientesRef.current = [];
+            await Promise.all(ids.map(id => deleteDoc(doc(db, "mail_questions", id))
+                .catch(e => console.error("No se pudo borrar del buzón", id, e))));
+        }
+        return ok;
+    };
 
 
     // --- MANEJO DE HOJAS ---
@@ -517,7 +521,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         <PiTutorial usuario={usuario} tutorialId="crear_recurso" pasos={TUTORIAL_CREAR_RECURSO} inline={true} />
 
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración"><Settings size={24} /></button>
-                        <button onClick={() => datos.isFinished ? onSave() : setModalPublicar('guardar')} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>
+                        <button onClick={() => datos.isFinished ? guardar() : setModalPublicar('guardar')} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>
                         <button onClick={() => setMostrandoAvisoCierre(true)} style={styles.iconBtn}><X size={24} /></button>
 
                     </div>
@@ -767,11 +771,11 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                     <PublicarModal
                         modo={modalPublicar}
                         onGuardarPublicar={async () => {
-                            await onSave({ isFinished: true });
+                            await guardar({ isFinished: true });
                             setDatos(prev => ({ ...prev, isFinished: true }));
                             setModalPublicar(null);
                         }}
-                        onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
+                        onGuardarSolo={async () => { await guardar(); setModalPublicar(null); }}
                         onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
                         onCancelar={() => setModalPublicar(null)}
                     />
@@ -791,7 +795,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     {!datos.isFinished && (
                                         <button
                                             onClick={async () => {
-                                                await onSave({ isFinished: true });
+                                                await guardar({ isFinished: true });
                                                 setDatos(prev => ({ ...prev, isFinished: true }));
                                                 onClose();
                                             }}
@@ -804,7 +808,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     {/* Guardar y Salir */}
                                     <button
                                         onClick={async () => {
-                                            await onSave();
+                                            await guardar();
                                             onClose();
                                         }}
                                         style={{ width: '100%', padding: '12px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}

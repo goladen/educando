@@ -703,6 +703,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'UNIDADES') return (
+                                    <FraccionesCard titulo="Cambio de unidades" emoji="🔁"
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'FRACCIONES') return (
                                     <FraccionesCard
                                         key={inf.id} inf={inf}
@@ -2286,7 +2298,7 @@ const NIVEL_FRAC_LABEL = { 1: '👶 Fácil', 2: '🤓 Medio', 3: '🔥 Difícil'
 // Chip de "reto por enlace" (jugadores[0].reto = título del reto)
 const ChipReto = ({ reto }) => reto ? <span style={{ marginLeft:8, padding:'1px 8px', borderRadius:20, background:'#eef4fb', color:'#1565C0', fontSize:'0.72rem', fontWeight:700 }}>🎯 {reto}</span> : null;
 
-const FraccionesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+const FraccionesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador, titulo = 'Fracciones', emoji = '🍰' }) => {
     const [confirmar, setConfirmar] = useState(false);
     const [expandido, setExpandido] = useState(false);
     const j = (inf.jugadores || [])[0] || {};
@@ -2310,10 +2322,10 @@ const FraccionesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, sel
                 {modoSeleccion && (
                     <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
                 )}
-                <span style={{ fontSize:'1.4rem' }}>🍰</span>
+                <span style={{ fontSize:'1.4rem' }}>{emoji}</span>
                 <div style={{ flex:1, minWidth:100 }}>
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
-                        Fracciones
+                        {titulo}
                         {puntos > 0 && <span style={{ marginLeft:8, fontWeight:400, color:'#7b1fa2', fontSize:'0.8rem' }}>🏆 {puntos} pts</span>}
                         <ChipReto reto={j.reto} />
                     </div>

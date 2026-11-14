@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import { useState, useEffect, useRef, memo } from 'react';
 import { db } from './firebase';
 import { factorLetra } from './utils/encajeTexto';
@@ -691,6 +692,7 @@ function ModalEnviarProfePiLive({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

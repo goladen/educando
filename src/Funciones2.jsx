@@ -9,6 +9,7 @@ import piNeutral from './assets/Pi-neutro.png';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { validarNombre, nombreSeguro } from './utils/filtroNombres';
 
 // ─── CONSTANTES DEL CANVAS ────────────────────────────────────────────────────
 const CS = 420;            // tamaño canvas px
@@ -2438,7 +2439,7 @@ function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
     const [myRank, setMyRank]         = useState(null);
     const [forceCheck, setForceCheck] = useState(null); // timestamp del último forceCheck silencioso
     const joiningRef = useRef(false);
-    const myName = usuario?.displayName || 'Alumno';
+    const myName = nombreSeguro(usuario?.displayName, 'Alumno');
     const myUid  = useRef(usuario?.uid || 'guest_' + Math.random().toString(36).substr(2,8)).current;
 
     const prevEstadoRef = useRef(null);
@@ -2885,6 +2886,7 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
         const code = joinCode.trim().toUpperCase();
         if (code.length !== 6) return alert('El código debe tener 6 caracteres.');
         if (!joinName.trim()) return alert('Introduce tu nombre antes de unirte.');
+        if (!validarNombre(joinName).ok) return alert(validarNombre(joinName).mensaje);
         const userObj = { displayName: joinName.trim(), uid: 'guest_' + Math.random().toString(36).substr(2,8) };
         if (onClientJoin) onClientJoin(code);
         else { setInternalClientUser(userObj); setInternalClient(code); }

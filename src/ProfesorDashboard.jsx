@@ -696,6 +696,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
             setMostrandoEditorOlympic(false);
             setMostrandoEditorSintaxis(false);
             cargarRecursosPropios();
+            return true; // el editor manual borra el buzón de preguntas de alumnos solo si se guardó
         } catch (e) {
             console.error(e);
             alert("Error al guardar: " + e.message);

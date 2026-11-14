@@ -79,6 +79,20 @@ export async function resolverFicha(ficha) {
   throw new Error('Esta ficha no se puede abrir en el juego.');
 }
 
+/** Preguntas de la partida (formato interno) → recurso de una hoja, en el mismo orden, para el código
+ *  de la ficha (utils/fichaCodigo.js): así se pueden jugar también en Luz roja, Burbujas, Test… */
+export function recursoDePreguntas(preguntas, titulo = 'Invasión Pi') {
+  const lista = (preguntas || []).filter((p) => String(p.enunciado || '').trim() && String(p.correcta ?? '').trim()).map((p) => {
+    const mal = (p.opciones || []).filter((o) => String(o) !== String(p.correcta)).slice(0, 3);
+    return mal.length && p.respuesta !== 'texto'
+      ? { pregunta: p.enunciado, respuesta: String(p.correcta), incorrectas: mal.map(String) }
+      : { tipo: 'SIMPLE', pregunta: p.enunciado, respuesta: String(p.correcta) };
+  });
+  if (!lista.length) return null;
+  const t = String(titulo || 'Invasión Pi').slice(0, 120);
+  return { titulo: t, tipoJuego: 'CAZABURBUJAS', hojas: [{ nombreHoja: t, preguntas: lista }] };
+}
+
 // ── Fichas impresas en este equipo (para volver a jugarlas otro día sin escanear el QR) ──
 export function fichasRecientes() {
   try {

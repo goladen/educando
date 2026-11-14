@@ -23,8 +23,11 @@ export default function Monstruo({ tipo = 0, color, size = 120, animo = 'normal'
     const base = color || MONSTRUOS[tipo % MONSTRUOS.length].color;
     const borde = oscurecer(base);
     const t = tipo % 6;
-    const ojosCerrados = animo === 'golpe';
-    const anim = animo === 'feliz' ? 'patioSalto .5s ease' : animo === 'golpe' || animo === 'triste' ? 'patioTiembla .4s ease' : 'patioFlota 3s ease-in-out infinite';
+    // 'golpe' = el garabato se está borrando (acierto del alumno): mareado, no enfadado
+    const mareado = animo === 'golpe';
+    const feliz = animo === 'feliz';
+    const anim = feliz ? 'patioSalto .5s ease' : mareado ? 'patioBorra .9s ease' : animo === 'triste' ? 'patioTiembla .4s ease' : 'patioFlota 3s ease-in-out infinite';
+    const espiral = (cx, cy) => <path d={`M${cx} ${cy} m-1 0 a1.5 1.5 0 1 1 3 0 a3.5 3.5 0 1 1 -7 0 a5.5 5.5 0 1 1 11 0 a7.5 7.5 0 1 1 -15 0`} stroke="#1f1235" strokeWidth="2.5" fill="white" strokeLinecap="round" />;
     return (
         <svg viewBox="0 0 120 120" width={size} height={size} style={{ overflow: 'visible', animation: anim, ...style }} aria-hidden="true">
             {/* Adornos superiores */}
@@ -46,11 +49,15 @@ export default function Monstruo({ tipo = 0, color, size = 120, animo = 'normal'
             <ellipse cx="60" cy="86" rx="26" ry="18" fill="#ffffff" opacity="0.28" />
             <ellipse cx="42" cy="36" rx="10" ry="5" fill="#ffffff" opacity="0.35" transform="rotate(-20 42 36)" />
             {/* Ojos */}
-            {t === 3 ? (
-                ojosCerrados ? <path d="M48 54 L72 54" stroke="#1f1235" strokeWidth="5" strokeLinecap="round" />
-                    : <><circle cx="60" cy="54" r="16" fill="white" stroke={borde} strokeWidth="3" /><circle cx="62" cy="56" r="7" fill="#1f1235" /><circle cx="64" cy="53" r="2.5" fill="white" /></>
-            ) : ojosCerrados ? (
-                <><path d="M36 52 L48 58 M36 60 L48 52" stroke="#1f1235" strokeWidth="4" strokeLinecap="round" /><path d="M72 52 L84 58 M72 60 L84 52" stroke="#1f1235" strokeWidth="4" strokeLinecap="round" /></>
+            {mareado ? (
+                t === 3 ? <><circle cx="60" cy="54" r="16" fill="white" stroke={borde} strokeWidth="3" />{espiral(60, 54)}</>
+                    : <>{espiral(44, 54)}{espiral(76, 54)}</>
+            ) : feliz ? (
+                // ojos sonrientes ^ ^
+                t === 3 ? <path d="M46 58 Q60 40 74 58" stroke="#1f1235" strokeWidth="5" fill="none" strokeLinecap="round" />
+                    : <><path d="M35 58 Q44 44 53 58" stroke="#1f1235" strokeWidth="5" fill="none" strokeLinecap="round" /><path d="M67 58 Q76 44 85 58" stroke="#1f1235" strokeWidth="5" fill="none" strokeLinecap="round" /></>
+            ) : t === 3 ? (
+                <><circle cx="60" cy="54" r="16" fill="white" stroke={borde} strokeWidth="3" /><circle cx="62" cy="56" r="7" fill="#1f1235" /><circle cx="64" cy="53" r="2.5" fill="white" /></>
             ) : (
                 <>
                     <ellipse cx="44" cy="54" rx="11" ry="12" fill="white" stroke={borde} strokeWidth="3" />
@@ -61,14 +68,23 @@ export default function Monstruo({ tipo = 0, color, size = 120, animo = 'normal'
                 </>
             )}
             {/* Mofletes */}
-            <ellipse cx="32" cy="72" rx="7" ry="4" fill="#ff8fab" opacity="0.7" />
-            <ellipse cx="88" cy="72" rx="7" ry="4" fill="#ff8fab" opacity="0.7" />
+            <ellipse cx="32" cy="72" rx="7" ry="4" fill="#ff8fab" opacity={feliz ? 1 : 0.7} />
+            <ellipse cx="88" cy="72" rx="7" ry="4" fill="#ff8fab" opacity={feliz ? 1 : 0.7} />
             {/* Boca */}
-            {animo === 'triste' || animo === 'golpe'
-                ? <path d="M46 84 Q60 72 74 84" stroke="#1f1235" strokeWidth="4" fill="none" strokeLinecap="round" />
-                : animo === 'feliz'
-                    ? <path d="M42 72 Q60 98 78 72 Z" fill="#1f1235" stroke="#1f1235" strokeWidth="3" strokeLinejoin="round" />
-                    : <><path d="M44 74 Q60 90 76 74" stroke="#1f1235" strokeWidth="4" fill="none" strokeLinecap="round" /><path d="M52 78 L55 84 L58 79 Z" fill="white" /><path d="M62 79 L65 84 L68 78 Z" fill="white" /></>}
+            {mareado
+                ? <path d="M48 82 Q54 76 60 82 T72 82" stroke="#1f1235" strokeWidth="4" fill="none" strokeLinecap="round" />
+                : animo === 'triste'
+                    ? <path d="M46 84 Q60 72 74 84" stroke="#1f1235" strokeWidth="4" fill="none" strokeLinecap="round" />
+                    : feliz
+                        ? <><path d="M40 72 Q60 100 80 72 Q60 78 40 72 Z" fill="#7a1f3d" stroke="#1f1235" strokeWidth="3" strokeLinejoin="round" /><path d="M50 86 Q60 80 70 86 Q60 96 50 86 Z" fill="#ff6b8b" /></>
+                        : <><path d="M44 74 Q60 90 76 74" stroke="#1f1235" strokeWidth="4" fill="none" strokeLinecap="round" /><path d="M52 78 L55 84 L58 79 Z" fill="white" /><path d="M62 79 L65 84 L68 78 Z" fill="white" /></>}
+            {/* Estrellitas de mareo al borrarse · brillos de alegría */}
+            {mareado && <g fill="#ffd60a" stroke="#b45309" strokeWidth="1.5">
+                {[[30, 20], [60, 8], [90, 20]].map(([x, y], i) => <path key={i} d={`M${x} ${y - 7} L${x + 2} ${y - 2} L${x + 7} ${y} L${x + 2} ${y + 2} L${x} ${y + 7} L${x - 2} ${y + 2} L${x - 7} ${y} L${x - 2} ${y - 2} Z`} />)}
+            </g>}
+            {feliz && <g fill="#ffd60a">
+                <path d="M8 20 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 Z" /><path d="M112 24 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5 Z" />
+            </g>}
         </svg>
     );
 }

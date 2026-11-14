@@ -5,7 +5,8 @@ import { TEMAS_MATES, tiposJugables, generarPreguntasMates } from './preguntasMa
 
 const LIMITES = [[19, 'hasta 19'], [100, 'hasta 100'], [1000, 'hasta 1000'], [9999, 'sin límite']];
 
-export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales = null, nivelInicial = null }) {
+// tiposIniciales: ['longitud', 'masa'] → de los temas iniciales solo quedan marcados esos tipos
+export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales = null, nivelInicial = null, tiposIniciales = null }) {
   // Al volver al menú tras una partida el selector se vuelve a montar: se recupera lo que se había
   // elegido (antes volvía a «Cálculo» con todos los tipos y la partida siguiente los mezclaba todos).
   const previo = apiRef?.current?.estado?.ui || null;
@@ -19,7 +20,16 @@ export default function SelectorMatesMandos({ numerico, apiRef, temasIniciales =
   const [porDefecto, setPorDefecto] = useState(() => (previo ? previo.porDefecto : !(temasIniciales || []).some((id) => TEMAS_MATES.some((f) => f.id === id))));
   const [nivel, setNivel] = useState(previo?.nivel || nivelInicial || 1);
   const [maxNum, setMaxNum] = useState(previo?.maxNum || 100);
-  const [quitados, setQuitados] = useState(previo?.quitados || {}); // 'tema.tipo' → true
+  const [quitados, setQuitados] = useState(() => {
+    if (previo?.quitados) return previo.quitados;
+    if (!tiposIniciales?.length) return {}; // 'tema.tipo' → true
+    const q = {};
+    (temasIniciales || []).forEach((id) => {
+      const f = TEMAS_MATES.find((x) => x.id === id);
+      Object.keys(f?.tipos || {}).forEach((tipo) => { if (!tiposIniciales.includes(tipo)) q[`${id}.${tipo}`] = true; });
+    });
+    return q;
+  });
   const opts = useMemo(() => ({ nivel, numerico, maxNum }), [nivel, numerico, maxNum]);
 
   const jugables = useMemo(

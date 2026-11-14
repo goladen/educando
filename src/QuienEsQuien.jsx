@@ -11,6 +11,7 @@
 // Compatible ratón + táctil (pointer events + elementFromPoint) y también
 // modo "tocar nombre, tocar respuesta" para máxima accesibilidad.
 
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -391,6 +392,7 @@ function Formulario({ initCode, initTestId } = {}) {
 
     const enviar = async () => {
         if (!nombre.trim()) { setError('Pon tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!apellidos.trim()) { setError('Pon tus apellidos.'); return; }
         if (!grupo.trim()) { setError('Indica tu grupo/clase.'); return; }
         const respuestas = {};
@@ -575,6 +577,7 @@ function Juego({ initCode, initTestId, initGrupo } = {}) {
 
     const empezar = () => {
         if (!nombreJugador.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombreJugador).ok) { setError(validarNombre(nombreJugador).mensaje); return; }
         if (!grupoSel) { setError('Elige tu grupo.'); return; }
         if (filtrados.length < 2) { setError(grupoFijo ? `Aún no hay al menos 2 personas de "${grupoFijo}" que hayan rellenado este test.` : 'Se necesitan al menos 2 alumnos en este test y grupo para jugar.'); return; }
         const activas = testActivo.preguntas.filter((p) => filtrados.some((a) => String(valorResp(a, p.id) ?? '').trim() !== ''));

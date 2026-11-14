@@ -1,3 +1,4 @@
+import { validarNombre } from '../../utils/filtroNombres';
 import React, { useState } from 'react';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -30,6 +31,7 @@ export default function ModalEnviarResultado({ tipo, nombreJuego, reto = null, d
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

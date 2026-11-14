@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect, useRef } from 'react';
 import sonidoCorrecto from './assets/correct-choice-43861.mp3';
 import sonidoFallo    from './assets/negative_beeps-6008.mp3';
@@ -35,6 +36,7 @@ function ModalEnviarProfe({ datos, onClose, reto = null }) {
   const enviar = async () => {
     const code = codigo.trim().toUpperCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     if (!code)          { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');
     try {

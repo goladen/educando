@@ -8,6 +8,7 @@
 // las palabras que se forman al cruzar solo tienen que existir. Casillas de premio clásicas,
 // +50 si usas las 9 letras y +2 por palabra con tilde. Acaba cuando alguien vacía su atril con
 // la bolsa vacía o cuando todos pasan dos vueltas seguidas.
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, onSnapshot, runTransaction } from 'firebase/firestore';
@@ -382,6 +383,7 @@ function Entrada({ idiomaInicial, codigoInicial, miId, onDentro, onMenu, onLocal
     const unirse = async () => {
         const cod = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError(t.escribeNombre); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!cod) return;
         setOcupado(true); setError(''); despertarAudio(); guardarNombre();
         try {

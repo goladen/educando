@@ -7,6 +7,7 @@
 // El generador crea la solución, extrae hechos verdaderos y elige un subconjunto
 // mínimo de pistas que garantiza SOLUCIÓN ÚNICA (solver con propagación + DFS).
 
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import RetoConRondas from './components/retos/RetoConRondas';
@@ -1012,6 +1013,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

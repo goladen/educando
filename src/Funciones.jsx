@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, RefreshCw, CheckCircle, Activity, Edit3, List, Send, Search, AlertTriangle, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
@@ -347,6 +348,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

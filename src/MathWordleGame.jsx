@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import { validarNombre } from './utils/filtroNombres';
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Trophy, X, Delete } from 'lucide-react';
@@ -28,6 +29,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {
@@ -271,6 +273,7 @@ export default function MathWordleGame({ usuario, onExit }) {
 
     const guardarPuntuacion = async () => {
         if (!playerName.trim()) return showMessage("Escribe un nombre");
+        if (!validarNombre(playerName).ok) return showMessage(validarNombre(playerName).mensaje);
         try {
             const modoStr = `${gameMode} (${digits} cif)`;
             // Usamos 'elapsedTime' que ya tiene el valor correcto del último tick

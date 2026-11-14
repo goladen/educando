@@ -5,6 +5,7 @@
 //  Práctica (10 preguntas + envío al profe), Contrarreloj o
 //  Competición por equipos (tirón de cuerda).
 // ═══════════════════════════════════════════════════════════════════
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -604,6 +605,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) return setError('Escribe tu nombre.');
+        if (!validarNombre(nombre).ok) return setError(validarNombre(nombre).mensaje);
         if (!code) return setError('Escribe el código del profesor.');
         setEstado('enviando'); setError('');
         try {

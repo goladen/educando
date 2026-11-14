@@ -1,5 +1,6 @@
 // Piezas comunes de VaniLa (modos solo, duelo y tablero): tema, sonidos, textos en
 // es/ca/en/fr, partículas de letras, fichas, reloj, botones y envío al profesor.
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
@@ -389,6 +390,7 @@ export function ModalEnviarProfe({ datos, idioma = 'es', onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError(t.errNombre); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError(t.errCodigo); return; }
         setEnviando(true); setError('');
         try {

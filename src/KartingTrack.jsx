@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import TrackEditor         from './TrackEditor';
@@ -437,6 +438,7 @@ function ModalEnviarProfe({ resultado, recurso, hojas, onClose }) {
 
   const enviar = async () => {
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     const code = codigo.trim().toUpperCase();
     if (!code) { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');

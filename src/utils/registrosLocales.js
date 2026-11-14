@@ -20,6 +20,7 @@ export const JUEGOS_REGISTRO_META = {
     CALCULO:             { nombre: 'Cálculo Mental',      emoji: '🧮', color: '#e67e22' },
     DIVISIBILIDAD:       { nombre: 'Divisibilidad',       emoji: '➗', color: '#16a085' },
     FRACCIONES:          { nombre: 'Fracciones',          emoji: '🍰', color: '#7b1fa2' },
+    UNIDADES:            { nombre: 'Cambio de unidades',  emoji: '🔁', color: '#0891b2' },
     ALGEBRA:             { nombre: 'Álgebra',             emoji: '🅰️', color: '#9b59b6' },
     OCA:                 { nombre: 'Oca Matemática',      emoji: '🎲', color: '#27ae60' },
     OAOA:                { nombre: 'Mates OAOA',          emoji: '🔢', color: '#2980b9' },

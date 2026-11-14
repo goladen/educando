@@ -7,6 +7,7 @@
 //     (equipos por turnos / la clase contra el Rey Garabato).
 //  Resultados: informes_juegos tipo PATIO + guardarRegistroLocal('PATIO').
 // ═══════════════════════════════════════════════════════════════════
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -48,6 +49,8 @@ function EstilosPatio() {
             @keyframes patioNube { from { transform: translateX(-30vw) } to { transform: translateX(130vw) } }
             @keyframes patioAparece { from { opacity: 0; transform: scale(.85) } to { opacity: 1; transform: scale(1) } }
             @keyframes patioConfeti { from { transform: translateY(-10vh) rotate(0) } to { transform: translateY(110vh) rotate(720deg) } }
+            @keyframes patioBorra { 0% { transform: rotate(0) scale(1); opacity: 1 } 25% { transform: rotate(-12deg) scale(.92); opacity: .55 } 50% { transform: rotate(10deg) scale(.95); opacity: .8 } 75% { transform: rotate(-5deg) scale(.97); opacity: .6 } 100% { transform: rotate(0) scale(1); opacity: 1 } }
+            @keyframes patioPop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.4) } 30% { opacity: 1; transform: translate(-50%,-50%) scale(1.15) } 70% { opacity: 1; transform: translate(-50%,-50%) scale(1) } 100% { opacity: 0; transform: translate(-50%,-80%) scale(1) } }
             @keyframes patioLatido { 0%,100% { transform: scale(1) } 50% { transform: scale(1.08) } }
             .patio-btn { transition: transform .08s, box-shadow .08s, filter .15s; -webkit-tap-highlight-color: transparent; }
             .patio-btn:hover:not(:disabled) { filter: brightness(1.06); }
@@ -365,6 +368,17 @@ function MapaAventura({ juego, curso, onNivel, onVolver }) {
     );
 }
 
+// Cartel grande sobre el garabato: deja claro si se ha acertado
+const FRASES_OK = ['¡Muy bien!', '¡Genial!', '¡Correcto!', '¡Bravo!', '¡Así se hace!'];
+function AvisoRespuesta({ ok }) {
+    const [frase] = useState(() => FRASES_OK[Math.floor(Math.random() * FRASES_OK.length)]);
+    return (
+        <div style={{ position: 'absolute', left: '50%', top: '45%', zIndex: 5, pointerEvents: 'none', whiteSpace: 'nowrap', animation: 'patioPop 1.1s ease forwards', background: ok ? '#16a34a' : '#ef4444', color: 'white', fontWeight: 800, fontSize: 'clamp(1.4rem, 4vw, 2.2rem)', padding: '6px 22px', borderRadius: 999, border: '4px solid white', boxShadow: '0 6px 0 rgba(0,0,0,.25)' }}>
+            {ok ? `✔ ${frase}` : '✘ ¡Uy!'}
+        </div>
+    );
+}
+
 function Nivel({ juego, curso, nivel, onVolver, onSiguiente }) {
     const generar = useMemo(() => crearGenerador(juego, curso), [juego, curso]);
     const [q, setQ] = useState(() => generar());
@@ -467,7 +481,8 @@ function Nivel({ juego, curso, nivel, onVolver, onSiguiente }) {
                     <div>🏆 {puntos}{mult > 1 && <span key={racha} style={{ marginLeft: 8, background: '#ffd60a', color: TINTA, borderRadius: 12, padding: '2px 10px', display: 'inline-block', animation: 'patioSalto .4s' }}>¡Racha ×{mult}!</span>}</div>
                     {nivel.tiempo > 0 && <div style={{ background: tiempo <= 3 ? '#ef4444' : 'white', color: tiempo <= 3 ? 'white' : TINTA, borderRadius: 14, padding: '2px 12px', minWidth: 64, textAlign: 'center' }}>⏱️ {Math.max(0, tiempo)}</div>}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '6px 0 12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '6px 0 12px', position: 'relative' }}>
+                    {elegida != null && <AvisoRespuesta key={intentos} ok={elegida === q.correcta} />}
                     <Monstruo key={`${animoM}-${intentos}`} tipo={nivel.tipo} color={nivel.jefe ? JEFE.color : undefined} corona={nivel.jefe} size={nivel.jefe ? 150 : 120} animo={animoM} />
                     <BarraVida actual={vidaMonstruo} max={nivel.vida} etiqueta={nivel.jefe ? `👑 ${JEFE.nombre}` : `Garabato ${nivel.nombre.replace(/^El /, 'del ').replace(/^La /, 'de la ')}`} />
                 </div>
@@ -809,7 +824,8 @@ function ClaseVsMonstruo({ juego, curso, onVolver }) {
                     <div>👧🧒 Clase: {Array.from({ length: VIDAS_CLASE }, (_, i) => (i < vidas ? '❤️' : '🖤')).join('')}</div>
                     <div style={{ background: tiempo <= 5 ? '#ef4444' : '#ffd60a', color: tiempo <= 5 ? 'white' : TINTA, borderRadius: 14, padding: '2px 14px' }}>⏱️ {Math.max(0, tiempo)}</div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '4px 0 12px', color: 'white' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '4px 0 12px', color: 'white', position: 'relative' }}>
+                    {elegida != null && <AvisoRespuesta key={`${vida}-${vidas}`} ok={elegida === q.correcta} />}
                     <Monstruo key={`${animo}-${vida}-${vidas}`} tipo={3} color={JEFE.color} corona size={150} animo={animo} />
                     <BarraVida actual={vida} max={VIDA} etiqueta={`👑 ${JEFE.nombre}`} />
                 </div>
@@ -833,6 +849,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) return setError('Escribe tu nombre.');
+        if (!validarNombre(nombre).ok) return setError(validarNombre(nombre).mensaje);
         if (!code) return setError('Escribe el código del profesor.');
         setEstado('enviando'); setError('');
         try {

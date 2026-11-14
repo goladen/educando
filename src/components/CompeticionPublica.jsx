@@ -1,3 +1,4 @@
+import { validarNombre } from '../utils/filtroNombres';
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, getDocs, collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -37,6 +38,7 @@ function ModalInscripcion({ comp, compId, onClose }) {
 
     const enviar = async () => {
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!alias.trim())  { setError('Escribe un alias: es el nombre con el que aparecerás en la clasificación pública.'); return; }
         const cl = clave.trim();
         if (cl.length < 4 || cl.length > 8) { setError('La contraseña debe tener entre 4 y 8 caracteres.'); return; }

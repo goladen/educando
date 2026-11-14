@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
+import { validarNombre } from './utils/filtroNombres';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
@@ -209,6 +210,7 @@ export default function CazaBurbujasGame(props) {
 function CazaBurbujasJuego({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null, autoStart = false, hojaInicial = null, modoJuegoInicial = 'Burbujas', mandosBurbujas = null }) {
     const [fase, setFase] = useState('SETUP');
     const [puntuacion, setPuntuacion] = useState(0);
+    const [resumen, setResumen] = useState(null); // { aciertos, total } de la última partida
     const [modo, setModo] = useState('Burbujas');
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [verRanking, setVerRanking] = useState(false);
@@ -302,6 +304,7 @@ function CazaBurbujasJuego({ recurso, usuario, alTerminar, modoOlimpico = false,
         const emailFinal = esInvitado ? 'invitado' : usuario.email;
 
         if (!nombreFinal) return alert("Error: Nombre necesario.");
+        if (!validarNombre(nombreFinal).ok) return alert(validarNombre(nombreFinal).mensaje);
 
         setGuardando(true);
         try {
@@ -406,6 +409,7 @@ function CazaBurbujasJuego({ recurso, usuario, alTerminar, modoOlimpico = false,
                 modoOlimpico={modoOlimpico}
                 recurso={recurso}
                 hoja={hojaSeleccionada}
+                resumen={resumen}
             />
         );
     }
@@ -416,10 +420,9 @@ function CazaBurbujasJuego({ recurso, usuario, alTerminar, modoOlimpico = false,
             modo={modo} 
             hoja={hojaSeleccionada} 
             setPuntuacionTotal={setPuntuacion} 
-            onFinish={() => {
-               
-                    setFase('FIN'); // Si es normal, va a tu PantallaFin
-                
+            onFinish={(_pts, res) => {
+                setResumen(res || null);
+                setFase('FIN'); // Si es normal, va a tu PantallaFin
             }}
             onExit={alTerminar}
             playSound={playSound}
@@ -451,6 +454,7 @@ function ModalEnviarProfeBase({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {
@@ -460,7 +464,11 @@ function ModalEnviarProfeBase({ datos, onClose }) {
                 tipo: 'CAZABURBUJAS', modalidad: 'Individual', fecha: new Date(),
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+                jugadores: [datos.total ? {
+                    nombre: nombre.trim(), curso: curso.trim(), hoja: datos.hoja, puntos: datos.puntos,
+                    aciertos: datos.aciertos, fallos: datos.total - datos.aciertos,
+                    intentos: datos.total, porcentaje: Math.round(datos.aciertos / datos.total * 100),
+                } : { nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
             });
             guardarRegistroLocal('CAZABURBUJAS', {
                 titulo: datos.recursoTitulo, aciertos: datos.aciertos,
@@ -613,7 +621,7 @@ function PantallaCuentaAtras({ hoja, profesor, instrucciones, playSound, onFinis
     );
 }
 
-function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerminar, playSound, modoOlimpico, recurso, hoja }) {
+function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerminar, playSound, modoOlimpico, recurso, hoja, resumen }) {
     const [nombreInvitado, setNombreInvitado] = useState('');
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
@@ -676,7 +684,9 @@ function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerm
             <EstilosComunes />
             {mostrarEnvio && (
                 <ModalEnviarProfe
-                    datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja, aciertos: puntuacion }}
+                    datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja, puntos: puntuacion,
+                        // Aciertos = preguntas acertadas (antes se enviaban los puntos y el informe salía con 0 %)
+                        ...(resumen?.total ? { aciertos: resumen.aciertos, total: resumen.total } : { aciertos: puntuacion }) }}
                     onClose={() => setMostrarEnvio(false)}
                 />
             )}
@@ -691,6 +701,8 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
 
     const puntosRef = useRef(0);
     useEffect(() => { puntosRef.current = puntos; }, [puntos]);
+    // Preguntas acertadas (no puntos): para el informe que se envía al profesor
+    const aciertosRef = useRef(0);
 
     const [opcionesTest, setOpcionesTest] = useState([]);
     const [indiceFeedback, setIndiceFeedback] = useState(null);
@@ -812,7 +824,10 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
         setTipoFeedback(null);
         bloqueoRef.current = false;
 
-        if (indiceActual.current >= preguntasJugables.current.length) { onFinish(puntosRef.current); return; }
+        if (indiceActual.current >= preguntasJugables.current.length) {
+            onFinish(puntosRef.current, { aciertos: aciertosRef.current, total: preguntasJugables.current.length });
+            return;
+        }
         setProgreso({ actual: indiceActual.current + 1, total: preguntasJugables.current.length });
 
         const datos = preguntasJugables.current[indiceActual.current];
@@ -897,6 +912,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
                 setPuntos(p => p + 1);
             } else {
                 setPuntos(p => p + puntosAcierto);
+                aciertosRef.current++;
                 bloqueoRef.current = true;
                 clearInterval(timerRef.current);
             }
@@ -912,7 +928,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
             if (esEspecial) {
                 // Comprobar si quedan correctas
                 const quedanCorrectas = bubblesRef.current.some(b => b.esCorrecta && !b.eliminada);
-                if (!quedanCorrectas) pasarSiguiente(true);
+                if (!quedanCorrectas) { aciertosRef.current++; pasarSiguiente(true); }
             } else {
                 pasarSiguiente(true);
             }
@@ -949,6 +965,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
             triggerAvatar('happy');
             setTipoFeedback('correct');
             setPuntos(p => p + puntosAcierto);
+            aciertosRef.current++;
         } else {
             playSound('WRONG');
             triggerAvatar('angry');

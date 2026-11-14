@@ -26,6 +26,7 @@ import BotonPdfRecurso from './components/BotonPdfRecurso';
 import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import GuardarResultadosMandos from './mandos/GuardarResultadosMandos.jsx';
+import { validarNombre, nombreSeguro } from './utils/filtroNombres';
 
 /* =====================================================================
  *  LUZ ROJA · LUZ VERDE  (juego del calamar educativo)
@@ -965,7 +966,8 @@ function PartidaSolo({ preguntas, titulo, meta, dificultad, nombre, usuario, onS
 // =====================================================================
 //  PARTIDA ONLINE — ALUMNO
 // =====================================================================
-function PartidaOnline({ codigoSala, nombre, usuario, onSalir }) {
+function PartidaOnline({ codigoSala, nombre: nombreRecibido, usuario, onSalir }) {
+    const nombre = nombreSeguro(nombreRecibido, 'Jugador');
     const audioRef = useRef(null);
     if (!audioRef.current) audioRef.current = crearAudio();
     const audio = audioRef.current;
@@ -1853,6 +1855,7 @@ function ModalEnviarProfeBase({ datos, nombreSugerido, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {
@@ -2013,7 +2016,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
     const [titulo, setTitulo] = useState('Modo libre');
     const [meta, setMeta] = useState(15);
     const [dificultad, setDificultad] = useState('NORMAL');
-    const [nombre, setNombre] = useState(usuario?.displayName || '');
+    const [nombre, setNombre] = useState(nombreSeguro(usuario?.displayName, ''));
     const [codigoEntrada, setCodigoEntrada] = useState(String(codigoSala || '').toUpperCase());
     const [errorUnir, setErrorUnir] = useState('');
     const [semilla, setSemilla] = useState(0);   // fuerza reinicio de la partida
@@ -2106,6 +2109,7 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         const entrar = async () => {
             const code = codigoEntrada.trim().toUpperCase();
             if (!nombre.trim()) { setErrorUnir('Escribe tu nombre.'); return; }
+            if (!validarNombre(nombre).ok) { setErrorUnir(validarNombre(nombre).mensaje); return; }
             if (!code) { setErrorUnir('Escribe el código de la sala.'); return; }
             try {
                 const snap = await getDoc(doc(db, 'live_games', code));

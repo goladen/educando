@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { RotateCcw, CheckCircle, XCircle, Trophy, ArrowRight, Calculator, Ruler, Play, Users, Loader, Monitor, Copy, Save, ArrowUp, Share2 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { bibliotecaGeometria } from './BibliotecaGeometria';
 import PerimetroArea from './PerimetroArea';
 import Visor3dPoliedrosEuler from './Visor3dPoliedrosEuler';
 import SalaGeometria3D from './SalaGeometria3D';
+const CambioUnidades = lazy(() => import('./unidades/CambioUnidades'));
 import ModalCompartirReto from './components/ModalCompartirReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
@@ -23,6 +24,7 @@ import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
 import { CalculadoraFlotante as CalculadoraCasio } from './calculadora/CalculadoraInteractiva';
+import { validarNombre, nombreSeguro } from './utils/filtroNombres';
 
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
 const audioCorrect = _mkAudio(correctSoundFile);
@@ -387,6 +389,7 @@ function ModalFigurasCompuestas({ usuario, onClose }) {
 
     const enviarAlProfe = async () => {
         if (!nombreAlumno.trim()) { setErrorEnvio('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombreAlumno).ok) { setErrorEnvio(validarNombre(nombreAlumno).mensaje); return; }
         if (!codigoProfe.trim()) { setErrorEnvio('Escribe el código del profesor.'); return; }
         setEnviando(true); setErrorEnvio('');
         try {
@@ -559,6 +562,7 @@ function ModalEnviarGeo({ datos, usuario, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {
@@ -816,7 +820,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [drawMode, setDrawMode] = useState(false);
     const [showCalc, setShowCalc] = useState(false);
     const [showFigurasCompuestas, setShowFigurasCompuestas] = useState(false);
-    const [herramienta, setHerramienta] = useState(null); // 'perimetro' | 'poliedros' | 'sala3d'
+    const [herramienta, setHerramienta] = useState(null); // 'perimetro' | 'poliedros' | 'sala3d' | 'unidades'
 
     // Modo 3 config
     const [showGameConfig, setShowGameConfig] = useState(false);
@@ -977,6 +981,16 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         onClientJoin(joinCode.toUpperCase());
     };
 
+
+    if (herramienta === 'unidades') {
+        return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: '#f8fafc' }}>
+                <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', fontWeight: 800, color: '#0891b2' }}>Cargando…</div>}>
+                    <CambioUnidades contexto="geometria" onExit={() => setHerramienta(null)} />
+                </Suspense>
+            </div>
+        );
+    }
 
     if (herramienta === 'sala3d') {
         return <SalaGeometria3D onExit={() => setHerramienta(null)} />;
@@ -1155,6 +1169,9 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />
 
                         {/* Herramientas de exploración */}
+                        <button onClick={() => setHerramienta('unidades')} style={{ ...sLocal.btnPrimary, background: '#0891b2' }}>
+                            🔁 Cambio de unidades <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(longitud, superficie, volumen…)</span>
+                        </button>
                         <button onClick={() => setHerramienta('perimetro')} style={{ ...sLocal.btnPrimary, background: '#2E7D32' }}>
                             🟩 Perímetros y Áreas <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(construir y explorar)</span>
                         </button>
@@ -1494,7 +1511,7 @@ function GeometrixLiveClient({ codigoSala, usuario, onExit }) {
     const [canvasDim, setCanvasDim] = useState({ w: 380, h: 240 });
 
     const joiningRef = useRef(false);
-    const myName = usuario?.displayName || prompt("Tu nombre:") || "Invitado";
+    const myName = nombreSeguro(usuario?.displayName || prompt("Tu nombre:"), "Invitado");
     const myUid = usuario?.uid || 'guest_' + Math.random().toString(36).substr(2, 9);
 
     useEffect(() => {

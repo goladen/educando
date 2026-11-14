@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect } from 'react';
 import { bibliotecaIrregularVerbs as verbosData } from './BibliotecaIrregularVerbs';
 import { db } from './firebase';
@@ -38,6 +39,7 @@ function ModalEnviarProfe({ onClose, score, config, reto = null }) {
   const enviar = async () => {
     const code = codigo.trim().toUpperCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     if (!code) { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');
     try {

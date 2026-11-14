@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
+import { validarNombre } from './utils/filtroNombres';
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { Send, CheckCircle, AlertCircle, ArrowLeft, User, Info } from 'lucide-react';
@@ -109,6 +110,7 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
             emailFinal = usuario.email;
         } else {
             if (!nombreGuest.trim()) return setError("Por favor, escribe tu nombre antes de enviar.");
+            if (!validarNombre(nombreGuest).ok) return setError(validarNombre(nombreGuest).mensaje);
             nombreFinal = nombreGuest.trim();
         }
         const tipo = datosHoja.targetGame;

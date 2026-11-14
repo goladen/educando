@@ -133,6 +133,20 @@ export const GAMES = [
     nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'fisica/unidades', emoji: '🔁', color: '#0891b2',
+    h1: 'Cambio de unidades: factores de conversión y saltos',
+    title: 'Cambio de unidades y factores de conversión | PiKT',
+    desc: 'Aprende a cambiar de unidades con la escalera de saltos y los factores de conversión: longitud, masa, volumen, velocidad, densidad, temperatura y radianes. Problemas, juegos y fichas PDF gratis.',
+    nivel: 'Primaria, ESO y Bachillerato', materia: 'Física y Química y Matemáticas',
+  },
+  {
+    slug: 'primaria/geometria/unidades', emoji: '📏', color: '#16a34a',
+    h1: 'Cambio de unidades para Primaria: la escalera de las medidas',
+    title: 'Cambio de unidades en Primaria: km, m, cm, kg, l | PiKT',
+    desc: 'La escalera de las medidas para Primaria: longitud, masa, capacidad, superficie y tiempo contando saltos. Formas complejas, problemas, tirón de cuerda y fichas para imprimir. Gratis.',
+    nivel: 'Primaria y 1.º ESO', materia: 'Matemáticas',
+  },
+  {
     slug: 'vanila', emoji: '🔤', color: '#A78BFA',
     h1: 'VaniLa: forma palabras con 9 letras',
     title: 'VaniLa: juego de palabras con tildes (ES, CA, EN, FR) | PiKT',

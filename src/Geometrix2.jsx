@@ -12,6 +12,7 @@ import startSoundFile from './assets/inicio-juego.mp3';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import { nombreSeguro } from './utils/filtroNombres';
 
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
 const audioCorrect = _mkAudio(correctSoundFile);
@@ -838,7 +839,7 @@ function GeometrixLiveClient({ codigoSala, usuario, onExit }) {
     const [canvasDim, setCanvasDim] = useState({ w: 380, h: 240 });
 
     const joiningRef = useRef(false);
-    const myName = usuario?.displayName || prompt("Tu nombre:") || "Invitado";
+    const myName = nombreSeguro(usuario?.displayName || prompt("Tu nombre:"), "Invitado");
     const myUid = usuario?.uid || 'guest_' + Math.random().toString(36).substr(2, 9);
 
     useEffect(() => {

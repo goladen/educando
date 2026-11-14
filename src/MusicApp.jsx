@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { PASOS, NOTAS, NOTAS_STAFF, INSTRUMENTOS_SEQ, playTone } from './musicUtils';
 import CreadorRitmosColab from './CreadorRitmosColab';
@@ -26,6 +27,7 @@ export default function MusicApp({ onBack, usuario = null }) {
 
     const enviarAlProfesor = async () => {
         if (!mNombre.trim()) { alert('Introduce tu nombre'); return; }
+        if (!validarNombre(mNombre).ok) { alert(validarNombre(mNombre).mensaje); return; }
         const cod = mCodigo.trim().toUpperCase();
         if (cod.length < 3) { alert('Introduce el código de tu profesor'); return; }
         if (sesionMusical.length === 0) { alert('No hay partidas guardadas en la sesión'); return; }

@@ -10,6 +10,7 @@ import { useMandoPregunta, LetraMando } from './MandosCuerda';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
 import { leerRetoUrl } from '../utils/retoLink';
 import BotonFichas from './BotonFichas';
+import { validarNombre } from '../utils/filtroNombres';
 const VisorCuerpo = lazy(() => import('../anatomia/VisorCuerpo'));
 
 const N_PREGUNTAS = 10;
@@ -575,6 +576,7 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
 
   const enviarAlProfesor = async (aciertos, total) => {
     if (!mNombre.trim()) { alert('Introduce tu nombre'); return; }
+    if (!validarNombre(mNombre).ok) { alert(validarNombre(mNombre).mensaje); return; }
     const cod = mCodigo.trim().toUpperCase();
     if (cod.length < 3) { alert('Introduce el código de tu profesor'); return; }
     setEnviando(true);
@@ -602,6 +604,7 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
     const code = joinCode.trim().toUpperCase();
     if (code.length !== 6) return alert('El código debe tener 6 caracteres.');
     if (!joinName.trim()) return alert('Introduce tu nombre.');
+    if (!validarNombre(joinName).ok) return alert(validarNombre(joinName).mensaje);
     onJoinLive?.(code, { displayName: joinName.trim(), uid: 'guest_' + Math.random().toString(36).substr(2, 8) });
   };
 
@@ -1740,6 +1743,7 @@ function AnatomiaQuiz({ onBack }) {
 
   const enviarAlProfesor = async (aciertos, total) => {
     if (!mNombre.trim()) { alert('Introduce tu nombre'); return; }
+    if (!validarNombre(mNombre).ok) { alert(validarNombre(mNombre).mensaje); return; }
     const cod = mCodigo.trim().toUpperCase();
     if (cod.length < 3) { alert('Introduce el código de tu profesor'); return; }
     setEnviando(true);

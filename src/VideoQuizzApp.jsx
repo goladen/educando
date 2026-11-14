@@ -2,6 +2,7 @@
 // Vídeo de YouTube que se pausa en timestamps para mostrar ejercicios Omni.
 // Uso: <VideoQuizzApp onBack={fn} recursoDirecto={null} />
 
+import { validarNombre } from './utils/filtroNombres';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import VtePlayScreen from './VtePlayScreen';
 import { db } from './firebase';
@@ -409,6 +410,7 @@ function ModalEnviarVQBase({ recurso, resultados, onClose }) {
 
   const enviar = async () => {
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     const code = codigo.trim().toUpperCase();
     if (!code) { setError('Escribe el código del profesor.'); return; }
     setEnviando(true); setError('');

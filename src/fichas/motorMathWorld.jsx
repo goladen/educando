@@ -8,6 +8,7 @@ import { EXPRESIONES } from './fuentes/expresiones';
 import { POTENCIAS, DIVISIBILIDAD, NUMEROS } from './fuentes/numeros';
 import { GEOMETRIA, GEO_ANALITICA, MEDIDAS } from './fuentes/geometria';
 import { ESTADISTICA, PROBABILIDAD } from './fuentes/datos';
+import { UNIDADES } from './fuentes/unidades';
 import { CATALOGO_MATES } from './catalogo';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ export const FUENTES = {
     divisibilidad: crearFuente(DIVISIBILIDAD),
     potencias: crearFuente(POTENCIAS),
     medidas: crearFuente(MEDIDAS),
+    unidades: crearFuente(UNIDADES),
     geometria: crearFuente(GEOMETRIA),
     estadistica: crearFuente(ESTADISTICA),
     probabilidad: crearFuente(PROBABILIDAD),

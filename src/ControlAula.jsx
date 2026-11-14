@@ -12,6 +12,7 @@
 // Usa Firestore (mismo stack que el resto del proyecto). Los juegos puntuables comparten el
 // contrato modoOlimpico + tiempoOlimpico + hojaOlimpica + onOlimpicoFinish(puntuacion).
 
+import { validarNombre } from './utils/filtroNombres';
 import React, { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { db, auth } from './firebase';
 import {
@@ -912,6 +913,7 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
     const entrar = async () => {
         setError('');
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!codigo.trim()) { setError('Escribe el código de la sala.'); return; }
         setComprobando(true);
         try {

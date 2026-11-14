@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, query, where, limit, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -62,6 +63,7 @@ function ModalEnviarProfeBase({ datos, onClose }) {
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {
@@ -636,6 +638,7 @@ function AhorcadoJuego({ usuario, onExit, recurso, mandosApi, juegoMandos }) {
     // =========================================================
     const guardarPuntuacion = async () => {
         if (!playerName.trim()) return alert('Escribe tu nombre');
+        if (!validarNombre(playerName).ok) return alert(validarNombre(playerName).mensaje);
         setGuardando(true);
         try {
             const isGuest = !usuario || !usuario.email;

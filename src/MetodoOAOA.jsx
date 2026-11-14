@@ -1,3 +1,4 @@
+import { validarNombre } from './utils/filtroNombres';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SimuladorOAOA from './MatesOAOA';
 import { db } from './firebase';
@@ -59,6 +60,7 @@ function ModalEnviarProfeOAOA({ resumen, onClose, reto = null }) {
   const enviar = async () => {
     const code = codigo.trim().toUpperCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
     if (!code)          { setError('Escribe el código del profesor.'); return; }
     if (totalIntentos === 0 && estrategias.length === 0 && estimaciones.length === 0) {
       setError('Todavía no has jugado a ninguna actividad.'); return;

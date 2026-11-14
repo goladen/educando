@@ -2,6 +2,7 @@
 // Responde el test y los problemas, corrige (los problemas con solución numérica se corrigen solos;
 // los de respuesta abierta se autoevalúan viendo la solución) y envía el resultado al profesor
 // (informes_juegos, tipo HOJA_FQ).
+import { validarNombre } from '../utils/filtroNombres';
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
@@ -168,6 +169,7 @@ function ModalEnviarHoja({ hoja, datos, onClose }) {
     const enviarInforme = async () => {
         const code = codigo.trim().toUpperCase();
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!validarNombre(nombre).ok) { setError(validarNombre(nombre).mensaje); return; }
         if (!code) { setError('Escribe el código del profesor.'); return; }
         setEnviando(true); setError('');
         try {

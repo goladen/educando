@@ -21,6 +21,7 @@ const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
 const CursorManos = lazy(() => import('./manos/CursorManos.jsx'));
 const QuizManos = lazy(() => import('./manos/QuizManos.jsx'));
 const SonometroAula = lazy(() => import('./keyestudio/SonometroAula.jsx'));
+const DinamicasAula = lazy(() => import('./dinamicasAula/DinamicasAula.jsx'));
 import { db, auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import PizarraAnalisisIA, { ADMIN_EMAIL_IA } from './components/PizarraAnalisisIA';
@@ -30,6 +31,11 @@ import { SONIDOS, reproducirSonido } from './pizarraSonidos';
 import { suavizarCamino, muestrearCamino, anguloEnCamino, difAngulo, longitudCamino } from './pizarraAnimacion';
 import PlanetaEsfera, { renderEsferaDataURL } from './PlanetaEsfera';
 import { CalculadoraFlotante as CalculadoraCasio } from './calculadora/CalculadoraInteractiva';
+import { BotonGrupoDispositivo } from './components/GruposDispositivo';
+import { nombresGrupoActivo } from './utils/gruposDispositivo';
+
+// Lista inicial: el grupo en uso en este dispositivo (Mis grupos) o unos nombres de ejemplo
+const alumnosIniciales = () => { const n = nombresGrupoActivo(); return n.length ? n.join('\n') : 'Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo'; };
 
 const NUM_CAPAS = 5;
 
@@ -57,7 +63,7 @@ const sustituirX = (s, x) => s.replace(/(?<![a-zA-Z.])x(?![a-zA-Z])/g, `(${x})`)
 const COLORES_RULETA = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#34495e'];
 
 function RuletaApp() {
-    const [alumnosTxt, setAlumnosTxt] = useState("Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo");
+    const [alumnosTxt, setAlumnosTxt] = useState(alumnosIniciales);
     const [alumnos, setAlumnos] = useState([]);
     const [rotacion, setRotacion] = useState(0);
     const [girando, setGirando] = useState(false);
@@ -127,6 +133,7 @@ function RuletaApp() {
             <div style={{ flex: 1, minWidth: 300, maxWidth: 400 }}>
                 <h3 style={{ color: '#2c3e50', marginTop: 0 }}>Lista de Alumnos</h3>
                 <p style={{ fontSize: '0.85rem', color: '#7f8c8d', marginBottom: 10 }}>Pega una columna de Excel/Drive o separa por comas.</p>
+                <BotonGrupoDispositivo onUsar={g => setAlumnosTxt(g.alumnos.join('\n'))} style={{ marginBottom: 10 }} />
                 <textarea value={alumnosTxt} onChange={e => setAlumnosTxt(e.target.value)} style={{ width: '100%', height: 350, padding: 15, borderRadius: 10, border: '2px solid #bdc3c7', fontSize: '1rem', outline: 'none', resize: 'none' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', flex: 1, minWidth: 350 }}>
@@ -3380,7 +3387,7 @@ function ShareModalHerramienta({ url, titulo, onClose }) {
 const COLORES_GRUPOS_LIB = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#c0392b','#16a085','#8e44ad'];
 
 function GruposLibre() {
-    const [alumnosTxt, setAlumnosTxt] = useState("Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo");
+    const [alumnosTxt, setAlumnosTxt] = useState(alumnosIniciales);
     const [numGrupos, setNumGrupos] = useState(3);
     const [modoGrupos, setModoGrupos] = useState('grupos'); // 'grupos' (nº de grupos) | 'porgrupo' (alumnos por grupo)
     // grupos: Array<{ nombre: string, alumnos: string[] }>
@@ -3483,6 +3490,7 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                     <label style={{ display:'block', fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:6 }}>
                         Alumnos <span style={{ fontWeight:400, color:'#95a5a6' }}>(separados por coma o salto de línea)</span>
                     </label>
+                    <BotonGrupoDispositivo onUsar={g => setAlumnosTxt(g.alumnos.join('\n'))} compacto style={{ marginBottom: 6 }} />
                     <textarea value={alumnosTxt} onChange={e => setAlumnosTxt(e.target.value)} rows={5}
                         style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e0e4f0', fontSize:'0.88rem', fontFamily:'inherit', outline:'none', resize:'vertical', boxSizing:'border-box', display:'block' }}/>
                     <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginTop:4 }}>{alumnos.length} alumno{alumnos.length !== 1 ? 's' : ''}</div>
@@ -3717,7 +3725,7 @@ function DeskCardLibre({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, o
 }
 
 function PlanoAulaLibre() {
-    const [alumnosTxt, setAlumnosTxt] = useState("Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo");
+    const [alumnosTxt, setAlumnosTxt] = useState(alumnosIniciales);
     const [editandoAlumnos, setEditandoAlumnos] = useState(true);
     const [mesas, setMesas] = useState(defaultLayoutLibre);
     const [selSeat, setSelSeat] = useState(null);
@@ -3844,6 +3852,7 @@ function PlanoAulaLibre() {
                 <label style={{ display:'block', fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:8, textAlign:'left' }}>
                     Alumnos <span style={{ fontWeight:400, color:'#95a5a6' }}>(separados por coma o salto de línea)</span>
                 </label>
+                <BotonGrupoDispositivo onUsar={g => setAlumnosTxt(g.alumnos.join('\n'))} style={{ marginBottom: 8, justifyContent: 'center' }} />
                 <textarea value={alumnosTxt} onChange={e => setAlumnosTxt(e.target.value)} rows={6}
                     style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e0e4f0', fontSize:'0.88rem', fontFamily:'inherit', outline:'none', resize:'vertical', boxSizing:'border-box', marginBottom:8, display:'block' }}/>
                 <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginBottom:16, textAlign:'left' }}>{alumnos.length} alumno{alumnos.length!==1?'s':''}</div>
@@ -4011,7 +4020,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
-        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'horario', 'miniapp', 'recortes', 'control', 'ruido'].includes(g)) return g;
+        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'horario', 'miniapp', 'recortes', 'control', 'ruido', 'dinamicas'].includes(g)) return g;
         return null;
     });
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
@@ -4028,9 +4037,16 @@ export default function HerramientasClase({ onExit, initialTool }) {
         { id: 'miniapp',  icon: <span style={{fontSize:36}}>⚡</span>, titulo: 'App con IA', desc: 'Genera una mini-aplicación interactiva con Claude o Gemini y previsualízala al instante.', color: '#7c3aed' },
         { id: 'recortes', icon: <span style={{fontSize:36}}>✂️</span>, titulo: 'Recortes Extrem', desc: 'Carga una imagen o PDF y haz varios recortes a la vez para crear una matriz de imágenes.', color: '#16a085' },
         { id: 'control',  icon: <Radio size={40}/>,       titulo: 'Control de Aula',    desc: 'Crea una sala, controla la presencia de tus alumnos en tiempo real y lánzales juegos.', color: '#4f46e5' },
+        { id: 'dinamicas', icon: <span style={{fontSize:36}}>🎉</span>, titulo: 'Dinámicas de Aula', desc: '10 dinámicas activas (piedra-papel-tijera por niveles, Kaboom, citas rápidas, silla caliente…) con tiempos, turnos y equipos en la PDI y fichas en PDF. Basado en ideas de @myteachingexperience.', color: '#ec4899' },
         { id: 'ruido',    icon: <span style={{fontSize:36}}>🚦</span>, titulo: 'Sonómetro de Aula', desc: 'Semáforo del ruido para proyectar, con el micrófono del ordenador, la placa Imagina TdR STEAM o una micro:bit.', color: '#dc2626' },
     ];
 
+    // Dinámicas de aula ocupa toda la pantalla (tiene su propia cabecera y proyector)
+    if (activa === 'dinamicas') return (
+        <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}>
+            <DinamicasAula onExit={() => { setActiva(null); try { const u = new URL(window.location.href); ['gestion','d','m'].forEach(k => u.searchParams.delete(k)); window.history.replaceState(window.history.state, '', u.pathname + u.search); } catch { /* */ } }} />
+        </Suspense>
+    );
     return (
         <div style={{ minHeight: '100vh', background: '#fce4ec', padding: 'clamp(10px, 3vw, 20px)', boxSizing: 'border-box', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
             {/* Header */}
@@ -4068,7 +4084,11 @@ export default function HerramientasClase({ onExit, initialTool }) {
             {!activa ? (
                 <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
                     <Settings size={44} color="#9b59b6" style={{ marginBottom: 8 }} />
-                    <h1 style={{ color: '#2c3e50', fontSize: 'clamp(1.4rem, 5vw, 2.5rem)', margin: '0 0 clamp(16px, 4vw, 30px)' }}>Herramientas de Clase</h1>
+                    <h1 style={{ color: '#2c3e50', fontSize: 'clamp(1.4rem, 5vw, 2.5rem)', margin: '0 0 12px' }}>Herramientas de Clase</h1>
+                    <div style={{ marginBottom: 'clamp(16px, 4vw, 26px)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: '0.88rem', color: '#4b5563' }}>
+                        <BotonGrupoDispositivo />
+                        <span>El grupo de clase guardado en este dispositivo sale en la ruleta, los grupos, los juegos, al enviar resultados y en los mandos micro:bit.</span>
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 'clamp(12px, 3vw, 20px)' }}>
                         {HERRAMIENTAS.map(h => (
                             <div key={h.id} style={{ position: 'relative' }}>

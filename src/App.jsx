@@ -6,12 +6,15 @@ const ProfesorDashboard = lazy(() => import('./ProfesorDashboard'));
 import LandingGames from './components/LandingGames3';
 import Login from './Login';
 const GamePlayer = lazy(() => import('./GamePlayer'));
+// Mitad de un juego en pantalla dual (?dual=0|1, dentro de un iframe; ver components/JuegoDual.jsx)
+const MarcoMitadDual = lazy(() => import('./components/JuegoDual').then(m => ({ default: m.MarcoMitadDual })));
 const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
 const FuncionesEjecutivas = lazy(() => import('./FuncionesEjecutivas'));
 const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
 import { SolarSystemViewer } from './components/LandingGames3';
 const ImperiosGame = lazy(() => import('./components/ImperiosGame'));
 const Orientacion = lazy(() => import('./orientacion/Orientacion'));
+const DinamicasAula = lazy(() => import('./dinamicasAula/DinamicasAula'));
 const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
 const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
 const CompeticionPublica = lazy(() => import('./components/CompeticionPublica'));
@@ -73,6 +76,8 @@ function App() {
     // ESTADO PARA EL TOKEN DE DRIVE
     const [googleToken, setGoogleToken] = useState(null);
     const [deepLinkGame, setDeepLinkGame] = useState(null);
+    const [mitadDual] = useState(() => { try { return new URLSearchParams(window.location.search).get('dual'); } catch { return null; } });
+    const [reinicioMitad, setReinicioMitad] = useState(0);
     const [rutaPublica, setRutaPublica] = useState(null);
     const [vqRecurso, setVqRecurso] = useState(null); // ?vq=ID deep link for VTE VideoQuizz
     const [hojaFqId, setHojaFqId] = useState(null); // ?hojafq=ID hoja interactiva de Física y Química
@@ -154,7 +159,7 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'comic' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas') {
         setRutaPublica(slug);
         return;
       }
@@ -183,8 +188,8 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','invasores','manos','avatar','orientacion',
-        'comunidades','comunidad','competicion','banco',
+        'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','invasores','manos','avatar','orientacion','dinamicas',
+        'comunidades','comunidad','competicion','banco','pdf','imprimir',
         'fisica',
         'math_world','primaria','feria','patio',
         'arkade',
@@ -233,6 +238,18 @@ function App() {
         }
         const recursoId = params.get('r');
         if (!recursoId) return;
+        // Mitad de la pantalla dual: el recurso llega de la ventana principal, tal cual se abrió allí
+        if (params.has('dual')) {
+            import('./components/JuegoDual').then(m => {
+                const recurso = m.recursoDeVentanaDual();
+                if (recurso) { setDeepLinkGame({ recurso, hoja: 'General', modoInicial: params.get('m') || null }); return; }
+                if (recursoId === 'dual') return;
+                getDoc(doc(db, 'resources', recursoId)).then(snap => {
+                    if (snap.exists()) setDeepLinkGame({ recurso: { id: snap.id, ...snap.data() }, hoja: 'General', modoInicial: params.get('m') || null });
+                });
+            }).catch(e => console.error('Pantalla dual:', e));
+            return;
+        }
         // Recurso virtual de PiKT (preguntas de las herramientas): se construye en el navegador
         if (recursoId.startsWith('pikt--')) {
             import('./bancoPreguntas/recursosPikt').then(m => m.recursoPiktPorId(recursoId)).then(recurso => {
@@ -371,6 +388,7 @@ function App() {
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'manos') return <><QuizManos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'dinamicas') return <><DinamicasAula onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'orientacion') return <><Orientacion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'avatar') return <><AvatarCuerpo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
@@ -449,6 +467,21 @@ function App() {
     if (cargando && !deepLinkGame) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;
 
     // DEEP LINK: abrir juego directamente (funciona para todos, incluso sin cuenta)
+    if (deepLinkGame && mitadDual !== null) {
+        // Cada mitad empieza en la pantalla de inicio del juego (cada lado elige hoja y modo);
+        // salir del juego vuelve a esa pantalla en vez de ir a la portada
+        return <Suspense fallback={null}><MarcoMitadDual lado={mitadDual}>
+            <GamePlayer
+                key={reinicioMitad}
+                recurso={deepLinkGame.recurso}
+                usuario={usuario}
+                alTerminar={() => setReinicioMitad(n => n + 1)}
+                autoStart={false}
+                hojaInicial={deepLinkGame.hoja}
+                modoInicial={deepLinkGame.modoInicial}
+            />
+        </MarcoMitadDual></Suspense>;
+    }
     if (deepLinkGame) {
         return <GamePlayer
             recurso={deepLinkGame.recurso}

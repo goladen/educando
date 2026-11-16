@@ -416,7 +416,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                         {Object.entries(jugadores).map(([k, j]) => (
                             <label key={k} title={tr("Escribe el nombre del alumno")} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px 3px 10px', borderRadius: 99, background: '#5b21b6', fontWeight: 700, fontSize: '.9rem' }}>
                                 🎮 {j.mando > 900 ? `V${j.mando - 900}` : j.mando}
-                                <input value={j.nombre} onChange={e => renombrar(k, e.target.value)} onBlur={e => { if (!e.target.value.trim()) renombrar(k, nombreMando(j.mando, {})); }}
+                                <input data-nombres-grupo="si" value={j.nombre} onChange={e => renombrar(k, e.target.value)} onBlur={e => { if (!e.target.value.trim()) renombrar(k, nombreMando(j.mando, {})); }}
                                     style={{ width: 110, border: 'none', borderRadius: 99, padding: '3px 8px', background: 'rgba(0,0,0,.35)', color: '#fff', fontWeight: 700, fontFamily: 'inherit' }} />
                             </label>
                         ))}

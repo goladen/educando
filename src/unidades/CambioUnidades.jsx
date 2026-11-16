@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { MAGNITUDES, MAGNITUDES_CONTEXTO } from './magnitudes.js';
 import { METODOS, NIVELES } from './generadores.js';
 import { MAG_PROBLEMAS } from './problemasUnidades.js';
@@ -6,6 +6,11 @@ import ConversorVisual from './ConversorVisual.jsx';
 import Practica from './Practica.jsx';
 import TironUnidades from './TironUnidades.jsx';
 import BotonFichas from '../components/BotonFichas';
+
+// Modos para toda la clase: se cargan solo al abrirlos
+const QuizMandos = lazy(() => import('../mandos/QuizMandos.jsx'));
+const EnVivoUnidades = lazy(() => import('./EnVivoUnidades.jsx'));
+const Cargando = () => <div style={{ padding: 40, textAlign: 'center', fontWeight: 800, color: '#0891b2' }}>Cargando…</div>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  🔁 CAMBIO DE UNIDADES
@@ -132,6 +137,25 @@ export default function CambioUnidades({ onExit, contexto = 'fisica', vistaInici
         </div></div>
     );
 
+    // Mandos micro:bit: el Quiz con mandos con el tema «unidades» y solo las magnitudes elegidas
+    if (vista === 'mandos') return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10010, overflowY: 'auto', background: '#f8fafc' }}>
+            <Suspense fallback={<Cargando />}>
+                <QuizMandos soloMates onExit={volverMenu}
+                    matesIniciales={{ temas: ['unidades'], tipos: mags, nivel, titulo: '🎮 Cambio de unidades con mandos' }} />
+            </Suspense>
+        </div>
+    );
+
+    if (vista === 'envivo') return (
+        <div style={fondo}><div style={contenedor}>
+            <Cabecera titulo="📱 Cambio de unidades en vivo" sub="Cada alumno responde desde su dispositivo con el código de la sala" />
+            <Suspense fallback={<Cargando />}>
+                <EnVivoUnidades magsIniciales={mags} nivelInicial={nivel} onSalir={volverMenu} />
+            </Suspense>
+        </div></div>
+    );
+
     // ── MENÚ ──
     return (
         <div style={fondo}><div style={contenedor}>
@@ -143,6 +167,8 @@ export default function CambioUnidades({ onExit, contexto = 'fisica', vistaInici
                 <Tarjeta emoji="📝" color="#7c3aed" titulo="Problemas" texto="Una misma magnitud en distintas unidades: hay que pasarlo todo a la misma unidad para poder operar." onClick={() => setVista('problemas')} />
                 <Tarjeta emoji="🧩" color="#0d9488" titulo="Formas complejas e incomplejas" texto="3 km 5 hm 20 m = … m · 8 130 s = … h … min … s · grados, minutos y segundos." onClick={() => setVista('complejas')} />
                 <Tarjeta emoji="🪢" color="#ea580c" titulo="Tirón de cuerda por equipos" texto="Dos equipos compiten eligiendo la conversión correcta. También con mandos micro:bit." onClick={() => setVista('tiron')} />
+                <Tarjeta emoji="📱" color="#9333ea" titulo="En vivo por código" texto="Creas una sala y cada alumno responde desde su móvil o tablet con el código o el QR. Ranking por rapidez." onClick={() => setVista('envivo')} />
+                <Tarjeta emoji="🎮" color="#0369a1" titulo="Con mandos micro:bit" texto="Las preguntas salen en la pizarra y cada alumno responde con su micro:bit (A-D o número)." onClick={() => setVista('mandos')} />
                 <Tarjeta emoji="👾" color="#16a34a" titulo="Invasión Pi" texto="El arcade de marcianitos con las magnitudes y el nivel elegidos arriba." onClick={abrirInvasores} />
             </div>
             <div style={{ marginTop: 14 }}>

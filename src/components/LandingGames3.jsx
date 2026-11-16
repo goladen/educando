@@ -44,6 +44,7 @@ const InvasoresArcade = lazy(() => import('../invasores/InvasoresArcade'));
 const Visor3D = lazy(() => import('../Visor3D'));
 const Esculpir3D = lazy(() => import('../Esculpir3D'));
 const ComicCreator = lazy(() => import('../comic/ComicCreator'));
+const CentroPdf = lazy(() => import('../centroPdf/CentroPdf'));
 const TextWordleGame = lazy(() => import('../TextWordleGame'));
 const MathWordleGame = lazy(() => import('../MathWordleGame'));
 const SopaDeLetrasGame = lazy(() => import('../SopaDeLetrasGame'));
@@ -114,6 +115,8 @@ const PizarraApp = lazy(() => import('../GestionAula').then(m => ({ default: m.P
 const QuizManos = lazy(() => import('../manos/QuizManos.jsx'));
 const AvatarCuerpo = lazy(() => import('../cuerpo/AvatarCuerpo.jsx'));
 const Orientacion = lazy(() => import('../orientacion/Orientacion.jsx'));
+const DinamicasAula = lazy(() => import('../dinamicasAula/DinamicasAula.jsx'));
+const SemaforoAlumno = lazy(() => import('../dinamicasAula/SemaforoLive.jsx'));
 const AlgebraApp = lazy(() => import('../Algebra'));
 const VistasDidricas = lazy(() => import('../VistasDidricas'));
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
@@ -1421,6 +1424,14 @@ export const GAME_INFO = {
         materias: ['Universal', 'Plástica', 'Música', 'Geografía'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    DINAMICAS_AULA: {
+        descripcion: 'Diez dinámicas activas para orquestar desde la PDI, basadas en ideas de @myteachingexperience: piedra, papel o tijera por niveles, baila-para-y-habla, luz roja/luz verde, citas rápidas, mímica y frase, Kaboom, reto de los 10 sobres, la silla caliente, lanza y habla (dado y ruleta de frase) y tablero sorpresa. PiKT marca los tiempos con avisos sonoros, los turnos, las rotaciones de parejas y el marcador de cada equipo.',
+        tipoPreguntas: 'Preguntas para conversar, estructuras gramaticales, palabras para mímica o definición y retos con solución. Contenido listo para Inglés, Francés, Lengua, Matemáticas, Ciencias y Geografía e Historia, editable por el profesor.',
+        biblioteca: 'Sí, un banco por materia que el profesor puede sustituir por el suyo (se guarda en el dispositivo).',
+        multiplayer: 'Toda la clase en el aula: parejas que cambian, dos filas, equipos (2-8) o grupos pequeños; sorteo con la lista de clase. Fichas en PDF: ficha del profesor con QR, una ficha por equipo/alumno y tarjetas recortables (palitos de Kaboom, sobres, dado para montar). Cada sesión se guarda en «Mis registros».',
+        materias: ['Universal', 'Idiomas', 'Lengua', 'Matemáticas', 'Tutoría'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     QUIEN_ES_QUIEN: {
         descripcion: 'Dinámica para conocerse en clase en dos fases. Fase 1: cada alumno rellena un formulario (nombre, nº de hermanos, deporte, comida, lugar más lejano, película/serie favorita y una frase que le define), que se guarda por código de profesor y grupo. Fase 2: juego de "unir con líneas" por rondas donde hay que adivinar qué respuesta corresponde a cada compañero. El profesor tiene un panel para ver la tabla, gestionar los grupos y borrar los datos.',
         tipoPreguntas: 'Emparejar nombres con respuestas (deporte, hermanos, comida, lugar, película, frase) uniendo con líneas; las respuestas repetidas se agrupan.',
@@ -1450,6 +1461,14 @@ export const GAME_INFO = {
         tipoPreguntas: 'No hay preguntas. Es una herramienta de gestión y organización docente.',
         biblioteca: 'No aplica.',
         multiplayer: 'Herramienta docente para toda la clase.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    CENTRO_PDF: {
+        descripcion: 'Todos los generadores de PDF de PiKT en un solo sitio, ordenados por lo que necesitas: 📝 fichas de ejercicios nuevas cada vez (Matemáticas, Lengua, Biología, Geografía, Música, Lógica), 🎮 tus preguntas en papel eligiendo la estética (clásica con rosco, test, sopa de letras, unir con flechas… o arcade de Invasión Pi en papel o pantalla negra), 🎲 las fichas de cada juego con su estilo propio (Ovni, Escape Room de terror, puzzle recortable, Física, cuerpo humano…) y 🏫 documentos de aula (plano de clase, cartas personalizadas, mapas del INE, informes). Con buscador para encontrar lo que buscas sin conocer las herramientas.',
+        tipoPreguntas: 'Las de cada generador: ejercicios generados al azar con soluciones, o las preguntas de tus recursos.',
+        biblioteca: 'Sí: colecciones de fichas listas por etapa y curso, fichas compartidas por otros profes y recursos públicos.',
+        multiplayer: 'No aplica. Muchas fichas llevan QR y código para jugar después en clase con las mismas preguntas.',
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
@@ -1676,7 +1695,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
-        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA', 'OVNI', 'INVASORES'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'DINAMICAS_AULA', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA', 'OVNI', 'INVASORES'],
     },
     {
         id: 'ED_FISICA', label: 'Educación Física', emoji: '🏃', color: '#15803d',
@@ -1686,7 +1705,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'TUTORIA', label: 'Tutoría y aula', emoji: '🍎', color: '#c2410c',
         keywords: ['tutoria', 'convivencia', 'emociones', 'valores', 'orientacion', 'cohesion de grupo', 'funciones ejecutivas', 'quien es quien'],
-        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN', 'OVNI'],
+        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN', 'DINAMICAS_AULA', 'OVNI'],
     },
 ];
 
@@ -1733,6 +1752,7 @@ const EXTRA_TOOLS = {
     GEOGRAFIA:          { id: 'GEOGRAFIA',          name: 'Geografía',        emoji: '🌍', color: '#0d9488' },
     IMPERIOS:           { id: 'IMPERIOS',           name: 'Imperios',         emoji: '🏛️', color: '#b45309' },
     ORIENTACION:        { id: 'ORIENTACION',        name: 'Orientación',      emoji: '🚩', color: '#c026d3' },
+    DINAMICAS_AULA:     { id: 'DINAMICAS_AULA',     name: 'Dinámicas de aula', emoji: '🎉', color: '#ec4899' },
     BIOLOGIA:           { id: 'BIOLOGIA',           name: 'Biología',         emoji: '🔬', color: '#16a34a' },
     GESTION_AULA:       { id: 'GESTION_AULA',       name: 'Gestión Aula',     emoji: '🏫', color: '#e67e22' },
     VISTAS_DIDRICAS:    { id: 'VISTAS_DIDRICAS',    name: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed' },
@@ -2050,6 +2070,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
                 if (juegoParam.toLowerCase() === 'imperios')       { setImperiosApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'quienesquien')   { setQuienEsQuienApp(true); return; }
+                if (juegoParam.toLowerCase() === 'dinamicas')      { setDinamicasApp(true); return; }
                 if (juegoParam.toLowerCase() === 'quienhistorico') { setQuienHistoricoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
                 if (juegoParam.toLowerCase() === 'manos')          { setQuizManosApp(true);   return; }
@@ -2164,6 +2185,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setEsculpirApp(true);
             } else if (path === 'comic') {
                 setComicApp(true);
+            } else if (path === 'pdf' || path === 'imprimir') {
+                setCentroPdf(true);
             } else if (path === 'moneyboard' || path === 'piktboard') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
             } else if (path === 'ovni') {
@@ -2277,10 +2300,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [quizManosApp,        setQuizManosApp]        = useState(false);
     const [avatarCuerpoApp,     setAvatarCuerpoApp]     = useState(false);
     const [orientacionApp,      setOrientacionApp]      = useState(false);
+    const [dinamicasApp,        setDinamicasApp]        = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
     const [esculpirApp,         setEsculpirApp]         = useState(false);
     const [comicApp,            setComicApp]            = useState(false);
+    const [centroPdf,           setCentroPdf]           = useState(false); // 🖨️ Generar en PDF (/pdf)
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
     const [situacionesAprendizaje, setSituacionesAprendizaje] = useState(false);
@@ -2324,6 +2349,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     useEffect(() => { if (!quizManosApp) refrescarRegistros(); }, [quizManosApp]);
     useEffect(() => { if (!avatarCuerpoApp) refrescarRegistros(); }, [avatarCuerpoApp]);
     useEffect(() => { if (!orientacionApp) refrescarRegistros(); }, [orientacionApp]);
+    useEffect(() => { if (!dinamicasApp) refrescarRegistros(); }, [dinamicasApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
@@ -2826,8 +2852,10 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             QUIZ_MANOS:         () => setQuizManosApp(true),
             AVATAR_CUERPO:      () => setAvatarCuerpoApp(true),
             ORIENTACION:        () => { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); },
+            DINAMICAS_AULA:     () => { setDinamicasApp(true); window.history.pushState({}, '', '/dinamicas'); },
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
+            CENTRO_PDF:         () => { setCentroPdf(true); window.history.pushState({}, '', '/pdf'); },
             VISTAS_DIDRICAS:    () => setVistasDidricas(true),
             MINIAPP_CREATOR:    () => setMiniAppCreator(true),
             SIMULADORES_FISICA: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); },
@@ -2955,6 +2983,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         // Usamos la verdad absoluta de la base de datos, o el de la app si no está
         const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : (typeof appData !== 'undefined' ? appData.id : '');
 
+        if (tipoFinal === 'DINAMICA_SEMAFORO') return <Suspense fallback={null}><SemaforoAlumno codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} /></Suspense>;
         if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'EAE') return <ExpresionArtEscri isHost={false} codigoSala={joinLiveCode} usuario={{ uid: joinLiveHostId || null, displayName: joinLiveName, email: null }} onExit={() => { setLiveModeAlumno(false); setJoinLiveHostId(null); }} />;
@@ -3013,6 +3042,24 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         <ComicCreator onExit={() => { setComicApp(false); window.history.pushState({}, '', '/'); }} />
     );
 
+    if (centroPdf) return (
+        <CentroPdf
+            onExit={() => { setCentroPdf(false); window.history.pushState({}, '', '/'); }}
+            onIr={(destino) => {
+                // Abre el generador elegido; al salir de él se vuelve a la página principal
+                setCentroPdf(false);
+                const RUTAS = { invasores: '/invasores', ovni: '/ovni', escape: '/escaperoom', calculadora: '/calculadora', pizarras: '/pizarras_verticales', patio: '/patio', fisica: '/fisica', comic: '/comic', oca: '/oca', domino: '/domino' };
+                if (RUTAS[destino]) { window.history.pushState({}, '', RUTAS[destino]); window.dispatchEvent(new Event('popstate')); return; }
+                window.history.pushState({}, '', '/');
+                if (destino === 'puzzle') setJuegoActivo({ tipoJuego: 'PUZZLE_IMAGENES' });
+                else if (destino === 'gestion') setGestionAula(true);
+                else if (destino === 'orientacion') { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); }
+                else if (destino === 'quienesquien') { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }
+                else if (destino === 'comunidades') { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }
+            }}
+        />
+    );
+
     if (esculpirApp) return (
         <Esculpir3D onExit={() => { setEsculpirApp(false); window.history.pushState({}, '', '/'); }} />
     );
@@ -3031,6 +3078,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         <QuienEsQuienHistorico onExit={() => { setQuienHistoricoApp(false); window.history.pushState({}, '', '/'); }} />
     );
     if (quizManosApp) return <Suspense fallback={null}><QuizManos onExit={() => { setQuizManosApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
+    if (dinamicasApp) return <Suspense fallback={null}><DinamicasAula onExit={() => { setDinamicasApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (orientacionApp) return <Suspense fallback={null}><Orientacion onExit={() => { setOrientacionApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (avatarCuerpoApp) return <Suspense fallback={null}><AvatarCuerpo onExit={() => { setAvatarCuerpoApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (pizarraApp) return (
@@ -4438,10 +4486,12 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                 {[
                     // ── Gestión del aula
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${basePublica()}?gestion=menu` },
+                    { id: 'CENTRO_PDF', label: 'Generar en PDF', emoji: '🖨️', color: '#6D28D9', action: () => { setCentroPdf(true); window.history.pushState({}, '', '/pdf'); }, shareable: true, shareUrl: `${window.location.origin}/pdf` },
                     { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },
                     { id: 'COMUNIDADES', label: 'Comunidades', emoji: '👥', color: '#1565C0', action: () => { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }, shareable: true, shareUrl: `${window.location.origin}/comunidades` },
                     { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }), shareable: true },
                     { id: 'QUIEN_ES_QUIEN',      label: '¿Quién es quién?',     emoji: '🕵️', color: '#7c3aed', action: () => { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }, shareable: true, shareUrl: `${window.location.origin}/quienesquien` },
+                    { id: 'DINAMICAS_AULA',      label: 'Dinámicas de aula',    emoji: '🎉', color: '#ec4899', action: () => { setDinamicasApp(true); window.history.pushState({}, '', '/dinamicas'); }, shareable: true, shareUrl: `${window.location.origin}/dinamicas` },
                     // ── Banco de recursos y materias
                     { id: 'BANCO_RECURSOS', label: 'Banco de recursos', emoji: '📚', color: '#3949ab', action: abrirBancoRecursos, shareable: true, shareUrl: `${window.location.origin}/banco` },
                     { id: 'MATH_WORLD_PORTAL', label: 'Math World',    emoji: 'π', img: ICONO_PI, color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true, shareUrl: `${window.location.origin}/math_world` },
@@ -5112,6 +5162,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
         // Usamos la verdad absoluta de la base de datos, o el de la app si no está
         const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : (typeof appData !== 'undefined' ? appData.id : '');
 
+        if (tipoFinal === 'DINAMICA_SEMAFORO') return <Suspense fallback={null}><SemaforoAlumno codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} /></Suspense>;
         if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
 

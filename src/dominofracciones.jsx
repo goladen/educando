@@ -66,6 +66,15 @@ export default function DominoMatematico({ onExit }) {
     const [tiempo, setTiempo] = useState(30);
     const [nombres, setNombres] = useState(['', '', '', '']);
     const [showReglas, setShowReglas] = useState(false);
+    // Dominó en papel: un juego de 28 fichas por grupo (cada grupo con operaciones distintas)
+    const [gruposPdf, setGruposPdf] = useState(1);
+    const [solucionesPdf, setSolucionesPdf] = useState(true);
+    const [pdfEstado, setPdfEstado] = useState('');
+    const descargarPapel = async () => {
+        setPdfEstado('creando');
+        try { const { generarPdfDomino } = await import('./utils/pdfJuegosMesa'); await generarPdfDomino({ modo, grupos: gruposPdf, soluciones: solucionesPdf }); setPdfEstado(''); }
+        catch (e) { setPdfEstado('No se ha podido crear el PDF: ' + e.message); }
+    };
 
     const [jugadores, setJugadores] = useState([]);
     const [pozo, setPozo] = useState([]);
@@ -318,6 +327,27 @@ export default function DominoMatematico({ onExit }) {
                         <button onClick={iniciarJuego} style={{ width: '100%', padding: 15, background: '#f1c40f', border: 'none', borderRadius: 10, fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', color: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                             <Play size={20} /> EMPEZAR JUEGO
                         </button>
+                    </div>
+
+                    {/* Dominó en papel */}
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '16px 20px', borderRadius: 16, border: '1.5px dashed rgba(241,196,15,0.5)' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>🖨️ Jugar en papel (PDF)</div>
+                        <div style={{ fontSize: '0.8rem', opacity: 0.7, marginBottom: 12 }}>
+                            Las 28 fichas recortables de {MODOS_DOMINO.find(m => m.id === modo)?.label || modo}, con las reglas. Cada grupo recibe un juego con operaciones distintas.
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                            <span style={{ fontSize: '0.85rem' }}>Grupos:</span>
+                            {[1, 2, 4, 6, 8].map(n => (
+                                <button key={n} onClick={() => setGruposPdf(n)} style={{ padding: '6px 12px', borderRadius: 8, border: `2px solid ${gruposPdf === n ? '#f1c40f' : '#555'}`, background: gruposPdf === n ? '#f1c40f33' : 'transparent', color: 'white', cursor: 'pointer' }}>{n}</button>
+                            ))}
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={solucionesPdf} onChange={e => setSolucionesPdf(e.target.checked)} /> Hoja de soluciones
+                            </label>
+                        </div>
+                        <button onClick={descargarPapel} disabled={pdfEstado === 'creando'} style={{ width: '100%', padding: 12, background: 'transparent', border: '2px solid #f1c40f', borderRadius: 10, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', color: '#f1c40f' }}>
+                            {pdfEstado === 'creando' ? 'Creando PDF…' : '⬇️ Descargar fichas en PDF'}
+                        </button>
+                        {pdfEstado && pdfEstado !== 'creando' && <div style={{ marginTop: 8, color: '#ff6b6b', fontSize: '0.8rem' }}>{pdfEstado}</div>}
                     </div>
                 </div>
             </div>

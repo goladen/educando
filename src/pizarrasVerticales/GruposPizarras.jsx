@@ -7,24 +7,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { useGruposDispositivo, reemplazarGruposDispositivo, setGrupoActivo } from '../utils/gruposDispositivo';
+import { BotonGrupoDispositivo } from '../components/GruposDispositivo';
 
-const LS_LISTAS = 'pv_listas_v1';
-const LS_ANTIGUO = 'pv_alumnos_v1';   // versión anterior: un único textarea
+// Las listas del dispositivo viven en utils/gruposDispositivo.js (migra pv_listas_v1 y pv_alumnos_v1).
 const LS_ULTIMA = 'pv_lista_sel_v1';
 
 const leerLS = (k, def) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? def; } catch { return def; } };
 const guardarLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 const nuevoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const aLineas = t => String(t || '').split('\n').map(s => s.trim()).filter(Boolean);
-
-function leerListas() {
-    const listas = leerLS(LS_LISTAS, null);
-    if (Array.isArray(listas)) return listas;
-    const antiguo = aLineas(leerLS(LS_ANTIGUO, ''));
-    const migradas = antiguo.length ? [{ id: nuevoId(), nombre: 'Mi lista', alumnos: antiguo, fecha: new Date().toISOString() }] : [];
-    guardarLS(LS_LISTAS, migradas);
-    return migradas;
-}
 
 // Grupos de 3; si sobran 1 o 2 alumnos se reparten creando grupos de 4 (con 5 alumnos: 3 + 2).
 export function formarGrupos(nombres) {
@@ -52,14 +44,17 @@ const chip = (activo, color) => ({
 });
 const tituloFuente = { fontWeight: 800, fontSize: '0.85rem', color: '#475569', margin: '12px 0 6px' };
 
-export default function GruposPizarras({ grupos, setGrupos }) {
+// Props opcionales para reutilizarlo en otras herramientas (Dinámicas de aula): formar(nombres) → grupos,
+// etiqueta de cada grupo ("Pizarra", "Equipo"…), titulo, descripcion y nombreGrupo(i) para personalizar la tarjeta.
+export default function GruposPizarras({ grupos, setGrupos, formar = formarGrupos, etiqueta = 'Pizarra', titulo = '👥 Grupos aleatorios visibles', descripcion = 'Hazlo delante de la clase y cambia los grupos en cada tarea. Grupos de 3; si sobran alumnos, algunos grupos serán de 4.', nombreGrupo }) {
     // ── Usuario (funciona igual dentro de la app y en la ruta pública) ──
     const [user, setUser] = useState(() => auth.currentUser);
     useEffect(() => onAuthStateChanged(auth, u => setUser(u)), []);
 
     // ── Listas del dispositivo ──
-    const [listas, setListas] = useState(leerListas);
-    const guardarListas = l => { setListas(l); guardarLS(LS_LISTAS, l); };
+    // Son los «grupos del dispositivo» compartidos con la ruleta, los juegos, enviar resultados y los mandos
+    const { grupos: listas, activo: grupoEnUso } = useGruposDispositivo();
+    const guardarListas = l => reemplazarGruposDispositivo(l);
 
     // ── Fuentes en la nube ──
     const [misGrupos, setMisGrupos] = useState(null);       // null = cargando / sin sesión
@@ -116,7 +111,7 @@ export default function GruposPizarras({ grupos, setGrupos }) {
         if (s.clave) guardarLS(LS_ULTIMA, s.clave);
     };
 
-    const elegirDispositivo = l => elegir({ clave: `d:${l.id}`, origen: 'dispositivo', listaId: l.id, nombre: l.nombre, alumnos: l.alumnos.map(n => ({ nombre: n })) });
+    const elegirDispositivo = l => { setGrupoActivo(l.id); elegir({ clave: `d:${l.id}`, origen: 'dispositivo', listaId: l.id, nombre: l.nombre, alumnos: l.alumnos.map(n => ({ nombre: n })) }); };
     const elegirGrupo = g => elegir({
         clave: `g:${g.id}`, origen: 'grupo', nombre: g.nombre,
         alumnos: (g.alumnos || []).filter(a => a?.nombre).map(a => ({ nombre: a.nombre, sub: (a.grupo || '').trim() })),
@@ -137,7 +132,7 @@ export default function GruposPizarras({ grupos, setGrupos }) {
     // Reabrir la última lista del dispositivo usada (las de la nube se vuelven a elegir a mano)
     useEffect(() => {
         const ultima = leerLS(LS_ULTIMA, '');
-        const l = ultima.startsWith('d:') && listas.find(x => `d:${x.id}` === ultima);
+        const l = (grupoEnUso && listas.find(x => x.id === grupoEnUso.id)) || (ultima.startsWith('d:') && listas.find(x => `d:${x.id}` === ultima));
         if (l) elegirDispositivo(l);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -194,7 +189,7 @@ export default function GruposPizarras({ grupos, setGrupos }) {
                 setAviso('📱 Lista guardada en este dispositivo.');
             }
         }
-        setGrupos(formarGrupos(lista));
+        setGrupos(formar(lista));
     };
 
     const toggleAusente = i => setAusentes(prev => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; });
@@ -204,11 +199,11 @@ export default function GruposPizarras({ grupos, setGrupos }) {
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 40px', color: TINTA }}>
             <div style={{ background: 'white', borderRadius: 18, padding: 18, marginBottom: 16 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 4 }}>👥 Grupos aleatorios visibles</h3>
-                <p style={{ marginTop: 0, fontSize: '0.9rem', color: '#4b5563' }}>Hazlo delante de la clase y cambia los grupos en cada tarea. Grupos de 3; si sobran alumnos, algunos grupos serán de 4.</p>
+                <h3 style={{ marginTop: 0, marginBottom: 4 }}>{titulo}</h3>
+                <p style={{ marginTop: 0, fontSize: '0.9rem', color: '#4b5563' }}>{descripcion}</p>
 
                 {/* ── Fuentes ── */}
-                <div style={tituloFuente}>📱 Guardadas en este dispositivo</div>
+                <div style={{ ...tituloFuente, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>📱 Guardadas en este dispositivo <BotonGrupoDispositivo /></div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                     {listas.map(l => (
                         <span key={l.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
@@ -324,7 +319,7 @@ export default function GruposPizarras({ grupos, setGrupos }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                     {grupos.map((g, i) => (
                         <div key={i} style={{ background: 'white', borderRadius: 14, padding: '12px 16px', borderTop: '5px solid #f59e0b' }}>
-                            <div style={{ fontWeight: 900, fontSize: '1.15rem', color: '#b45309' }}>Pizarra {i + 1}</div>
+                            <div style={{ fontWeight: 900, fontSize: '1.15rem', color: '#b45309' }}>{nombreGrupo ? nombreGrupo(i) : `${etiqueta} ${i + 1}`}</div>
                             {g.map((n, k) => <div key={k} style={{ fontSize: '1.05rem' }}>{n}</div>)}
                         </div>
                     ))}

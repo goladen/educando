@@ -194,7 +194,7 @@ export function OpcionesMandos({ m }) {
                 {lista.filter(x => x.equipo === e).map(x => (
                   <div key={x.id} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 3 }}>
                     <button onClick={() => m.cambiarEquipo(x.id)} title="Cambiar de equipo" style={{ ...btn(e ? COLOR[e] : '#94a3b8'), minWidth: 36, padding: '2px 6px' }}>{x.id > 900 ? `V${x.id - 900}` : x.id}</button>
-                    <input value={x.nombre} onChange={ev => m.renombrar(x.id, ev.target.value)} onBlur={ev => { if (!ev.target.value.trim()) m.renombrar(x.id, nombrePorDefecto(x.id)); }}
+                    <input data-nombres-grupo="si" value={x.nombre} onChange={ev => m.renombrar(x.id, ev.target.value)} onBlur={ev => { if (!ev.target.value.trim()) m.renombrar(x.id, nombrePorDefecto(x.id)); }}
                       style={{ flex: 1, minWidth: 0, border: '1px solid #cbd5e1', borderRadius: 6, padding: '2px 6px', fontFamily: 'inherit' }} />
                   </div>
                 ))}

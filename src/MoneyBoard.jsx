@@ -125,7 +125,8 @@ function elegirPreguntaFinal(categorias, usadas = new Set()) {
 // =====================================================================
 //  BUSCADOR DE RECURSOS  (solo recursos con 2+ categorías jugables)
 // =====================================================================
-function BuscadorRecursos({ onBack, onPick }) {
+// Exportado también para Dinámicas de aula (importar preguntas al Tablero sorpresa, etc.).
+export function BuscadorRecursos({ onBack, onPick, minCats = 2, ayuda }) {
     const [busqueda, setBusqueda] = useState('');
     const [todos, setTodos] = useState([]);
     const [cargando, setCargando] = useState(true);
@@ -135,7 +136,7 @@ function BuscadorRecursos({ onBack, onPick }) {
     useEffect(() => {
         setLocales(listarRecursosLocales()
             .map(r => ({ r, cats: categoriasDeRecurso(r) }))
-            .filter(x => x.cats.length >= 2));
+            .filter(x => x.cats.length >= minCats));
     }, []);
 
     useEffect(() => {
@@ -146,13 +147,13 @@ function BuscadorRecursos({ onBack, onPick }) {
                 const docs = await conRecursosPikt(snap.docs.map(d => ({ ...d.data(), id: d.id })), 'CAZABURBUJAS', {}, { rellenar: true });
                 const jugables = docs
                     .map(r => ({ r, cats: categoriasDeRecurso(r) }))
-                    .filter(x => x.cats.length >= 2)
+                    .filter(x => x.cats.length >= minCats)
                     .sort((a, b) => (b.r.playCount || 0) - (a.r.playCount || 0));
                 setTodos(jugables);
             } catch (e) { console.error('Buscador Money Board:', e); }
             setCargando(false);
         })();
-    }, []);
+    }, [minCats]);
 
     const q = busqueda.toLowerCase().trim();
     const resultados = !q ? todos : todos.filter(({ r, cats }) =>
@@ -169,7 +170,7 @@ function BuscadorRecursos({ onBack, onPick }) {
                     <Search size={21} /> Elegir recurso
                 </h2>
                 <p style={{ color: '#90a4c8', fontSize: '0.85rem', margin: '0 0 12px' }}>
-                    Cada <b>hoja</b> del recurso será una categoría del tablero. Solo aparecen recursos con 2 o más hojas.
+                    {ayuda || <>Cada <b>hoja</b> del recurso será una categoría del tablero. Solo aparecen recursos con 2 o más hojas.</>}
                 </p>
                 <BuscarFichaCodigo oscuro style={{ marginBottom: 10 }} />
                 <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Título, tema, categoría…"
@@ -211,7 +212,7 @@ function BuscadorRecursos({ onBack, onPick }) {
 
                 <div style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {cargando ? <p style={{ color: '#90a4c8', textAlign: 'center' }}>Cargando biblioteca…</p>
-                        : resultados.length === 0 ? <p style={{ color: '#90a4c8', textAlign: 'center' }}>Sin recursos con 2 o más hojas.</p>
+                        : resultados.length === 0 ? <p style={{ color: '#90a4c8', textAlign: 'center' }}>{minCats > 1 ? 'Sin recursos con 2 o más hojas.' : 'Sin recursos.'}</p>
                             : resultados.map(({ r, cats }) => (
                                 <button key={r.id} onClick={() => onPick(r, cats)} style={{
                                     textAlign: 'left', padding: '12px 14px', borderRadius: 12,

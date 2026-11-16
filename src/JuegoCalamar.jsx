@@ -1591,7 +1591,7 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir, ordenFijo = 
                                 {lista.map(j => (
                                     <label key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px 3px 10px', borderRadius: 99, background: '#149e7a', color: 'white', fontWeight: 800, fontSize: '0.88rem' }}>
                                         {j.id > 900 ? `V${j.id - 900}` : j.id}
-                                        <input value={j.nombre} onChange={e => renombrar(j.id, e.target.value)}
+                                        <input data-nombres-grupo="si" value={j.nombre} onChange={e => renombrar(j.id, e.target.value)}
                                             onBlur={e => { if (!e.target.value.trim()) renombrar(j.id, j.id > 900 ? `Virtual ${j.id - 900}` : `Mando ${j.id}`); }}
                                             style={{ width: 110, border: 'none', borderRadius: 99, padding: '3px 8px', background: 'rgba(0,0,0,0.3)', color: 'white', fontWeight: 700, fontFamily: 'inherit' }} />
                                     </label>

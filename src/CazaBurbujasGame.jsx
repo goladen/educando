@@ -20,6 +20,7 @@ import bg4 from './assets/pantalla4.jpeg';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import MandosEnJuego, { COLORES_HUECO, esperarMandos } from './mandos/RelevosMandos.jsx';
+import { BotonPantallaDual } from './components/JuegoDual';
 
 const BACKGROUNDS = [bg1, bg2, bg3, bg4]; // Array para elegir al azar
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';
@@ -537,6 +538,7 @@ function PantallaSetup({ recurso, onStart, onRanking, onExit }) {
             )}
             <button className="btn-burbujas" onClick={()=>onStart('Burbujas', hoja)}>Jugar Burbujas</button>
             <button className="btn-test" onClick={()=>onStart('Test', hoja)}>Jugar Modo Test</button>
+            <BotonPantallaDual recurso={recurso} modo="BURBUJAS" style={{ marginTop: 10 }} />
             <button className="btn-ranking" onClick={onRanking}>VER RANKING</button>
             <button className="btn-back" onClick={onExit}>Volver</button>
             <EstilosComunes />

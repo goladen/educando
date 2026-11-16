@@ -16,7 +16,7 @@ import { generarEjercicio } from './Practica.jsx';
 const conUnidad = (t, un) => (un ? `${t}${['°', "'", '"'].includes(un) ? '' : ' '}${un}` : t);
 
 /** Ejercicio con 4 opciones (o null si no tiene suficientes distractores). */
-function preguntaCuerda(cfg) {
+export function preguntaCuerda(cfg) {
     for (let i = 0; i < 25; i++) {
         const ap = generarEjercicio(cfg);
         if (!ap) continue;

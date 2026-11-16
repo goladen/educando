@@ -1,8 +1,17 @@
 {
   "functions": {
-    "api/listening-tts.js": { "maxDuration": 60 },
-    "api/aemet.js": { "maxDuration": 300 },
-    "api/ia-recurso.js": { "maxDuration": 300 }
+    "api/listening-tts.js": {
+      "maxDuration": 60
+    },
+    "api/aemet.js": {
+      "maxDuration": 300
+    },
+    "api/ia-recurso.js": {
+      "maxDuration": 300
+    },
+    "api/saih.js": {
+      "maxDuration": 300
+    }
   },
   "headers": [
     {
@@ -42,6 +51,10 @@
     {
       "path": "/api/aemet",
       "schedule": "30 17 * * *"
+    },
+    {
+      "path": "/api/saih",
+      "schedule": "50 22 * * *"
     }
   ]
 }

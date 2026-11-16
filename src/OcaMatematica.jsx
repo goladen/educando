@@ -87,6 +87,9 @@ const resolverOp = (base, op, modo) => {
     return {question:`${bv} ${op.op} ${ov<0?`(${ov})`:ov}`, answer:res.toString()};
 };
 
+// Para el tablero en papel (utils/pdfJuegosMesa.js): las mismas casillas y operaciones que en pantalla
+export const OCA_PAPEL = { SQUARE_POS, OCAS, PUENTE_A, PUENTE_B, CARCEL, CAVERNA, MUERTE, META, getOp, opLabel, genBase, baseStr };
+
 // ─── Apariencia de casillas ───────────────────────────────────────────────────
 const NRM = ['#fff0f3','#f0fff4','#f0f4ff','#fffbf0','#f5f0ff','#f0fffe','#fff7f0','#f9fff0','#eef3ff','#f0fffa','#fff5f0','#ffeef8'];
 const squareMeta = (i) => {
@@ -426,6 +429,12 @@ export default function OcaMatematica({ onExit }) {
     const [numJ,     setNumJ]     = useState(2);
     const [tiempo,   setTiempo]   = useState(30);
     const [nombres,  setNombres]  = useState(['','','','']); // nombres personalizados
+    const [pdfEstado, setPdfEstado] = useState(''); // '' | 'creando' | mensaje de error
+    const descargarPapel = async () => {
+        setPdfEstado('creando');
+        try { const { generarPdfOca } = await import('./utils/pdfJuegosMesa'); await generarPdfOca({ modo }); setPdfEstado(''); }
+        catch (e) { setPdfEstado('No se ha podido crear el PDF: ' + e.message); }
+    };
     const [jugadores,setJugadores]= useState([]);
     const [turno,    setTurno]    = useState(0);
     const [dado,     setDado]     = useState(null);
@@ -736,6 +745,15 @@ export default function OcaMatematica({ onExit }) {
                         </button>
                         <button onClick={iniciar} style={{flex:1,padding:'13px',borderRadius:12,border:'none',background:'linear-gradient(135deg,#f1c40f,#e67e22)',color:'#1a1a2e',fontWeight:900,fontSize:'1.03rem',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontFamily:'inherit',boxShadow:'0 4px 18px rgba(241,196,15,0.4)'}}><Play size={19}/> ¡Empezar!</button>
                     </div>
+                    <button onClick={descargarPapel} disabled={pdfEstado==='creando'} title="Tablero, hojas de los jugadores, dado y fichas para recortar"
+                        style={{marginTop:12,width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px dashed rgba(241,196,15,0.55)',background:'rgba(241,196,15,0.08)',color:'#f1c40f',cursor:'pointer',fontFamily:'inherit',fontWeight:800,fontSize:'0.9rem',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
+                        <span style={{fontSize:'1.4rem'}}>🖨️</span>
+                        <span style={{flex:1}}>
+                            {pdfEstado==='creando'?'Creando PDF…':'Jugar en papel (PDF)'}
+                            <span style={{display:'block',fontWeight:500,fontSize:'0.72rem',color:'rgba(255,255,255,0.5)',marginTop:2}}>Tablero con las operaciones ({MODOS.find(m=>m.id===modo)?.label}), hojas de los jugadores, dado y fichas recortables</span>
+                        </span>
+                    </button>
+                    {pdfEstado&&pdfEstado!=='creando'&&<div style={{marginTop:8,color:'#ff6b6b',fontSize:'0.8rem',textAlign:'center'}}>{pdfEstado}</div>}
                 </div>
             </div>
         );

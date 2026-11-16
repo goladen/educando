@@ -13,6 +13,7 @@ import bg1 from './assets/pantalla5.jpeg';
 import bg2 from './assets/pantalla2.jpeg';
 import bg3 from './assets/pantalla3.jpeg';
 import bg4 from './assets/pantalla4.jpeg';
+import { BotonPantallaDual, esMitadDual } from './components/JuegoDual';
 
 // --- CONFIGURACIÓN VISUAL POR NIVEL ---
 const LEVEL_THEMES = [
@@ -856,8 +857,8 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                         )}
                     </div>
 
-                    {/* 2. BOTÓN PANTALLA COMPLETA (ESQUINA DERECHA SUPERIOR) */}
-                    <button
+                    {/* 2. BOTÓN PANTALLA COMPLETA (ESQUINA DERECHA SUPERIOR) — no en una mitad de la pantalla dual */}
+                    {!esMitadDual() && <button
                         onClick={toggleFullScreen}
                         style={{
                             position: 'absolute',
@@ -878,7 +879,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                         title="Pantalla Completa"
                     >
                         <Maximize size={24} />
-                    </button>
+                    </button>}
                 </>
             )}
 
@@ -1224,6 +1225,7 @@ function PantallaSetup({ recurso, onStart, onExit, onRanking }) {
                 <button onClick={onRanking} style={{ ...btnStyle, marginTop: 0, background: '#8e44ad', boxShadow: '0 5px 0 #6c3483' }}>
                     <Trophy size={20} /> VER RANKING
                 </button>
+                <BotonPantallaDual recurso={recurso} modo="PIKATRON" style={{ marginBottom: 0, borderRadius: 10 }} />
 
 
 

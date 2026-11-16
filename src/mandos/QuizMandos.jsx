@@ -152,7 +152,8 @@ const guardarLS = (clave, valor) => {
 };
 
 // soloMates: herramienta «Mates con mandos» de Math World (el mismo quiz, solo con sus ejercicios)
-export default function QuizMandos({ onExit, soloMates = false }) {
+// matesIniciales: { temas, tipos, nivel, titulo } → arranca con esos ejercicios (p. ej. desde Cambio de unidades)
+export default function QuizMandos({ onExit, soloMates = false, matesIniciales = null }) {
   const [fase, setFase] = useState('config'); // config | lobby | pregunta | resultado | final
   const [tipo, setTipo] = useState(soloMates ? 'mates' : 'tablas');
   const generarMates = useRef(null);
@@ -351,7 +352,7 @@ export default function QuizMandos({ onExit, soloMates = false }) {
         <button onClick={onExit} style={st.backBtn}>
           ← Volver
         </button>
-        <h2 style={st.title}>{soloMates ? '🧮 Mates con mandos' : '🏆 Quiz con mandos'}</h2>
+        <h2 style={st.title}>{matesIniciales?.titulo || (soloMates ? '🧮 Mates con mandos' : '🏆 Quiz con mandos')}</h2>
         <ChipAntena />
         {(fase === 'pregunta' || fase === 'resultado') && (
           <span style={st.contador}>
@@ -409,7 +410,7 @@ export default function QuizMandos({ onExit, soloMates = false }) {
                     : <>Ejercicios de todas las apps de Math World: cada uno se convierte en una pregunta con opciones A-D.</>}
                 </p>
                 <Suspense fallback={<p style={st.ayuda}>Cargando ejercicios…</p>}>
-                  <SelectorMatesMandos numerico={numerico} apiRef={generarMates} />
+                  <SelectorMatesMandos numerico={numerico} apiRef={generarMates} temasIniciales={matesIniciales?.temas} tiposIniciales={matesIniciales?.tipos} nivelInicial={matesIniciales?.nivel} />
                 </Suspense>
               </>
             )}
@@ -519,7 +520,7 @@ export default function QuizMandos({ onExit, soloMates = false }) {
                 .map((j) => (
                   <div key={j.id} style={st.jugCard}>
                     <span style={st.jugNum}>{j.id > 900 ? '🧪' : j.id}</span>
-                    <input
+                    <input data-nombres-grupo="si"
                       value={nombres[j.id] || ''}
                       placeholder={nombre(j.id)}
                       onChange={(e) => setNombres((p) => ({ ...p, [j.id]: e.target.value }))}

@@ -5,6 +5,7 @@ import App from './App.jsx'
 import CargandoChunk from './components/CargandoChunk.jsx'
 import { LanguageProvider } from './i18n/LanguageContext.jsx'
 import { instalarCapturaErrores } from './utils/reportarError.js'
+import SelectorNombresGlobal from './components/SelectorNombresGlobal.jsx'
 
 // Registro de fallos de los usuarios (errores_web, panel 🐞 del admin)
 instalarCapturaErrores();
@@ -31,6 +32,8 @@ createRoot(document.getElementById('root')).render(
       <Suspense fallback={<CargandoChunk />}>
         <App />
       </Suspense>
+      {/* Nombres del grupo guardado en el dispositivo al tocar un campo «nombre» */}
+      <SelectorNombresGlobal />
     </LanguageProvider>
   </StrictMode>,
 )

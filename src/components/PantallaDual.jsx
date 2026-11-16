@@ -18,6 +18,8 @@ const NO_TEXTO = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'ran
 function campoDe(el) {
     const c = el?.closest?.('input, textarea, select');
     if (!c || c.disabled || c.readOnly) return null;
+    // El juego trae su propio teclado en pantalla para esta casilla (p. ej. Pasapalabra)
+    if (c.closest('[data-teclado-propio]')) return null;
     if (c.tagName === 'INPUT' && NO_TEXTO.has((c.type || '').toLowerCase())) return null;
     return c;
 }
@@ -45,8 +47,8 @@ const FILAS_ABC = [
 ];
 
 /** Panel táctil de una mitad: teclado (casillas) u opciones (desplegables). */
-function PanelCampo({ campo, onCerrar, color }) {
-    const [abc, setAbc] = useState(false);
+function PanelCampo({ campo, onCerrar, color, tecladoInicial = 'num' }) {
+    const [abc, setAbc] = useState(tecladoInicial === 'abc' && campo.type !== 'number');
     const [, refrescar] = useState(0);
     const esSelect = campo.tagName === 'SELECT';
     const esNumero = campo.type === 'number';
@@ -83,7 +85,6 @@ function PanelCampo({ campo, onCerrar, color }) {
     };
     // onPointerDown (no onClick): cada tecla responde a su dedo aunque el otro lado esté tocando
     const tecla = (k, extra = {}) => ({
-        key: k,
         onPointerDown: (e) => { e.preventDefault(); e.stopPropagation(); pulsar(k); },
         style: {
             flex: k === '␣' ? 4 : 1, minWidth: 0, minHeight: 46, borderRadius: 9, border: '1px solid #30363d',
@@ -117,7 +118,7 @@ function PanelCampo({ campo, onCerrar, color }) {
                 </div>
             ) : (abc ? FILAS_ABC : FILAS_NUM).map((fila, i) => (
                 <div key={i} style={{ display: 'flex', gap: 6 }}>
-                    {fila.map((k) => <button type="button" {...tecla(k)}>{k === '␣' ? 'espacio' : k}</button>)}
+                    {fila.map((k) => <button key={k} type="button" {...tecla(k)}>{k === '␣' ? 'espacio' : k}</button>)}
                 </div>
             ))}
         </div>
@@ -125,14 +126,17 @@ function PanelCampo({ campo, onCerrar, color }) {
 }
 
 /**
- * Una mitad. Lleva transform para que los `position: fixed` de dentro (modales) se queden en
+ * Una mitad (exportada: JuegoDual la usa dentro de cada iframe). Lleva transform para que los `position: fixed` de dentro (modales) se queden en
  * ella; el contenido se desplaza en una capa interior y el teclado queda fijo abajo.
  */
-function Mitad({ children, color }) {
+// tecladoInicial: 'num' (mates) | 'abc' (juegos de palabras)
+// abrirAlEnfocar: si el juego enfoca él solo una casilla (autoFocus), se abre el teclado de esta mitad
+export function Mitad({ children, color, tecladoInicial = 'num', abrirAlEnfocar = false }) {
     const toques = useRef(new Map());   // pointerId → { x, y, t, target }
     const generados = useRef([]);       // clicks generados (para no duplicar el click nativo)
     const [activo, setActivo] = useState(null); // { el, n }: n reinicia el teclado al cambiar de casilla
     const campo = activo?.el || null;
+    const ultimoPuntero = useRef(null); // 'mouse' | 'touch' | 'pen': con ratón no se abre el teclado al enfocar
     const setCampo = useCallback((el) => setActivo((a) => (el ? { el, n: (a?.n || 0) + 1 } : null)), []);
 
     // Resalta la casilla activa de esta mitad
@@ -143,10 +147,13 @@ function Mitad({ children, color }) {
         campo.style.outlineOffset = '2px';
         // si la casilla desaparece (cambia el ejercicio), se cierra el teclado
         const id = setInterval(() => { if (!campo.isConnected || campo.disabled) setCampo(null); }, 400);
-        return () => { clearInterval(id); campo.style.outline = prev.outline; campo.style.outlineOffset = prev.offset; };
+        // el teclado ocupa la parte de abajo: que la casilla siga a la vista
+        const t = setTimeout(() => { try { campo.scrollIntoView({ block: 'nearest' }); } catch { /* nada */ } }, 80);
+        return () => { clearInterval(id); clearTimeout(t); campo.style.outline = prev.outline; campo.style.outlineOffset = prev.offset; };
     }, [campo, color, setCampo]);
 
     const onPointerDownCapture = useCallback((e) => {
+        ultimoPuntero.current = e.pointerType;
         if (e.pointerType === 'mouse') return;
         toques.current.set(e.pointerId, { x: e.clientX, y: e.clientY, t: Date.now(), target: e.target });
         // Sin foco nativo en las casillas (se escribe con el teclado de esta mitad)
@@ -173,6 +180,12 @@ function Mitad({ children, color }) {
         }));
     }, [setCampo]);
 
+    const onFocusCapture = useCallback((e) => {
+        if (!abrirAlEnfocar || ultimoPuntero.current === 'mouse') return;
+        const c = campoDe(e.target);
+        if (c && c !== campo) setCampo(c);
+    }, [abrirAlEnfocar, campo, setCampo]);
+
     const onPointerCancelCapture = useCallback((e) => { toques.current.delete(e.pointerId); }, []);
 
     // El click nativo que llega después de un toque ya atendido se descarta (si no, contaría doble)
@@ -195,12 +208,12 @@ function Mitad({ children, color }) {
     return (
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', transform: 'translateZ(0)' }}
             onPointerDownCapture={onPointerDownCapture} onPointerUpCapture={onPointerUpCapture}
-            onPointerCancelCapture={onPointerCancelCapture} onClickCapture={onClickCapture}>
+            onPointerCancelCapture={onPointerCancelCapture} onClickCapture={onClickCapture} onFocusCapture={onFocusCapture}>
             {/* pan-y: se puede desplazar con un dedo, pero sin pellizco ni gestos de dos dedos */}
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', touchAction: 'pan-y', overscrollBehavior: 'contain' }}>
                 {children}
             </div>
-            {campo && <PanelCampo key={activo.n} campo={campo} color={color} onCerrar={() => setCampo(null)} />}
+            {campo && <PanelCampo key={activo.n} campo={campo} color={color} tecladoInicial={tecladoInicial} onCerrar={() => setCampo(null)} />}
         </div>
     );
 }

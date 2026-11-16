@@ -119,6 +119,13 @@ export const GAMES = [
     nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'pdf', emoji: '🖨️', color: '#6D28D9',
+    h1: 'Fichas para imprimir en PDF: todos los generadores de PiKT',
+    title: 'Generador de fichas en PDF para imprimir, gratis | PiKT',
+    desc: 'Fichas en PDF con ejercicios nuevos cada vez y soluciones: matemáticas, lengua, biología, geografía y música. Pasa tus preguntas a papel (test, rosco, sopa de letras) y documentos de aula.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
+  },
+  {
     slug: 'comic', emoji: '💬', color: '#e84393',
     h1: 'Creador de cómics para clase',
     title: 'Creador de cómics online para clase, gratis | PiKT',

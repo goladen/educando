@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ZONAS_ESCALADA, DOC_LLUVIA_AEMET } from '../../api/_zonasLluvia.js';
+import { ZONAS_ESCALADA, DOC_LLUVIA_AEMET, DOC_LLUVIA_SAIH } from '../../api/_zonasLluvia.js';
 import { lluviaMeteocat } from './meteocatXema';
 
 // ─── Recopilador de precipitaciones (Open-Meteo) ────────────────────────────
@@ -162,6 +162,52 @@ function useEsMovil(max = 640) {
     }, [consulta]);
     return movil;
 }
+
+// ─── SAIH Ebro: filas por zona a partir de sitio_publico/lluvia_saih (lo llena el cron de api/saih.js) ───
+// Solo las zonas con "saih" en ZONAS_ESCALADA. "parciales" marca los periodos que empiezan antes del
+// primer día del historial (que el cron va rellenando poco a poco).
+function filasSaih(doc, sitios) {
+    if (!doc?.dias) return {};
+    const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+    const [anio, mes] = hoy.split('-').map(Number);
+    const iniMesAnt = mes === 1 ? `${anio - 1}-12-01` : `${anio}-${String(mes - 1).padStart(2, '0')}-01`;
+    const finMesAnt = sumarDias(`${hoy.slice(0, 7)}-01`, -1);
+    const desde = doc.desde || hoy;
+    const nombres = Object.fromEntries((doc.estaciones || []).map(e => [e.codigo, e.nombre]));
+    const out = {};
+    sitios.forEach(s => {
+        const cod = ZONAS_ESCALADA.find(z => z.id === s.id)?.saih;
+        if (!cod) return;
+        const dia = {};
+        Object.entries(doc.dias).forEach(([d, v]) => { if (typeof v?.[cod] === 'number') dia[d] = v[cod]; });
+        const fechas = Object.keys(dia).sort();
+        if (!fechas.length) return;
+        const suma = (f) => redondear(fechas.filter(f).reduce((t, d) => t + dia[d], 0));
+        let diasSeco = null;
+        for (let n = 0; n <= 366; n++) {
+            const d = sumarDias(hoy, -n);
+            if (d < fechas[0]) break;
+            if ((dia[d] || 0) >= UMBRAL_DIA_LLUVIA) { diasSeco = n; break; }
+        }
+        out[s.id] = {
+            estacion: { id: cod, nombre: nombres[cod] || cod },
+            h24: typeof doc.h24?.[cod]?.valor === 'number' ? doc.h24[cod].valor : null,
+            d7: suma(d => d > sumarDias(hoy, -7)),
+            d30: suma(d => d > sumarDias(hoy, -30)),
+            mesAnt: suma(d => d >= iniMesAnt && d <= finMesAnt),
+            anio: suma(d => d.startsWith(String(anio))),
+            diasSeco,
+            hasta: fechas[fechas.length - 1],
+            parciales: {
+                d7: desde > sumarDias(hoy, -6), d30: desde > sumarDias(hoy, -29),
+                mesAnt: desde > iniMesAnt, anio: desde > `${anio}-01-01`, diasSeco: diasSeco == null,
+            },
+            desde,
+        };
+    });
+    return out;
+}
+const marcaSaih = (x, k) => (x?.parciales?.[k] ? '*' : '');
 
 // ─── Gráfico de barras SVG ───────────────────────────────────────────────────
 function Barras({ datos, color, alto = 140, destacarUltimo = false }) {
@@ -349,6 +395,8 @@ export default function Precipitaciones() {
     const [aemetActualizado, setAemetActualizado] = useState(null); // hora del último cron
     const [meteocat, setMeteocat] = useState({});        // id → fila de Meteocat (XEMA)
     const [estadoMeteocat, setEstadoMeteocat] = useState('cargando');
+    const [saihDoc, setSaihDoc] = useState(null);         // documento del cron del SAIH Ebro
+    const [estadoSaih, setEstadoSaih] = useState('cargando');
     const [fuente, setFuente] = useState('ambas');     // ambas | om | aemet
     const movil = useEsMovil();
 
@@ -411,6 +459,16 @@ export default function Precipitaciones() {
         return () => { cancel = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [claveSitios, recarga]);
+
+    // SAIH Ebro: una lectura del documento que el cron actualiza cada noche a las 23:50.
+    useEffect(() => {
+        let cancel = false;
+        getDoc(doc(db, ...DOC_LLUVIA_SAIH.split('/')))
+            .then(snap => { if (!cancel) { setSaihDoc(snap.exists() ? snap.data() : null); setEstadoSaih('listo'); } })
+            .catch(() => { if (!cancel) setEstadoSaih('error'); });
+        return () => { cancel = true; };
+    }, []);
+    const saih = useMemo(() => filasSaih(saihDoc, sitios), [saihDoc, sitios]);
 
     // Meteocat (XEMA, datos abiertos de la Generalitat): sin clave ni cuota, directo desde el navegador.
     useEffect(() => {
@@ -491,7 +549,7 @@ export default function Precipitaciones() {
     const quitar = (id) => { setSitios(prev => prev.filter(s => s.id !== id)); if (detalle === id) setDetalle(null); };
 
     // Fuente principal de la tabla y del mapa: Open-Meteo (también en "ambas") o AEMET.
-    const principal = fuente === 'aemet' ? aemet : fuente === 'meteocat' ? meteocat : datos;
+    const principal = fuente === 'aemet' ? aemet : fuente === 'meteocat' ? meteocat : fuente === 'saih' ? saih : datos;
 
     const maximos = useMemo(() => {
         const m = {};
@@ -500,7 +558,7 @@ export default function Precipitaciones() {
     }, [principal]);
 
     const filas = useMemo(() => {
-        const f = sitios.map(s => ({ s, d: datos[s.id], a: aemet[s.id], m: meteocat[s.id], p: principal[s.id] }));
+        const f = sitios.map(s => ({ s, d: datos[s.id], a: aemet[s.id], m: meteocat[s.id], h: saih[s.id], p: principal[s.id] }));
         if (!orden) return f;
         return [...f].sort((a, b) => {
             // En Open-Meteo, diasSeco null = más de 92 días sin lluvia (el más seco); sin datos va al final.
@@ -508,13 +566,13 @@ export default function Precipitaciones() {
             const va = valor(a) ?? -1, vb = valor(b) ?? -1;
             return orden.dir * (va - vb);
         });
-    }, [sitios, datos, aemet, meteocat, principal, orden]);
+    }, [sitios, datos, aemet, meteocat, saih, principal, orden]);
 
     const hoyLocal = fechaMadrid();
     const aemetAtrasado = (a) => a?.hasta && a.hasta < sumarDias(hoyLocal, -1);
     const fechaCorta = (d) => d.split('-').reverse().slice(0, 2).join('/');
 
-    const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : fuente === 'meteocat' ? estadoMeteocat === 'cargando' : estado === 'cargando';
+    const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : fuente === 'meteocat' ? estadoMeteocat === 'cargando' : fuente === 'saih' ? estadoSaih === 'cargando' : estado === 'cargando';
     // Utilidades de presentación de los valores AEMET de una fila (tabla y tarjetas).
     const ayudasAemet = (a) => {
         // Periodos que AEMET cubre con valores diarios (que llegan con unos días de retraso).
@@ -574,7 +632,7 @@ export default function Precipitaciones() {
     // Tarjeta de una ubicación (vista móvil): cuadrícula de periodos con el valor principal y, debajo, AEMET y Meteocat.
     const TILES = [...COLUMNAS.map(c => ({ ...c, label: c.key === 'mesAnt' && ejemplo ? `Mes ant. (${ejemplo.nombreMesAnt.slice(0, 3)})` : c.key === 'anio' && ejemplo ? `Año ${ejemplo.anioActual}` : c.label.replace('Últimas ', '').replace('Última ', '').replace('Último ', '') })),
         { key: 'diasSeco', label: 'Días sin lluvia' }, { key: 'prox24', label: 'Próx. 24 h' }];
-    const tarjeta = ({ s, d, a, m, p }) => {
+    const tarjeta = ({ s, d, a, m, h, p }) => {
         const { parcial, extra, textoSeco } = ayudasAemet(a);
         const abierta = detalle === s.id;
         return (
@@ -589,6 +647,9 @@ export default function Precipitaciones() {
                         )}
                         {(fuente === 'ambas' || fuente === 'meteocat') && m?.estacion && (
                             <div style={{ color: '#2dd4bf', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📡 Meteocat: {m.estacion.nombre} · {m.estacion.km} km</div>
+                        )}
+                        {(fuente === 'ambas' || fuente === 'saih') && h?.estacion && (
+                            <div style={{ color: '#f472b6', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📡 SAIH Ebro: {h.estacion.nombre}</div>
                         )}
                     </div>
                     <span style={{ color: '#64748b', fontSize: '0.75rem', paddingTop: 4 }}>{abierta ? '▲' : '▼'}</span>
@@ -606,7 +667,7 @@ export default function Precipitaciones() {
                             <div key={t.key} style={{ background: fondo, borderRadius: 10, padding: '7px 8px', minWidth: 0, outline: destacado ? '1px solid #38bdf8' : 'none' }}>
                                 <div style={{ color: esProx ? '#c4b5fd' : '#94a3b8', fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.label}</div>
                                 <div style={{ fontWeight: 800, fontSize: '1.05rem', fontVariantNumeric: 'tabular-nums', color: esSeco ? colorSeco(p) : v ? 'white' : '#64748b' }}>
-                                    {fuenteP ? (esSeco ? textoSeco(p) : fmt(v)) + (fuente === 'aemet' && !esProx ? extra(t.key) : '') : cargandoP ? '…' : '—'}
+                                    {fuenteP ? (esSeco ? textoSeco(p) : fmt(v)) + (fuente === 'aemet' && !esProx ? extra(t.key) : fuente === 'saih' && !esProx ? marcaSaih(p, t.key) : '') : cargandoP ? '…' : '—'}
                                     {!esSeco && fuenteP && <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94a3b8' }}> mm</span>}
                                 </div>
                                 {fuente === 'ambas' && !esProx && (
@@ -617,6 +678,11 @@ export default function Precipitaciones() {
                                 {fuente === 'ambas' && !esProx && m && (
                                     <div style={{ fontSize: '0.66rem', fontWeight: 600, color: '#2dd4bf', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         Meteocat {esSeco ? textoSeco(m) : fmt(m[t.key])}
+                                    </div>
+                                )}
+                                {fuente === 'ambas' && !esProx && h && (
+                                    <div style={{ fontSize: '0.66rem', fontWeight: 600, color: '#f472b6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        SAIH {esSeco ? textoSeco(h) : fmt(h[t.key])}{marcaSaih(h, t.key)}
                                     </div>
                                 )}
                             </div>
@@ -649,11 +715,14 @@ export default function Precipitaciones() {
                         {estadoAemet === 'error' && fuente !== 'om' && <span style={{ color: '#f87171' }}> · AEMET no disponible ahora</span>}
                         {estadoMeteocat === 'cargando' && (fuente === 'ambas' || fuente === 'meteocat') && <span style={{ color: '#2dd4bf' }}> · Cargando Meteocat…</span>}
                         {estadoMeteocat === 'error' && (fuente === 'ambas' || fuente === 'meteocat') && <span style={{ color: '#f87171' }}> · Meteocat no disponible ahora</span>}
+                        {(fuente === 'ambas' || fuente === 'saih') && saihDoc?.actualizado && (
+                            <span style={{ color: '#f472b6' }}> · SAIH Ebro: {new Date(saihDoc.actualizado).toLocaleString('es-ES', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })} (cada noche a las 23:50)</span>
+                        )}
                     </span>
                     <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: 3, width: movil ? '100%' : 'auto', order: movil ? -1 : 0 }}>
-                        {[['ambas', 'Comparar'], ['om', 'Open-Meteo'], ['aemet', 'AEMET'], ['meteocat', 'Meteocat']].map(([k, l]) => (
+                        {[['ambas', 'Comparar'], ['om', 'Open-Meteo'], ['aemet', 'AEMET'], ['meteocat', 'Meteocat'], ['saih', 'SAIH Ebro']].map(([k, l]) => (
                             <button key={k} onClick={() => setFuente(k)}
-                                style={{ flex: movil ? 1 : 'none', background: fuente === k ? (k === 'aemet' ? '#f59e0b' : k === 'meteocat' ? '#0d9488' : '#0ea5e9') : 'transparent', border: 'none', color: 'white', borderRadius: 999, padding: movil ? '8px 6px' : '5px 12px', cursor: 'pointer', fontSize: movil ? '0.82rem' : '0.78rem', fontWeight: 700 }}>
+                                style={{ flex: movil ? 1 : 'none', background: fuente === k ? (k === 'aemet' ? '#f59e0b' : k === 'meteocat' ? '#0d9488' : k === 'saih' ? '#db2777' : '#0ea5e9') : 'transparent', border: 'none', color: 'white', borderRadius: 999, padding: movil ? '8px 3px' : '5px 12px', cursor: 'pointer', fontSize: movil ? '0.72rem' : '0.78rem', whiteSpace: 'nowrap', fontWeight: 700 }}>
                                 {l}
                             </button>
                         ))}
@@ -700,7 +769,7 @@ export default function Precipitaciones() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filas.map(({ s, d, a, m, p }) => {
+                                {filas.map(({ s, d, a, m, h, p }) => {
                                     const { parcial, extra, notaAemet, textoSeco } = ayudasAemet(a);
                                     return (
                                     <tr key={s.id} onClick={() => setDetalle(detalle === s.id ? null : s.id)} style={{ cursor: 'pointer', background: detalle === s.id ? 'rgba(14,165,233,0.12)' : 'transparent' }}>
@@ -713,10 +782,13 @@ export default function Precipitaciones() {
                                             {(fuente === 'ambas' || fuente === 'meteocat') && m?.estacion && (
                                                 <div style={{ color: '#2dd4bf', fontSize: '0.68rem' }} title={`Estación Meteocat ${m.estacion.id}`}>📡 Meteocat: {m.estacion.nombre} · {m.estacion.km} km</div>
                                             )}
+                                            {(fuente === 'ambas' || fuente === 'saih') && h?.estacion && (
+                                                <div style={{ color: '#f472b6', fontSize: '0.68rem' }} title={`Pluviómetro SAIH ${h.estacion.id}`}>📡 SAIH Ebro: {h.estacion.nombre}</div>
+                                            )}
                                         </td>
                                         {COLUMNAS.map(c => (
                                             <td key={c.key} style={celda(p?.[c.key], maximos[c.key])} title={fuente === 'ambas' || fuente === 'aemet' ? notaAemet(c.key) : undefined}>
-                                                {p ? `${fmt(p[c.key])}${fuente === 'aemet' ? extra(c.key) : ''}` : cargandoP ? '…' : '—'}
+                                                {p ? `${fmt(p[c.key])}${fuente === 'aemet' ? extra(c.key) : fuente === 'saih' ? marcaSaih(p, c.key) : ''}` : cargandoP ? '…' : '—'}
                                                 {fuente === 'ambas' && (
                                                     <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fbbf24' }}>
                                                         {a ? `AEMET ${fmt(a[c.key])}${extra(c.key)}` : estadoAemet === 'cargando' ? 'AEMET …' : ''}
@@ -725,12 +797,16 @@ export default function Precipitaciones() {
                                                 {fuente === 'ambas' && m && (
                                                     <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#2dd4bf' }}>Meteocat {fmt(m[c.key])}</div>
                                                 )}
+                                                {fuente === 'ambas' && h && (
+                                                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#f472b6' }}>SAIH {fmt(h[c.key])}{marcaSaih(h, c.key)}</div>
+                                                )}
                                             </td>
                                         ))}
                                         <td style={{ ...celda(0, 1), color: p?.diasSeco == null ? '#4ade80' : p.diasSeco >= 3 ? '#4ade80' : p.diasSeco >= 1 ? '#fbbf24' : '#f87171' }}>
                                             {p ? textoSeco(p) : '—'}
                                             {fuente === 'ambas' && a && <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fbbf24' }}>AEMET {textoSeco(a)}{parcial('diasSeco') ? '*' : ''}</div>}
                                             {fuente === 'ambas' && m && <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#2dd4bf' }}>Meteocat {textoSeco(m)}</div>}
+                                            {fuente === 'ambas' && h && <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#f472b6' }}>SAIH {textoSeco(h)}</div>}
                                         </td>
                                         <td style={celda(d?.prox24, maximos.prox24, '167,139,250')}>{d ? fmt(d.prox24) : '—'}</td>
                                         <td style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -751,6 +827,7 @@ export default function Precipitaciones() {
                     {movil ? 'Toca una tarjeta (o un punto del mapa) para ver sus gráficos.' : 'Pulsa una fila (o un punto del mapa) para ver el detalle. Pulsa una cabecera para ordenar.'}
                     {fuente !== 'om' && <> AEMET usa la estación más cercana{movil ? '' : ' (pasa el ratón por una cifra para verla)'}; <span style={{ color: '#fbbf24' }}>*</span> = los valores diarios de AEMET llegan con unos días de retraso.</>}
                     {(fuente === 'ambas' || fuente === 'meteocat') && <> Meteocat solo tiene estaciones en Cataluña (a menos de 20 km de la zona); sus datos son de cada media hora y van al día.</>}
+                    {(fuente === 'ambas' || fuente === 'saih') && <> SAIH Ebro: pluviómetros de la Confederación en algunas zonas; <span style={{ color: '#f472b6' }}>*</span> = el historial aún no cubre todo el periodo{saihDoc?.desde ? ` (hay datos desde el ${saihDoc.desde.split('-').reverse().join('/')})` : ''}.</>}
                 </p>
 
                 {sitios.length > 0 && (
@@ -780,7 +857,8 @@ export default function Precipitaciones() {
                     <br />
                     <span style={{ fontSize: '0.72rem' }}>Datos: <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>Open-Meteo</a> (modelos meteorológicos y reanálisis ERA5, CC BY 4.0): estimaciones en una rejilla de 1–25 km, no lecturas de pluviómetro.
                         {' '}<a href="https://opendata.aemet.es/" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>© AEMET</a>: pluviómetros de la estación más cercana (observación horaria para 24 h y valores climatológicos diarios para el resto).
-                        {' '}<a href="https://analisi.transparenciacatalunya.cat/Medi-Ambient/Dades-meteorol-giques-di-ries-de-la-XEMA/7bvh-jvq2" target="_blank" rel="noreferrer" style={{ color: '#2dd4bf' }}>© Meteocat (XEMA)</a>: estaciones automáticas de Cataluña, datos abiertos de la Generalitat.</span>
+                        {' '}<a href="https://analisi.transparenciacatalunya.cat/Medi-Ambient/Dades-meteorol-giques-di-ries-de-la-XEMA/7bvh-jvq2" target="_blank" rel="noreferrer" style={{ color: '#2dd4bf' }}>© Meteocat (XEMA)</a>: estaciones automáticas de Cataluña, datos abiertos de la Generalitat.
+                        {' '}<a href="https://www.saihebro.com/" target="_blank" rel="noreferrer" style={{ color: '#f472b6' }}>© SAIH Ebro (CHE)</a>: pluviómetros de la Confederación Hidrográfica del Ebro.</span>
                 </div>
             </div>
         </div>

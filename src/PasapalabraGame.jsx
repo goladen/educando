@@ -5,6 +5,7 @@ import { doc, updateDoc, addDoc, getDoc, collection, query, where, getDocs, orde
 import confetti from 'canvas-confetti';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { factorLetra, letraAjustada } from './utils/encajeTexto';
+import { BotonPantallaDual, esMitadDual } from './components/JuegoDual';
 
 // --- IMPORTACIÓN DE AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -463,6 +464,7 @@ const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
                 style={{ width: '100%', padding: '11px', marginBottom: '12px', border: '1.5px solid rgba(255,255,255,0.25)', borderRadius: '30px', background: copiado ? 'rgba(39,174,96,0.3)' : 'rgba(255,255,255,0.08)', color: copiado ? '#2ecc71' : '#ccc', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', transition: '0.3s' }}>
                 {copiado ? '✅ ¡Enlace copiado!' : '🔗 Copiar enlace directo'}
             </button>
+            <BotonPantallaDual recurso={recurso} modo="PASAPALABRA" />
             <button className="btn-back" onClick={onExit}>Volver</button>
         </div>
     );
@@ -550,6 +552,47 @@ const PantallaCuentaAtras = ({ hoja, profesor, instrucciones, playSound, onFinis
     );
 };
 
+// --- TECLADO EN PANTALLA ---
+// Para jugar en el monitor interactivo o la pizarra con el juego abierto en el ordenador:
+// escribe directamente en la respuesta (no depende del foco), así que también funciona en
+// cada mitad de la pantalla dual a la vez. Las teclas responden en pointerdown (con dos dedos
+// a la vez, uno en cada mitad, no llega el «click»).
+const FILAS_TECLADO = [
+    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ñ'],
+    ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫'],
+];
+const CLAVE_TECLADO = 'pikt_pasapalabra_teclado';
+const leerPrefTeclado = () => { try { return localStorage.getItem(CLAVE_TECLADO) === '1'; } catch { return false; } };
+const guardarPrefTeclado = (v) => { try { localStorage.setItem(CLAVE_TECLADO, v ? '1' : '0'); } catch { /* sin almacenamiento */ } };
+
+function TecladoPasapalabra({ color, bloqueado, onLetra, onBorrar, onEnviar, onPasar, onOcultar, refTeclado }) {
+    const pulsar = (fn) => (e) => { e.preventDefault(); e.stopPropagation(); if (!bloqueado) fn(); };
+    const tecla = { flex: 1, minWidth: 0, height: 'clamp(40px, 6.2vh, 58px)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: 'clamp(1rem, 2.4vh, 1.35rem)', fontWeight: 800, cursor: 'pointer', touchAction: 'none', userSelect: 'none', padding: 0 };
+    return (
+        <div ref={refTeclado} onPointerDown={(e) => e.stopPropagation()}
+            style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 900, background: 'rgba(15,20,25,0.96)', borderTop: `4px solid ${color}`, padding: '8px clamp(6px, 2vw, 18px) 10px', display: 'flex', flexDirection: 'column', gap: 6, touchAction: 'none', userSelect: 'none', opacity: bloqueado ? 0.5 : 1, fontFamily: "'Segoe UI', sans-serif", boxSizing: 'border-box' }}>
+            <div style={{ maxWidth: 900, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {FILAS_TECLADO.map((fila, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 6, padding: i === 2 ? '0 4%' : 0 }}>
+                        {fila.map((k) => (
+                            <button key={k} type="button" tabIndex={-1} onPointerDown={pulsar(() => (k === '⌫' ? onBorrar() : onLetra(k)))}
+                                style={{ ...tecla, ...(k === '⌫' ? { flex: 1.6, background: 'rgba(231,76,60,0.35)' } : null) }}>{k}</button>
+                        ))}
+                    </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button type="button" tabIndex={-1} onPointerDown={pulsar(onOcultar)} title="Ocultar el teclado"
+                        style={{ ...tecla, flex: 1.2, fontSize: '0.85rem', background: 'transparent' }}>▾ Ocultar</button>
+                    <button type="button" tabIndex={-1} onPointerDown={pulsar(() => onLetra(' '))} style={{ ...tecla, flex: 3, fontSize: '0.9rem' }}>espacio</button>
+                    <button type="button" tabIndex={-1} onPointerDown={pulsar(onEnviar)} style={{ ...tecla, flex: 2.2, background: '#2ecc71', fontSize: 'clamp(0.85rem, 2vh, 1.05rem)' }}>✓ ENVIAR</button>
+                    <button type="button" tabIndex={-1} onPointerDown={pulsar(onPasar)} style={{ ...tecla, flex: 2.6, background: '#f1c40f', color: '#111', fontSize: 'clamp(0.8rem, 2vh, 1.05rem)' }}>PASAPALABRA</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // --- MOTOR DEL JUEGO (Tablero) ---
 const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSound, onFinish, modoOlimpico = false, onOlimpicoFinish = null }) => {
     const [input, setInput] = useState('');
@@ -557,6 +600,30 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
     const [datosError, setDatosError] = useState(null);
     const inputRef = useRef(null);
     const timerEndedRef = useRef(false);
+
+    // Teclado en pantalla: en una mitad de la pantalla dual sale abierto; si no, se recuerda la elección
+    const enDual = esMitadDual();
+    const [teclado, setTeclado] = useState(() => enDual || leerPrefTeclado());
+    const cambiarTeclado = (v) => { setTeclado(v); if (!enDual) guardarPrefTeclado(v); };
+    const refTeclado = useRef(null);
+    const [altoTeclado, setAltoTeclado] = useState(0);
+    const [ventana, setVentana] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    useEffect(() => {
+        const alCambiar = () => setVentana({ w: window.innerWidth, h: window.innerHeight });
+        window.addEventListener('resize', alCambiar);
+        return () => window.removeEventListener('resize', alCambiar);
+    }, []);
+    useEffect(() => {
+        const el = refTeclado.current;
+        if (!teclado || !el) { setAltoTeclado(0); return undefined; }
+        setAltoTeclado(el.offsetHeight);
+        if (typeof ResizeObserver === 'undefined') return undefined;
+        const ro = new ResizeObserver(() => setAltoTeclado(el.offsetHeight));
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [teclado]);
+    // El rosco (650 px) se encoge para caber entero encima del teclado
+    const escalaRosco = Math.max(0.3, Math.min(1, (ventana.w - 16) / 650, (ventana.h - (teclado ? altoTeclado : 0) - 16) / 650));
 
     const jugador = jugadores[turno];
     const preguntaActual = jugador.rosco[jugador.indice];
@@ -676,7 +743,8 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
 
     return (
         <>
-            <div id="game-container" className={turno === 1 ? 'p2-active' : ''}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: teclado ? altoTeclado : 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div id="game-container" className={turno === 1 ? 'p2-active' : ''} style={{ transform: `scale(${escalaRosco})`, flexShrink: 0 }}>
                 <ul id="rosco">
                     {jugador.rosco.map((p, i) => {
                         const angulo = (i * (2 * Math.PI / jugador.rosco.length)) - (Math.PI / 2);
@@ -710,6 +778,8 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
                         onKeyDown={e => e.key === 'Enter' && !pausado && procesar(false)}
                         autoFocus
                         disabled={pausado}
+                        inputMode={teclado ? 'none' : undefined}
+                        data-teclado-propio="1"
                     />
 
                     <div className="controles">
@@ -718,6 +788,26 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
                     </div>
                 </div>
             </div>
+            </div>
+
+            {teclado ? (
+                <TecladoPasapalabra
+                    refTeclado={refTeclado}
+                    color={modoDuelo && turno === 1 ? '#e67e22' : '#3498db'}
+                    bloqueado={pausado || jugador.terminado}
+                    onLetra={(k) => setInput((v) => v + k.toLowerCase())}
+                    onBorrar={() => setInput((v) => v.slice(0, -1))}
+                    onEnviar={() => procesar(false)}
+                    onPasar={() => procesar(true)}
+                    onOcultar={() => cambiarTeclado(false)}
+                />
+            ) : (
+                <button type="button" tabIndex={-1} title="Mostrar el teclado en pantalla"
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); cambiarTeclado(true); }}
+                    style={{ position: 'fixed', right: 14, bottom: 14, zIndex: 900, padding: '10px 16px', borderRadius: 30, border: '2px solid rgba(255,255,255,0.35)', background: 'rgba(15,20,25,0.85)', color: 'white', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', touchAction: 'none', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>
+                    ⌨️ Teclado
+                </button>
+            )}
 
             {/* MODAL ERROR NEÓN */}
             {pausado && datosError && (

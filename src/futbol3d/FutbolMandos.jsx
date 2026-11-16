@@ -340,7 +340,7 @@ export default function FutbolMandos({ onExit }) {
     const chipJugador = (j) => (
         <div key={j.id} style={{ ...st.chip, borderColor: j.team ? EQUIPOS[j.team].c : '#475569' }}>
             <button style={st.chipEquipo(j.team)} title="Cambiar de equipo" onClick={() => cambiarEquipo(j.id)}>{j.id > 900 ? `V${j.id - 900}` : j.id}</button>
-            <input value={j.nombre} onChange={e => renombrar(j.id, e.target.value)} onBlur={e => { if (!e.target.value.trim()) renombrar(j.id, nombrePorDefecto(j.id)); }} style={st.chipInput} />
+            <input data-nombres-grupo="si" value={j.nombre} onChange={e => renombrar(j.id, e.target.value)} onBlur={e => { if (!e.target.value.trim()) renombrar(j.id, nombrePorDefecto(j.id)); }} style={st.chipInput} />
         </div>
     );
 

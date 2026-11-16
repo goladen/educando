@@ -52,6 +52,7 @@ export const JUEGOS_REGISTRO_META = {
     KARTINGED_TRACK:     { nombre: 'Karting',             emoji: '🏁', color: '#2d3436' },
     KARTINGED_MULTI:     { nombre: 'Karting Multi',       emoji: '🏎️', color: '#0984e3' },
     QUIEN_ES_QUIEN:      { nombre: '¿Quién es quién?',    emoji: '🕵️', color: '#7c3aed' },
+    DINAMICAS_AULA:      { nombre: 'Dinámicas de aula',   emoji: '🎉', color: '#ec4899' },
     QUIEN_HISTORICO:     { nombre: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad' },
     BUNKER:              { nombre: 'Bunker',              emoji: '🎯', color: '#27ae60' },
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },

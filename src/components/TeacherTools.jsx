@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor, Mail, Library } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor, Mail, Library, Sparkles } from 'lucide-react';
 import VideoTimelineEditor from '../VideoTimelineEditor';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
@@ -17,6 +17,7 @@ const GestionInformatica = lazy(() => import('./GestionInformatica'));
 const PapelInteractivo = lazy(() => import('./PapelInteractivo'));
 const DocumentosPersonalizados = lazy(() => import('./DocumentosPersonalizados'));
 const BancoRecursos = lazy(() => import('../bancoRecursos/BancoRecursos'));
+const GeneradorPrompts = lazy(() => import('./GeneradorPrompts'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -88,6 +89,12 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
         </Suspense>
     );
 
+    if (herramientaActiva === 'PROMPTS') return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando…</div>}>
+            <GeneradorPrompts onBack={() => setHerramientaActiva(null)} />
+        </Suspense>
+    );
+
     // Banco de recursos: mientras está abierto la URL es /banco (su enlace propio)
     if (herramientaActiva === 'BANCO') return (
         <div style={{ padding: '20px 16px', maxWidth: 1000, margin: '0 auto' }}>
@@ -148,6 +155,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#3949ab' }}>Banco de recursos</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Enlaza tus materiales (Drive, webs, vídeos…) por materia, curso y tipo, y encuentra los de otros profes. Comprueba que cada enlace se abre.
+                    </p>
+                </div>
+
+                {/* ── Generador de prompts para tu IA ── */}
+                <div onClick={() => setHerramientaActiva('PROMPTS')} style={{ ...cardStyle, borderLeft: '4px solid #7c3aed' }}>
+                    <div style={{ background: '#ede9fe', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Sparkles size={32} color="#7c3aed" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#7c3aed' }}>Generador de prompts para tu IA</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        7 plantillas de evaluación inclusiva (adaptar exámenes, consignas, rúbricas…) o crea las tuyas. Copia o abre el prompt en ChatGPT, Claude, Gemini o Copilot.
                     </p>
                 </div>
 

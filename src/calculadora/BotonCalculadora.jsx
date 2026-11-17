@@ -8,7 +8,8 @@ import { APPS_CALCULADORA } from './appsCalculadora';
 const UsoCalculadora = lazy(() => import('./UsoCalculadora'));
 const CalculadoraFlotante = lazy(() => import('./CalculadoraInteractiva').then((m) => ({ default: m.CalculadoraFlotante })));
 
-export default function BotonCalculadora({ app, bloques }) {
+// global: el botón común de Física y Matemáticas (CalculadoraGlobal); se oculta si hay uno de la app (data-calc-local)
+export default function BotonCalculadora({ app, bloques, global = false }) {
     const [calc, setCalc] = useState(false);
     const [retos, setRetos] = useState(false);
     const lista = bloques || APPS_CALCULADORA[app]?.bloques;
@@ -17,6 +18,7 @@ export default function BotonCalculadora({ app, bloques }) {
     return (
         <>
             <button
+                {...(global ? { 'data-calc-global': '' } : { 'data-calc-local': '' })}
                 onClick={() => setCalc((c) => !c)}
                 title="Calculadora Casio fx-82MS"
                 aria-label="Calculadora"

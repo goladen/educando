@@ -168,7 +168,19 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                     }
                     return { ...prev, hojas };
                 });
-                alert("📬 ¡Has recibido nuevas preguntas de alumnos! Se han añadido a la lista. Revísalas y pulsa Guardar para quedártelas.");
+                // Resumen por hoja: las preguntas recibidas se añaden AL FINAL de su hoja
+                const porHoja = {};
+                for (const d of nuevos) {
+                    const x = d.data();
+                    const idx = parseInt(x.hojaIndex);
+                    porHoja[idx] = (porHoja[idx] || 0) + (x.preguntas || []).length;
+                }
+                const lineas = Object.entries(porHoja).map(([i, n]) => `  • ${n} en la hoja «${datos.hojas[i]?.nombreHoja || `Hoja ${Number(i) + 1}`}»`).join('\n');
+                const total = Object.values(porHoja).reduce((a, b) => a + b, 0);
+                alert(`📬 ¡Has recibido ${total} pregunta${total === 1 ? '' : 's'} nueva${total === 1 ? '' : 's'} de tus alumnos!
+${lineas}
+
+Están AL FINAL de cada hoja (baja hasta abajo). Revísalas y pulsa Guardar para quedártelas.`);
             } catch (e) {
                 console.error("Error cargando buzón:", e);
             }
@@ -601,6 +613,20 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     <p style={{ margin: 0, fontSize: 13, color: '#555', lineHeight: 1.5 }}>
                                         Genera un código y comparte el enlace. Cualquier alumno podrá enviarte preguntas en el formato de <strong>{configJuego.label}</strong> sin necesidad de cuenta.
                                     </p>
+                                    {/* Nº de preguntas que tiene que enviar cada alumno para que el envío sea válido */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                        <label style={{ fontSize: 13, fontWeight: 700, color: '#3F51B5' }}>Preguntas que debe enviar cada alumno:</label>
+                                        <input type="number" min={1} max={50}
+                                            value={hojaActual.numReq || parseInt(datos.config?.numPreguntas) || 3}
+                                            onChange={e => {
+                                                const v = Math.min(50, Math.max(1, parseInt(e.target.value) || 1));
+                                                const hojas = [...datos.hojas];
+                                                hojas[indiceHojaActiva] = { ...hojas[indiceHojaActiva], numReq: v };
+                                                setDatos({ ...datos, hojas });
+                                            }}
+                                            style={{ ...styles.input, width: 80, textAlign: 'center', fontWeight: 700 }} />
+                                        <span style={{ fontSize: 12, color: '#777' }}>Es por hoja. Se revisa que no haya insultos.</span>
+                                    </div>
                                     {!hojaActual.accessCode ? (
                                         <button onClick={generarCodigoHoja} style={{ background: '#3F51B5', color: 'white', border: 'none', padding: '10px 18px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}>
                                             <RotateCcw size={15} /> Activar enlace para esta hoja

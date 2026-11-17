@@ -66,14 +66,20 @@ export const fmtFactor = (f, potencias = false) => {
 export function leerNumero(txt) {
     let t = String(txt ?? '').trim();
     if (!t) return NaN;
+    // fuera espacios y la unidad del final («2,5 km», «3 m²», «0,25 vueltas»): empieza por letra o símbolo
+    t = t.replace(/[\s\u00A0\u202F]/g, '').replace(/[−–]/g, '-').replace(/[a-zA-Zµ°'"€%/][a-zA-Zµ°'"€%/²³·.]*$/, '');
+    if (!t) return NaN;
+    // exponentes en superíndice (10⁻⁶) → 10^-6
     t = t.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+/g, (m) => '^' + m.split('').map((c) => Object.keys(SUPS).find((k) => SUPS[k] === c)).join(''));
-    t = t.replace(/\s| /g, '').replace(/[−–]/g, '-').replace(/[a-df-zA-DF-Z°'"€%²³µ/]+$/g, '');
     let mant = t, exp = 0;
-    const m = t.match(/^(.*?)(?:[·x*×]10\^?\(?(-?\d+)\)?|[eE](-?\d+))$/);
-    if (m) { mant = m[1]; exp = Number(m[2] ?? m[3]); }
-    if (/^10\^?\(?-?\d+\)?$/.test(t)) { mant = '1'; exp = Number(t.replace(/^10\^?\(?/, '').replace(/\)$/, '')); }
+    // «4,5·10^-6», «4,5·10^(-6)», «4,5·10-6» (sin ^ solo con signo: «2·100» no es científica), «4,5e-6»
+    const m = t.match(/^(.*?)(?:[·x*×]10(?:\^\(?(-?\d+)\)?|(-\d+))|[eE](-?\d+))$/);
+    if (m) { mant = m[1]; exp = Number(m[2] ?? m[3] ?? m[4]); }
+    // «10^-3» (con ^ obligatorio: «1000» NO es 10 elevado a 00)
+    if (/^10\^\(?-?\d+\)?$/.test(t)) { mant = '1'; exp = Number(t.replace(/^10\^\(?/, '').replace(/\)$/, '')); }
     if (mant.includes(',')) mant = mant.replace(/\./g, '').replace(',', '.');
-    else if (/^-?\d{1,3}(\.\d{3})+$/.test(mant)) mant = mant.replace(/\./g, '');
+    // «3.500» = 3500 (punto de miles), pero «0.045» = 0,045 (un número no empieza por 0 de miles)
+    else if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(mant)) mant = mant.replace(/\./g, '');
     if (!/^-?\d*\.?\d+$/.test(mant)) return NaN;
     return limpio(Number(mant) * 10 ** exp);
 }

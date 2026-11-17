@@ -373,6 +373,6 @@ export const leerNumeroEs = (txt) => {
     let t = String(txt || '').trim().replace(/\s/g, '').replace(/[−–]/g, '-').replace(/[€a-zA-Z°²]/g, '');
     if (!t || t === '-') return NaN;
     if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
-    else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+    else if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // «0.045» es decimal
     return Number(t);
 };

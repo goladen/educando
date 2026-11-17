@@ -7,6 +7,8 @@ import { TEMAS, NIVELES, HEURISTICAS, PROBLEMAS, GUIA_METODO, SESION_TIPO } from
 import FiguraProblema from './FigurasProblema';
 import GruposPizarras from './GruposPizarras';
 import JuegosMagia from './JuegosMagia';
+import ModalSimulador from './SimuladoresProblema';
+import CanguroPizarras from './CanguroPizarras';
 import { createPortal } from 'react-dom';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
 
@@ -67,13 +69,14 @@ function Proyector({ p, grupos, onClose }) {
     const [exts, setExts] = useState(0);
     const [verGrupos, setVerGrupos] = useState(false);
     const [verSol, setVerSol] = useState(false);
+    const [verSim, setVerSim] = useState(false);
     const tema = temaDe(p.tema);
 
     useEffect(() => {
-        const onKey = e => { if (e.key === 'Escape' && !document.fullscreenElement) onClose(); };
+        const onKey = e => { if (e.key === 'Escape' && !document.fullscreenElement && !verSim) onClose(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [onClose, verSim]);
 
     const pantallaCompleta = () => {
         try {
@@ -129,11 +132,13 @@ function Proyector({ p, grupos, onClose }) {
                 {pistas > 0 && <button style={ctrl} onClick={() => setPistas(0)}>Ocultar pistas</button>}
                 <button style={ctrl} disabled={exts >= (p.extensiones || []).length} onClick={() => setExts(n => n + 1)}>🚀 Extensión ({exts}/{(p.extensiones || []).length})</button>
                 {exts > 0 && <button style={ctrl} onClick={() => setExts(0)}>Ocultar extensiones</button>}
+                {p.simulador && <button style={btn('#f59e0b')} onClick={() => setVerSim(true)}>🧪 Simulador</button>}
                 <button style={ctrl} onClick={() => setVerGrupos(v => !v)}>👥 {verGrupos ? 'Ocultar' : 'Ver'} grupos</button>
                 {p.solucion && <button style={ctrl} onClick={() => setVerSol(v => !v)}>{verSol ? 'Ocultar solución' : '✅ Solución'}</button>}
                 <button style={ctrl} onClick={pantallaCompleta}>⛶ Pantalla completa</button>
                 <button style={btn('#ef4444')} onClick={onClose}>✕ Cerrar</button>
             </div>
+            {verSim && <ModalSimulador tipo={p.simulador} config={p.simuladorConfig} oscuro onClose={() => setVerSim(false)} />}
         </div>
     );
 }
@@ -203,6 +208,7 @@ function VistaProblema({ p, onVolver, onProyectar, onEditar, onImprimir, grupos,
     const [pistasVistas, setPistasVistas] = useState(0);
     const [registrar, setRegistrar] = useState(false);
     const [guardadoOk, setGuardadoOk] = useState(false);
+    const [verSim, setVerSim] = useState(false);
     const misSesiones = sesiones.filter(s => s.problema === p.id).slice().reverse();
 
     return (
@@ -210,6 +216,7 @@ function VistaProblema({ p, onVolver, onProyectar, onEditar, onImprimir, grupos,
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '6px 0 14px' }}>
                 <button onClick={onVolver} style={btn('#e5e7eb', TINTA)}>← Problemas</button>
                 <div style={{ flex: 1 }} />
+                {p.simulador && <button onClick={() => setVerSim(true)} style={btn('#f59e0b')}>🧪 Simulador</button>}
                 <button onClick={onProyectar} style={btn(tema.color)}>📽️ Proyectar</button>
                 <button onClick={() => onImprimir('alumnos')} style={btn('#475569')}>🖨️ Enunciado</button>
                 <button onClick={() => onImprimir('profesor')} style={btn('#475569')}>🖨️ Ficha profesor</button>
@@ -286,6 +293,7 @@ function VistaProblema({ p, onVolver, onProyectar, onEditar, onImprimir, grupos,
                     )}
                 </div>
             </div>
+            {verSim && <ModalSimulador tipo={p.simulador} config={p.simuladorConfig} onClose={() => setVerSim(false)} />}
             {registrar && <ModalSesion p={p} nGruposSugerido={grupos.length || 8} onClose={() => setRegistrar(false)} onGuardado={() => { setRegistrar(false); setGuardadoOk(true); onSesionGuardada(); }} />}
         </div>
     );
@@ -424,7 +432,7 @@ function Impresion({ p, modo }) {
 }
 
 // ─────────────────────────── Componente principal ───────────────────────────
-export default function PizarrasVerticales({ onExit }) {
+export default function PizarrasVerticales({ onExit, usuario = null }) {
     const [vista, setVista] = useState('lista'); // lista | problema | guia | grupos | editor
     const [selId, setSelId] = useState(null);
     const [editando, setEditando] = useState(null);
@@ -482,7 +490,7 @@ export default function PizarrasVerticales({ onExit }) {
     };
 
     const pestanas = [
-        ['lista', '📚 Problemas'], ['guia', '🧱 Guía del método'], ['juegos', '🎩 Juegos y acertijos'], ['grupos', '👥 Formar grupos'],
+        ['lista', '📚 Problemas'], ['guia', '🧱 Guía del método'], ['juegos', '🎲 Juegos, retos y acertijos'], ['canguro', '🦘 Canguro 2026'], ['grupos', '👥 Formar grupos'],
     ];
 
     return (
@@ -592,7 +600,8 @@ export default function PizarrasVerticales({ onExit }) {
                     />
                 )}
                 {vista === 'guia' && <VistaGuia />}
-                {vista === 'juegos' && <JuegosMagia />}
+                {vista === 'juegos' && <JuegosMagia usuario={usuario} />}
+                {vista === 'canguro' && <CanguroPizarras />}
                 {vista === 'grupos' && <GruposPizarras grupos={grupos} setGrupos={setGrupos} />}
                 {vista === 'editor' && (
                     <EditorProblema

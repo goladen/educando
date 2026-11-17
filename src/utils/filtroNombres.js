@@ -139,3 +139,34 @@ export function nombreSeguro(nombre, respaldo = 'Jugador') {
     if (!limpio || nombreInapropiado(limpio)) return respaldo;
     return limpio;
 }
+
+// ─── Textos (preguntas y respuestas que envían los alumnos) ─────────────────
+// Más permisivo que con los nombres: en una pregunta de clase son normales
+// palabras como «pene», «sexo», «nazi», «Hitler», «paja» o «perra».
+// Los trozos claros (hijoputa, gilipoll…) solo se buscan DENTRO de cada palabra,
+// no en el texto entero unido (si no, «Mari con…» daría «maricon»).
+const PERMITIDAS_EN_TEXTO = new Set([
+    'pene', 'penes', 'vagina', 'sexo', 'sex', 'penis', 'nazi', 'nazis', 'hitler',
+    'paja', 'pajas', 'perra', 'perras', 'teta', 'tetas', 'retrasado', 'retrasada',
+    'prostituta', 'prostituto', 'violar', 'ramera', 'pedo', 'pedos', 'hostia', 'hostias',
+].map(p => unaLetra(basico(p))));
+
+/** Devuelve true si el texto (pregunta, respuesta…) contiene un insulto o palabra malsonante. */
+export function textoInapropiado(texto) {
+    const b = basico(texto);
+    if (!b.trim()) return false;
+    const palabras = b.split(/[^a-zñ]+/).filter(Boolean);
+    const mala = (p) => !PERMITIDAS_EN_TEXTO.has(unaLetra(p)) && palabraProhibida(p);
+    if (palabras.some(mala)) return true;
+    // Letras sueltas: «p u t a»
+    let grupo = '';
+    const grupos = [];
+    for (const p of palabras) {
+        if (p.length === 1) grupo += p;
+        else { if (grupo.length > 1) grupos.push(grupo); grupo = ''; }
+    }
+    if (grupo.length > 1) grupos.push(grupo);
+    if (grupos.some(mala)) return true;
+    // Trozos claros dentro de una misma palabra: «pedrohijoputa»
+    return palabras.some(p => { const u = unaLetra(sinEnye(p)); return LISTA_SUB.some(s => u.includes(s)); });
+}

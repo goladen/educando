@@ -3367,7 +3367,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <><AlgebraApp      usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="POLINOMIOS" /><FichaFlotante tema="polinomios" alAbrir="usar" /></>;
         if (juegoActivo.tipoJuego === 'ESTADISTICA') return <><EstadisticaApp  usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><BotonCalculadora app="ESTADISTICA" /><FichaFlotante tema="estadistica" alAbrir="usar" /></>;
         if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <><SimuladorDados onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} /><FichaFlotante tema="probabilidad" alAbrir="usar" /></>;
-        if (juegoActivo.tipoJuego === 'PIZARRAS_VERTICALES') return <PizarrasVerticales onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'PIZARRAS_VERTICALES') return <PizarrasVerticales usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULADORA') return <UsoCalculadora key={`${juegoActivo.bloque}-${juegoActivo.item}`} bloqueInicial={juegoActivo.bloque} itemInicial={juegoActivo.item} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_OAOA') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflow: 'hidden' }}>
@@ -5012,7 +5012,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
     if (appData.id === 'ECUACION_SISTEMAS') return <><EcuacionSistemas onExit={handleExitGame} /><FichaFlotante tema="sistemas" alAbrir="usar" /></>;
     if (appData.id === 'POTENCIAS_RAICES') return <><PotenciasRaices onExit={handleExitGame} /><BotonCalculadora app="POTENCIAS_RAICES" /><FichaFlotante tema="potencias" alAbrir="usar" /></>;
     if (appData.id === 'CALCULADORA') return <UsoCalculadora onExit={handleExitGame} />;
-    if (appData.id === 'PIZARRAS_VERTICALES') return <PizarrasVerticales onExit={handleExitGame} />;
+    if (appData.id === 'PIZARRAS_VERTICALES') return <PizarrasVerticales usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'FUNCIONES') return <><Funciones usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="FUNCIONES" /><FichaFlotante tema="funciones" alAbrir="usar" /></>;
     if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <><GeometriaAnalitica usuario={usuario} onExit={handleExitGame} /><BotonCalculadora app="GEOMETRÍA_ANALÍTICA" /><FichaFlotante tema="geoAnalitica" alAbrir="usar" /></>;
 

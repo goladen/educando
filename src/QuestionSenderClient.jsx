@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { validarNombre } from './utils/filtroNombres';
+import { validarNombre, textoInapropiado } from './utils/filtroNombres';
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { Send, CheckCircle, AlertCircle, ArrowLeft, User, Info } from 'lucide-react';
@@ -61,10 +61,11 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
             }
 
             // Preparar formulario
-            const numPreguntas = parseInt(hoja.numReq) || parseInt(docData.config?.numPreguntas) || 3;
+            // Nº que elige el profe en la hoja (numReq); en recursos antiguos, el de la configuración
+            const numPreguntas = Math.min(50, Math.max(1, parseInt(hoja.numReq) || parseInt(docData.config?.numPreguntas) || 3));
             
             // Inicializar respuestas vacías según el juego
-            const plantillas = Array.from({ length: numPreguntas }, () => ({ pregunta: '', respuesta: '', letra: '' }));
+            const plantillas = Array.from({ length: numPreguntas }, () => ({ pregunta: '', respuesta: '', letra: '', incorrecta1: '', incorrecta2: '', incorrecta3: '' }));
 
             setRespuestas(plantillas);
 
@@ -74,6 +75,8 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
                 hojaIndex,
                 nombreHoja: hoja.nombreHoja,
                 profesor: docData.profesorNombre,
+                profesorUid: docData.profesorUid || '',
+                recursoTitulo: docData.titulo || '',
                 targetGame: docData.targetGame || docData.tipoJuego || 'PASAPALABRA',
                 numPreguntas
             });
@@ -115,6 +118,7 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
         }
         const tipo = datosHoja.targetGame;
         const esTipoTest = ['CAZABURBUJAS', 'PIKATRON', 'THINKHOOT', 'RULETA'].includes(tipo);
+        const txt = (v) => String(v ?? '').trim();
         // -----------------------
 
         for (let i = 0; i < respuestas.length; i++) {
@@ -124,9 +128,13 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
             if (tipo === 'PASAPALABRA' && (!r.letra.trim() || !r.respuesta.trim())) return setError(`Falta Letra/Respuesta en #${i + 1}`);
 
             // VALIDACIÓN PARA TODOS LOS TIPO TEST
-            if (esTipoTest && (!r.respuesta.trim() || !r.incorrecta1.trim())) return setError(`Faltan respuestas (correcta o incorrectas) en #${i + 1}`);
+            if (esTipoTest && (!txt(r.respuesta) || !txt(r.incorrecta1))) return setError(`Faltan respuestas (correcta o incorrectas) en #${i + 1}`);
 
             if (tipo === 'APAREJADOS' && (!r.respuesta.trim())) return setError(`Falta la pareja en #${i + 1}`);
+
+            // Sin insultos ni palabras malsonantes en ningún campo
+            if ([r.pregunta, r.respuesta, r.incorrecta1, r.incorrecta2, r.incorrecta3].some(v => textoInapropiado(txt(v))))
+                return setError(`La pregunta #${i + 1} tiene palabras no permitidas. Cámbiala, por favor.`);
         }
 
         setEnviando(true);
@@ -144,9 +152,10 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
                 if (tipo === 'PASAPALABRA') {
                     base.letra = r.letra.toUpperCase();
                     base.respuesta = r.respuesta;
-                } else if (tipo === 'CAZABURBUJAS') {
-                    base.correcta = r.respuesta;
-                    base.incorrectas = [r.incorrecta1, r.incorrecta2, r.incorrecta3];
+                } else if (esTipoTest) {
+                    base.respuesta = txt(r.respuesta);
+                    base.correcta = txt(r.respuesta);
+                    base.incorrectas = [txt(r.incorrecta1), txt(r.incorrecta2), txt(r.incorrecta3)];
                 } else {
                     base.respuesta = r.respuesta;
                 }
@@ -158,6 +167,10 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
                 recursoId: datosHoja.recursoId,     // Para saber a qué recurso pertenecen
                 hojaIndex: datosHoja.hojaIndex,     // Para saber a qué hoja van
                 nombreHoja: datosHoja.nombreHoja,
+                // Para la campana del profe (useNotificacionesProfesor → grupo «buzon»)
+                profesorUid: datosHoja.profesorUid,
+                recursoTitulo: datosHoja.recursoTitulo,
+                studentName: nombreFinal,
                 preguntas: preguntasParaEnviar,     // El paquete de preguntas
                 fechaEnvio: new Date(),
                 estado: 'PENDIENTE'                 // Para que el profe sepa que son nuevas

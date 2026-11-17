@@ -16,7 +16,7 @@ const ADMIN_EMAIL = 'goladen@gmail.com';
 
 const fechaMs = (f) => !f ? 0 : f.toMillis ? f.toMillis() : f.seconds ? f.seconds * 1000 : new Date(f).getTime() || 0;
 
-export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCompartido }) {
+export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCompartido, onAbrirRecurso }) {
     const [open, setOpen]           = useState(false);
     const [novedades, setNovedades] = useState([]);
     const [leidas, setLeidas]       = useState([]);
@@ -63,6 +63,7 @@ export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCo
         marcarVisto(g.clave);
         if (g.clave === 'resultados' && onIr) { onIr('INFORMES'); setOpen(false); }
         if (g.clave === 'preguntas'  && onIr) { onIr('TRIVIAL_RECURSOS'); setOpen(false); }
+        if (g.clave === 'buzon' && onAbrirRecurso && g.items?.[0]) { onAbrirRecurso(g.items[0].recursoId); setOpen(false); }
         if (g.clave === 'compartidos' && onAbrirCompartido && g.items?.[0]) { onAbrirCompartido(g.items[0]); setOpen(false); }
     };
     const comsConMensajes = misComunidades.filter(c =>
@@ -470,10 +471,10 @@ export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil, onAbrirCo
                                                 <p style={{ margin: '3px 0 8px', color: '#555', fontSize: '0.84rem' }}>{g.detalle}</p>
                                             )}
                                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                                {g.clave !== 'apps' && (g.clave !== 'compartidos' || onAbrirCompartido) && (
+                                                {g.clave !== 'apps' && (g.clave !== 'compartidos' || onAbrirCompartido) && (g.clave !== 'buzon' || onAbrirRecurso) && (
                                                     <button onClick={() => irAGrupo(g)}
                                                         style={{ background: g.clave === 'intereses' ? '#e74c3c' : '#1565C0', color: 'white', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
-                                                        {g.clave === 'resultados' ? 'Ver informes' : g.clave === 'intereses' ? 'Rellenar ahora' : g.clave === 'compartidos' ? (g.items.length > 1 ? 'Ver el último' : 'Ver recurso') : 'Revisar preguntas'}
+                                                        {g.clave === 'resultados' ? 'Ver informes' : g.clave === 'intereses' ? 'Rellenar ahora' : g.clave === 'compartidos' ? (g.items.length > 1 ? 'Ver el último' : 'Ver recurso') : g.clave === 'buzon' ? (new Set(g.items.map(i => i.recursoId)).size > 1 ? 'Abrir el último recurso' : 'Abrir el recurso') : 'Revisar preguntas'}
                                                     </button>
                                                 )}
                                                 {g.clave !== 'intereses' && <button onClick={() => marcarVisto(g.clave)}

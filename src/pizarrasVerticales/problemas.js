@@ -175,6 +175,7 @@ export const PROBLEMAS = [
     {
         id: 'M2', tema: 'MEDIDA', titulo: 'Los relojes de arena', tipo: 'arranque',
         niveles: ['5º-6º Primaria', '1º ESO', '2º ESO'], minutos: 25, material: 'Ninguno',
+        simulador: 'relojes', simuladorConfig: { a: 4, b: 7, objetivo: 9 },
         heuristicas: ['DIBUJO', 'TABLA', 'ENSAYO'],
         enunciado: 'Tenéis dos relojes de arena: uno mide 4 minutos y el otro, 7 minutos.\n\n¿Cómo podéis medir exactamente 9 minutos para cocer un huevo?',
         lanzamiento: 'Dibuja los dos relojes. Explica que se les puede dar la vuelta cuando queráis, incluso si no han terminado.',
@@ -194,6 +195,7 @@ export const PROBLEMAS = [
     {
         id: 'M3', tema: 'MEDIDA', titulo: 'Las dos jarras', tipo: 'arranque',
         niveles: ['5º-6º Primaria', '1º ESO', '2º ESO'], minutos: 25, material: 'Opcional: dos vasos y agua',
+        simulador: 'jarras', simuladorConfig: { a: 5, b: 3, objetivo: 4, nombre: 'Jarra' },
         heuristicas: ['ENSAYO', 'TABLA', 'FINAL'],
         enunciado: 'Tenéis una jarra de 5 litros y otra de 3 litros, sin marcas, y un grifo.\n\n¿Cómo podéis conseguir exactamente 4 litros?',
         lanzamiento: 'Aclara las acciones permitidas: llenar una jarra en el grifo, vaciarla o pasar agua de una a otra hasta que una se vacíe o la otra se llene.',

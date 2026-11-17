@@ -2,6 +2,8 @@
 // Cada juego: se hace el truco → la clase se pregunta por qué funciona → reto para las pizarras.
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import TorresHanoi from './TorresHanoi';
+import { RETOS_WEB, PantallaJuego } from './RetosLogica';
 
 const TINTA = '#1f2937';
 const btn = (bg, color = 'white', extra = {}) => ({
@@ -566,10 +568,31 @@ export const JUEGOS_MAGIA = [
     { id: '21', emoji: '🤖', titulo: 'El 21 contra Pikt', desc: 'La clase juega contra la máquina, que conoce la estrategia ganadora. Estrategia y restos.', color: '#ea580c', tema: 'Lógica e ingenio', C: Juego21 },
 ];
 
-export default function JuegosMagia() {
+// Retos y puzles propios de esta pestaña (se abren dentro, como los juegos de magia)
+export const RETOS_PROPIOS = [
+    { id: 'hanoi', emoji: '🗼', titulo: 'Torres de Hanói', desc: 'Pasa la torre de discos a otro poste. Potencias de 2 y búsqueda de un algoritmo que funcione siempre.', color: '#7c3aed', tema: 'Lógica e ingenio', C: TorresHanoi },
+];
+
+const Tarjeta = ({ emoji, titulo, desc, color, tema, extra, onClick }) => (
+    <button onClick={onClick} style={{
+        textAlign: 'left', background: 'white', borderRadius: 16, padding: '16px 18px', cursor: 'pointer', fontFamily: 'inherit',
+        border: 'none', borderTop: `5px solid ${color}`, boxShadow: '0 3px 10px rgba(0,0,0,0.06)', color: TINTA,
+    }}>
+        <div style={{ fontSize: '2.2rem' }}>{emoji}</div>
+        <div style={{ fontWeight: 900, fontSize: '1.08rem', color }}>{titulo}</div>
+        <div style={{ fontSize: '0.86rem', color: '#4b5563', margin: '4px 0 6px' }}>{desc}</div>
+        {extra && <div style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 6px' }}>👩‍🏫 {extra}</div>}
+        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 700 }}>{tema}</div>
+    </button>
+);
+const Titulo = ({ children }) => <h3 style={{ margin: '18px 0 10px', color: TINTA, fontSize: '1.1rem' }}>{children}</h3>;
+const rejilla = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 270px), 1fr))', gap: 12 };
+
+export default function JuegosMagia({ usuario = null }) {
     const [sel, setSel] = useState(null);
+    const [abierto, setAbierto] = useState(null);   // reto de la web a pantalla completa
     const ref = useRef(null);
-    const juego = JUEGOS_MAGIA.find(j => j.id === sel);
+    const juego = [...JUEGOS_MAGIA, ...RETOS_PROPIOS].find(j => j.id === sel);
 
     const pantallaCompleta = () => {
         try {
@@ -584,7 +607,7 @@ export default function JuegosMagia() {
             <div ref={ref} style={{ background: '#f5f3ee', overflowY: 'auto' }}>
                 <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 40px', color: TINTA }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 14px' }}>
-                        <button onClick={() => setSel(null)} style={btn('#e5e7eb', TINTA)}>← Juegos</button>
+                        <button onClick={() => setSel(null)} style={btn('#e5e7eb', TINTA)}>← Juegos y retos</button>
                         <div style={{ flex: 1, fontWeight: 900, fontSize: '1.3rem', color: juego.color }}>{juego.emoji} {juego.titulo}</div>
                         <button onClick={pantallaCompleta} style={btn('#475569')}>⛶ Pantalla completa</button>
                     </div>
@@ -597,22 +620,24 @@ export default function JuegosMagia() {
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 16px 40px', color: TINTA }}>
             <div style={{ ...panel, background: '#fffbeb' }}>
-                <b>🎩 Magia matemática para empezar la clase.</b> Haz el truco, deja que se sorprendan y lanza la pregunta: <i>«¿Cómo lo he hecho?»</i>.
-                Cada juego trae instrucciones, la explicación y retos para trabajar después en las pizarras verticales.
+                <b>🎲 Juegos, retos y acertijos.</b> Magia matemática para empezar la clase (haz el truco y pregunta <i>«¿Cómo lo he hecho?»</i>)
+                y retos de lógica para calentar o para los grupos que terminan pronto. Cada uno trae ideas para trabajarlo después en las pizarras verticales.
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 270px), 1fr))', gap: 12 }}>
-                {JUEGOS_MAGIA.map(j => (
-                    <button key={j.id} onClick={() => setSel(j.id)} style={{
-                        textAlign: 'left', background: 'white', borderRadius: 16, padding: '16px 18px', cursor: 'pointer', fontFamily: 'inherit',
-                        border: 'none', borderTop: `5px solid ${j.color}`, boxShadow: '0 3px 10px rgba(0,0,0,0.06)', color: TINTA,
-                    }}>
-                        <div style={{ fontSize: '2.2rem' }}>{j.emoji}</div>
-                        <div style={{ fontWeight: 900, fontSize: '1.08rem', color: j.color }}>{j.titulo}</div>
-                        <div style={{ fontSize: '0.86rem', color: '#4b5563', margin: '4px 0 6px' }}>{j.desc}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 700 }}>{j.tema}</div>
-                    </button>
+
+            <Titulo>🎩 Magia matemática</Titulo>
+            <div style={rejilla}>
+                {JUEGOS_MAGIA.map(j => <Tarjeta key={j.id} {...j} onClick={() => setSel(j.id)} />)}
+            </div>
+
+            <Titulo>🧠 Retos de lógica y puzles</Titulo>
+            <div style={rejilla}>
+                {RETOS_PROPIOS.map(j => <Tarjeta key={j.id} {...j} onClick={() => setSel(j.id)} />)}
+                {RETOS_WEB.map(r => (
+                    <Tarjeta key={r.id} emoji={r.emoji} titulo={r.nombre} desc={r.desc} color={r.color} extra={r.aula}
+                        tema="Se abre a pantalla completa" onClick={() => setAbierto(r.id)} />
                 ))}
             </div>
+            {abierto && <PantallaJuego id={abierto} usuario={usuario} onClose={() => setAbierto(null)} />}
         </div>
     );
 }

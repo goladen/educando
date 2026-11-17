@@ -7,6 +7,8 @@ import { MAGNITUDES, leerNumero, escaleraDe, magnitudDibujo, saltosEntre } from 
 import { generarConversion, generarCompleja, MAGNITUDES_COMPLEJAS, pick } from './generadores.js';
 import { generarProblemaUnidades } from './problemasUnidades.js';
 import { VisualConversion, Escalera, CadenaFactores } from './Visuales.jsx';
+import FactoresEditables, { factoresRellenables, comprobarFactor, factorVacio, esFactorDenominador } from './FactoresEditables.jsx';
+import { factoresEntre } from './magnitudes.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  PRÁCTICA: conversiones (por saltos, factores o libre) y problemas en los que
@@ -118,6 +120,13 @@ export default function Practica({ modo, cfg, onSalir }) {
     const nuevo = () => generarEjercicio({ modo, mags, nivel, metodo });
     const [ap, setAp] = useState(nuevo);
     const [resp, setResp] = useState({});
+    // Método de factores: el alumno escribe el factor (o los dos, en las compuestas)
+    const conFactores = metodo === 'factor' && factoresRellenables(ap.v);
+    const esperados = conFactores ? factoresEntre(ap.v.mag, ap.v.de, ap.v.a) : [];
+    const [fact, setFact] = useState(() => []);
+    const [factCorr, setFactCorr] = useState(null);
+    const [aviso, setAviso] = useState('');
+    useEffect(() => { setFact(esperados.map(factorVacio)); setFactCorr(null); setAviso(''); }, [ap]); // eslint-disable-line react-hooks/exhaustive-deps
     const [corregido, setCorregido] = useState(null); // [ok por respuesta]
     const [pistas, setPistas] = useState(0);
     const [num, setNum] = useState(1);
@@ -135,11 +144,15 @@ export default function Practica({ modo, cfg, onSalir }) {
         if (corregido) return;
         const oks = ap.r.map((q, i) => comprobarRespuesta(q, resp[i]));
         if (oks.some((o) => o === null)) return; // falta alguna casilla
+        const fc = esperados.map((f, i) => comprobarFactor(f, fact[i] || factorVacio(), esFactorDenominador(ap.v, f)));
+        if (fc.some((c) => !c.completo)) { setAviso('Completa el factor de conversión: los dos números y las dos unidades.'); return; }
+        setAviso('');
+        setFactCorr(fc.length ? fc : null);
         setCorregido(oks);
-        const ok = oks.every(Boolean);
+        const ok = oks.every(Boolean) && fc.every((c) => c.ok);
         (ok ? sonidoCorrecto : sonidoIncorrecto)();
         if (ok) setPuntos((p) => p + Math.max(4, 10 - pistas * 2));
-        setDetalle((d) => [...d, { ok, enunciado: ap.e.slice(0, 160), respuesta: ap.r.map((_, i) => resp[i] ?? '').join(' · '), solucion: ap.s }]);
+        setDetalle((d) => [...d, { ok, enunciado: ap.e.slice(0, 160), respuesta: [...fact.map((x) => `(${x.an} ${x.au} / ${x.bn} ${x.bu})`), ...ap.r.map((_, i) => resp[i] ?? '')].join(' · '), solucion: ap.s }]);
     };
     const siguiente = () => {
         if (num >= n) { setFin(true); return; }
@@ -173,7 +186,7 @@ export default function Practica({ modo, cfg, onSalir }) {
     }
 
     const pasos = ap.pasos || [];
-    const todasOk = corregido?.every(Boolean);
+    const todasOk = corregido?.every(Boolean) && (!factCorr || factCorr.every((c) => c.ok));
     return (
         <div style={{ ...card, maxWidth: 760, margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -184,7 +197,9 @@ export default function Practica({ modo, cfg, onSalir }) {
 
             <div style={{ fontSize: ap.largo ? '1.12rem' : '1.6rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.5, textAlign: ap.largo ? 'left' : 'center', margin: '6px 0 14px' }}>{ap.e}</div>
 
-            {!corregido && <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Ayuda ap={ap} metodo={metodo} /></div>}
+            {conFactores
+                ? <div style={{ marginBottom: 14 }}><FactoresEditables v={ap.v} entradas={fact} setEntradas={setFact} correccion={factCorr} /></div>
+                : !corregido && <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Ayuda ap={ap} metodo={metodo} /></div>}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: ap.largo ? 'flex-start' : 'center' }}>
                 {ap.r.map((q, i) => (
@@ -230,6 +245,7 @@ export default function Practica({ modo, cfg, onSalir }) {
                     <button onClick={siguiente} style={btn('#16a34a')}>{num >= n ? 'Ver resultados 🏁' : 'Siguiente →'}</button>
                 )}
             </div>
+            {aviso && !corregido && <p style={{ textAlign: 'center', color: '#b45309', fontWeight: 800, marginTop: 10 }}>⚠ {aviso}</p>}
             {modo === 'problemas' && !corregido && <p style={{ textAlign: 'center', color: '#64748b', fontSize: '0.85rem', marginTop: 10 }}>Antes de operar, pasa todas las cantidades a la <b>misma unidad</b>.</p>}
         </div>
     );

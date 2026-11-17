@@ -6,6 +6,7 @@ import CargandoChunk from './components/CargandoChunk.jsx'
 import { LanguageProvider } from './i18n/LanguageContext.jsx'
 import { instalarCapturaErrores } from './utils/reportarError.js'
 import SelectorNombresGlobal from './components/SelectorNombresGlobal.jsx'
+import CalculadoraGlobal from './calculadora/CalculadoraGlobal.jsx'
 
 // Registro de fallos de los usuarios (errores_web, panel 🐞 del admin)
 instalarCapturaErrores();
@@ -33,6 +34,8 @@ createRoot(document.getElementById('root')).render(
       </Suspense>
       {/* Nombres del grupo guardado en el dispositivo al tocar un campo «nombre» */}
       <SelectorNombresGlobal />
+      {/* 🧮 Casio fx-82MS siempre a mano en Física y en Matemáticas */}
+      <CalculadoraGlobal />
     </LanguageProvider>
   </StrictMode>,
 )

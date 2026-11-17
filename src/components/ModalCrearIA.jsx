@@ -5,7 +5,13 @@ import { estadoUsoIA, generarRecursoIA, textoDeArchivo } from '../iaGenerador';
 // Modal «Crear con IA»: formulario común + dos vías
 //   ⚡ automática (NVIDIA → Gemini, 1 vez/semana por usuario; admin sin límite)
 //   📋 copiar el prompt para otra IA y pegar la respuesta (sin límite)
-export default function ModalCrearIA({ tipo, onGenerado, onClose }) {
+// Con `hojasDestino` (recurso ya creado) se eligen la hoja a la que se añaden o una hoja nueva con nombre:
+//   onGenerado(hojas, { tema, destino: índice | 'nueva', nombreNueva })
+export default function ModalCrearIA({ tipo, onGenerado, onClose, hojasDestino, maxHojas = 99, zIndex = 1100 }) {
+    const modoAnadir = Array.isArray(hojasDestino);
+    const puedeNueva = !modoAnadir || hojasDestino.length < maxHojas;
+    const [destino, setDestino] = useState(modoAnadir && hojasDestino.length ? 0 : 'nueva');
+    const [nombreNueva, setNombreNueva] = useState('');
     const juego = JUEGOS_IA[tipo];
     const [tema, setTema] = useState('');
     const [observaciones, setObservaciones] = useState('');
@@ -36,7 +42,7 @@ export default function ModalCrearIA({ tipo, onGenerado, onClose }) {
     const terminar = (hojas, validas) => {
         if (validas < n) alert(`Se han obtenido ${validas} ${juego.unidad} válidas de ${n}. Puedes completar el resto en el editor.`);
         if (tipo === 'RULETA' && !hojas[0].frasesOcultas?.[0]) alert('Recuerda rellenar la Frase Oculta en el editor.');
-        onGenerado(hojas, { tema: tema.trim() || hojas[0].nombreHoja });
+        onGenerado(hojas, { tema: tema.trim() || hojas[0].nombreHoja, destino, nombreNueva: nombreNueva.trim() || tema.trim() || hojas[0].nombreHoja });
     };
 
     const generarAuto = async () => {
@@ -108,11 +114,29 @@ export default function ModalCrearIA({ tipo, onGenerado, onClose }) {
     else if (uso) estadoTxt = `Ya la has usado esta semana. Próximo uso: ${fecha(uso.proximo)}`;
 
     return (
-        <div style={s.overlay} onClick={() => !generando && onClose()}>
+        <div style={{ ...s.overlay, zIndex }} onClick={() => !generando && onClose()}>
             <div style={s.modal} onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} disabled={generando} style={s.cerrar} aria-label="Cerrar">✕</button>
-                <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>🤖 Crear {juego.label} con IA</h2>
+                <h2 style={{ margin: '0 0 4px', fontSize: 20 }}>🤖 {modoAnadir ? 'Añadir' : 'Crear'} {modoAnadir ? juego.unidad : juego.label} con IA</h2>
                 <p style={{ margin: '0 0 14px', color: '#666', fontSize: 13 }}>Describe lo que necesitas. Después podrás revisar y editar todo antes de guardar.</p>
+
+                {modoAnadir && (
+                    <div style={{ ...s.caja, marginTop: 0, marginBottom: 4, borderStyle: 'solid', borderColor: '#673AB7', background: '#f5f0ff' }}>
+                        <label style={{ ...s.label, marginTop: 0 }}>¿Dónde se añaden?</label>
+                        <div style={s.fila}>
+                            <select value={destino} onChange={e => setDestino(e.target.value === 'nueva' ? 'nueva' : Number(e.target.value))}
+                                style={{ ...s.input, flex: '1 1 200px', width: 'auto' }} disabled={generando}>
+                                {hojasDestino.map((h, i) => <option key={i} value={i}>En la hoja «{h.nombreHoja || `Hoja ${i + 1}`}» ({(h.preguntas || []).filter(Boolean).length})</option>)}
+                                {puedeNueva && <option value="nueva">➕ En una hoja nueva</option>}
+                            </select>
+                            {destino === 'nueva' && (
+                                <input value={nombreNueva} onChange={e => setNombreNueva(e.target.value)} style={{ ...s.input, flex: '1 1 200px', width: 'auto' }}
+                                    disabled={generando} placeholder="Nombre de la hoja nueva" maxLength={40} />
+                            )}
+                        </div>
+                        {!puedeNueva && <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Este recurso ya tiene el máximo de {maxHojas} hojas.</div>}
+                    </div>
+                )}
 
                 <label style={s.label}>Temática</label>
                 <input value={tema} onChange={e => setTema(e.target.value)} style={s.input} disabled={generando}
@@ -196,7 +220,7 @@ export default function ModalCrearIA({ tipo, onGenerado, onClose }) {
                             placeholder='[{"pregunta": "...", ...}]' />
                         <button onClick={cargarPegada} disabled={!respuestaPegada.trim()}
                             style={{ ...s.btn, background: respuestaPegada.trim() ? '#673AB7' : '#bbb', width: '100%', marginTop: 8 }}>
-                            Cargar en el editor
+                            {modoAnadir ? 'Añadir al recurso' : 'Cargar en el editor'}
                         </button>
                     </div>
                 )}

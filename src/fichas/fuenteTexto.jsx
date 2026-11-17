@@ -1,6 +1,7 @@
 import React from 'react';
 import { leerNumeroEs } from '../generadorProblemasNumeros';
 import { renderMath } from '../utils/MathRender';
+import { leerNumero } from '../unidades/magnitudes.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FUENTES DE TEXTO para las fichas de Math World
@@ -94,7 +95,11 @@ export const comprobador = (q) => (valor) => {
         if (!t) return null;
         return { ok: [].concat(q.v).some(v => normalizar(v) === t) };
     }
-    const v = q.tipo === 'frac' ? leerFrac(valor) : leerNumeroEs(String(valor || '').replace('%', ''));
+    // «4,5·10^-6», «4,5 · 10⁻⁶», «4,5e-6»… también valen (notación científica)
+    const CIENT = /10\s*\^|10[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]|\d\s*[eE][-+]?\d|[·x×*]\s*10/;
+    const txt = String(valor || '').replace('%', '');
+    const normal = q.tipo === 'frac' || CIENT.test(txt) ? NaN : leerNumeroEs(txt);
+    const v = q.tipo === 'frac' ? leerFrac(valor) : Number.isNaN(normal) ? leerNumero(txt) : normal; // leerNumero: científica y unidades (3 dm³)
     if (Number.isNaN(v)) return null;
     return { ok: Math.abs(v - q.v) <= (q.tol ?? 0.01) };
 };

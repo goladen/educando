@@ -4,6 +4,8 @@
 //  notificación aunque haya muchos elementos nuevos:
 //    · resultados  → informes_juegos con mi codigoProfesor
 //    · preguntas   → preguntas_pendientes del trivial enviadas por alumnos
+//    · buzon       → mail_questions: preguntas que envían los alumnos a mis
+//                    recursos con el enlace ?c= (where profesorUid == mi uid)
 //    · compartidos → recursos que otro profe ha compartido conmigo
 //                    (resources.compartidoCon array-contains mi uid)
 //    · apps        → novedades marcadas como app/actualización, filtradas por
@@ -19,7 +21,7 @@ import {
     collection, query, where, orderBy, limit, onSnapshot, doc, setDoc,
 } from 'firebase/firestore';
 
-export const CLAVES_NOTIF = ['resultados', 'preguntas', 'apps', 'compartidos'];
+export const CLAVES_NOTIF = ['resultados', 'preguntas', 'apps', 'compartidos', 'buzon'];
 
 // Intereses disponibles (los mismos que usa el admin al publicar una novedad).
 // Son las materias de la vista «Por Materia» de la página principal
@@ -73,6 +75,7 @@ export default function useNotificacionesProfesor(usuario) {
     const [preguntas, setPreguntas] = useState([]);
     const [novedades, setNovedades] = useState([]);
     const [compartidos, setCompartidos] = useState([]);
+    const [buzon, setBuzon] = useState([]);
 
     // ── Perfil del profesor (código, vistos, intereses) ──────────────────────
     useEffect(() => {
@@ -156,6 +159,25 @@ export default function useNotificacionesProfesor(usuario) {
         return () => unsubs.forEach(u => u());
     }, [trivialsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── 2a. Preguntas de alumnos en el buzón de mis recursos (mail_questions) ─
+    // Se borran del buzón cuando el profe guarda el recurso: mientras sigan ahí y
+    // sean posteriores al «visto», avisan.
+    useEffect(() => {
+        if (!uid) { setBuzon([]); return; }
+        const q = query(collection(db, 'mail_questions'), where('profesorUid', '==', uid));
+        return onSnapshot(q, snap => setBuzon(snap.docs.map(d => {
+            const x = d.data();
+            return {
+                id: d.id,
+                fecha: ms(x.fechaEnvio),
+                autor: x.studentName || x.preguntas?.[0]?.studentName || '',
+                n: (x.preguntas || []).length,
+                recursoId: x.recursoId,
+                recursoTitulo: x.recursoTitulo || 'tu recurso',
+            };
+        })), () => setBuzon([]));
+    }, [uid]);
+
     // ── 2b. Recursos compartidos conmigo por otros profes ────────────────────
     useEffect(() => {
         if (!uid) { setCompartidos([]); return; }
@@ -195,6 +217,7 @@ export default function useNotificacionesProfesor(usuario) {
     const nuevosInformes  = informes.filter(i => i.fecha > desde('resultados'));
     const nuevasPreguntas = preguntas.filter(p => p.fecha > desde('preguntas'));
     const nuevasApps      = novedades.filter(n => n._ms > desde('apps') && encajaIntereses(n));
+    const nuevosBuzon     = buzon.filter(b => b.fecha > desde('buzon')).sort((a, b) => b.fecha - a.fecha);
     const nuevosCompart   = compartidos.filter(r => r.fecha > desde('compartidos')).sort((a, b) => b.fecha - a.fecha);
 
     const marcarVisto = async (clave) => {
@@ -235,6 +258,18 @@ export default function useNotificacionesProfesor(usuario) {
         fecha: Math.max(...nuevasPreguntas.map(p => p.fecha)),
         items: nuevasPreguntas,
     });
+    if (nuevosBuzon.length) {
+        const n = nuevosBuzon.reduce((a, b) => a + (b.n || 0), 0);
+        grupos.push({
+            clave: 'buzon',
+            emoji: '📬',
+            titulo: n === 1 ? 'Tus alumnos te han enviado 1 pregunta' : `Tus alumnos te han enviado ${n} preguntas`,
+            detalle: [resumenAlumnos(nuevosBuzon.map(b => b.autor)),
+                [...new Set(nuevosBuzon.map(b => `«${b.recursoTitulo}»`))].slice(0, 3).join(', ')].filter(Boolean).join(' · '),
+            fecha: nuevosBuzon[0].fecha,
+            items: nuevosBuzon,   // el más reciente primero
+        });
+    }
     if (nuevosCompart.length) grupos.push({
         clave: 'compartidos',
         emoji: '🤝',

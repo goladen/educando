@@ -68,6 +68,7 @@ import BuzonNovedades from './components/BuzonNovedades';
 import { mensajeAvisoGuardar } from './utils/encajeTexto';
 const BotonVistaJuegos = lazy(() => import('./components/VistaJuegos'));
 const BotonImportarPreguntas = lazy(() => import('./components/ImportarPreguntas').then(m => ({ default: m.BotonImportarPreguntas })));
+const BotonAnadirIA = lazy(() => import('./components/BotonAnadirIA'));
 import { interesesCompletos } from './hooks/useNotificacionesProfesor';
 const PresentationEditor = lazy(() => import('./components/PresentationEditor'));
 const PresentationList = lazy(() => import('./components/PresentationList'));
@@ -370,6 +371,18 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
         navegar(TIPOS_PRO.includes(r.tipo) || r.format === 'VTE' ? 'PRO' : 'CLASICO');
         if (r.tipoJuego) setJuegoSeleccionado(r.tipoJuego);
         setVista('MIS_RECURSOS');
+    };
+
+    // Desde la campana («📬 Tus alumnos te han enviado preguntas»): abre el recurso en su editor,
+    // que mete las preguntas del buzón al final de cada hoja
+    const abrirRecursoBuzon = async (recursoId) => {
+        try {
+            const s = await getDoc(doc(db, 'resources', recursoId));
+            if (!s.exists()) return alert('Ese recurso ya no existe.');
+            const r = { id: s.id, ...s.data() };
+            abrirCompartido(r);
+            abrirEdicion(r);
+        } catch (e) { alert(e.message); }
     };
 
     const copiarRecurso = async (r) => {
@@ -1286,7 +1299,7 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
                     inline={true}
                 />
 
-                <BuzonNovedades usuario={usuario} onIr={navegar} onAbrirPerfil={() => setMostrandoPerfil(true)} onAbrirCompartido={abrirCompartido} />
+                <BuzonNovedades usuario={usuario} onIr={navegar} onAbrirPerfil={() => setMostrandoPerfil(true)} onAbrirCompartido={abrirCompartido} onAbrirRecurso={abrirRecursoBuzon} />
 
                 <button onClick={() => setModoVista('ALUMNO')} style={{ background: 'white', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><Eye size={18} /> Vista Alumno</button>
                 <button onClick={() => setMostrandoPerfil(true)} style={{ position: 'relative', background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil
@@ -1794,6 +1807,18 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
                             const hojas = [...(prev.hojas || [])];
                             if (destino === 'nueva') hojas.push({ nombreHoja: nombreNueva || `Hoja ${hojas.length + 1}`, preguntas });
                             else hojas[destino] = { ...hojas[destino], preguntas: [...(hojas[destino]?.preguntas || []), ...preguntas] };
+                            return { ...prev, hojas };
+                        })} />
+                    {/* 🤖 Añadir más preguntas con IA (automática o pegando la respuesta de tu IA) a una hoja o a una nueva */}
+                    <BotonAnadirIA tipoJuego={juegoSeleccionado} hojas={datosEditor.hojas || []} maxHojas={mostrandoEditorManual ? 3 : 99}
+                        onAnadir={(destino, nombreNueva, preguntas, extraHoja) => setDatosEditor(prev => {
+                            const hojas = [...(prev.hojas || [])];
+                            if (destino === 'nueva') hojas.push({ nombreHoja: nombreNueva || `Hoja ${hojas.length + 1}`, preguntas, ...extraHoja });
+                            else {
+                                const h = hojas[destino] || {};
+                                const sinFrases = !(h.frasesOcultas || []).some(Boolean);
+                                hojas[destino] = { ...h, preguntas: [...(h.preguntas || []).filter(p => p && (p.pregunta || p.terminoA)), ...preguntas], ...(sinFrases ? extraHoja : {}) };
+                            }
                             return { ...prev, hojas };
                         })} />
                 </Suspense>

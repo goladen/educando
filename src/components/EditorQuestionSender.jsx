@@ -78,7 +78,8 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
 
                 if (contadordeCambios > 0) {
                     setDatos(prev => ({ ...prev, hojas: nuevasHojas }));
-                    alert(`📬 Se han descargado ${contadordeCambios} paquetes de preguntas en sus hojas correspondientes.`);
+                    alert(`📬 Se han descargado ${contadordeCambios} envíos de alumnos en sus hojas correspondientes.
+Las preguntas nuevas están AL FINAL de cada hoja.`);
                 }
             } else {
                 console.log("Buzón vacío");

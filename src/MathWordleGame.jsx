@@ -89,7 +89,33 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
+// --- Explicación de los colores (verde / amarillo / gris) ---
+const CeldaEj = ({ c, bg }) => (
+    <span style={{ display: 'inline-flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', background: bg, color: 'white', fontWeight: 'bold', fontFamily: "'Roboto Mono', monospace", borderRadius: 4, flexShrink: 0 }}>{c}</span>
+);
+function AyudaColores({ compacta = false }) {
+    if (compacta) return (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', fontSize: '0.78rem', color: '#d7dadc', padding: '6px 10px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CeldaEj c="" bg="#538d4e" /> en su sitio</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CeldaEj c="" bg="#b59f3b" /> está, en otra casilla</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CeldaEj c="" bg="#3a3a3c" /> no está</span>
+        </div>
+    );
+    const fila = { display: 'flex', alignItems: 'center', gap: 10, margin: '8px 0', textAlign: 'left' };
+    return (
+        <div style={{ background: '#1f1f21', border: '1px solid #3a3a3c', borderRadius: 10, padding: '12px 16px', maxWidth: 380, width: '90%', color: '#d7dadc', fontSize: '0.9rem', lineHeight: 1.4, boxSizing: 'border-box' }}>
+            <div style={{ fontWeight: 'bold', color: 'white', marginBottom: 6 }}>¿Cómo se juega?</div>
+            <div style={{ textAlign: 'left' }}>Escribe dos números que, con la operación indicada, den el <b>OBJETIVO</b>, y pulsa OK. Después de cada intento, el color de cada cifra te da una pista:</div>
+            <div style={fila}><CeldaEj c="4" bg="#538d4e" /><span><b style={{ color: '#6aaa64' }}>Verde:</b> la cifra es correcta y está en su sitio.</span></div>
+            <div style={fila}><CeldaEj c="7" bg="#b59f3b" /><span><b style={{ color: '#c9b458' }}>Amarillo:</b> la cifra está en la solución, pero en otra casilla.</span></div>
+            <div style={fila}><CeldaEj c="2" bg="#3a3a3c" /><span><b>Gris oscuro:</b> la cifra no está en la solución (o no aparece tantas veces como la has puesto).</span></div>
+            <div style={{ fontSize: '0.8rem', color: '#9ca3af', textAlign: 'left' }}>Hay que adivinar exactamente los números ocultos: otra operación que dé el mismo resultado no vale.</div>
+        </div>
+    );
+}
+
 export default function MathWordleGame({ usuario, onExit }) {
+    const [verAyuda, setVerAyuda] = useState(false);
     // Reto por enlace: operación y cifras fijadas por el profesor
     const [reto, setReto] = useState(() => leerRetoUrl());
     const cfgReto = reto ? { ...DEFAULT_RETO_MATHLE, ...(reto.config || {}) } : null;
@@ -392,6 +418,7 @@ export default function MathWordleGame({ usuario, onExit }) {
                 <button style={{ ...styles.btn, backgroundColor: '#b59f3b', color: 'white' }} onClick={() => { setGameMode('MULTI'); setScreen('CONFIG'); }}>✖ MULTIPLICACIÓN</button>
             </div>
             <button style={styles.btnOutline} onClick={onExit}>SALIR</button>
+            <div style={{ marginTop: 20, width: '100%', display: 'flex', justifyContent: 'center' }}><AyudaColores /></div>
         </div>
     );
 
@@ -421,6 +448,7 @@ export default function MathWordleGame({ usuario, onExit }) {
                 🏆 VER RANKING
             </button>
             <button style={{ ...styles.btnOutline, border: 'none', fontSize: '0.9rem', marginTop: '10px' }} onClick={() => setScreen('MAIN')}>↩ Volver</button>
+            <div style={{ marginTop: 14, width: '100%', display: 'flex', justifyContent: 'center' }}><AyudaColores /></div>
         </div>
     );
 
@@ -484,8 +512,17 @@ export default function MathWordleGame({ usuario, onExit }) {
                     <span style={{ fontSize: '0.8rem', color: '#818384' }}>OBJETIVO</span>
                     <span style={styles.targetNum}>{targetNum}</span>
                 </div>
-                <div style={{ width: '40px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setScreen(reto ? 'RETO' : 'CONFIG')}><X color="white" /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button onClick={() => setVerAyuda(true)} title="¿Qué significan los colores?" style={{ width: 30, height: 30, borderRadius: '50%', border: '2px solid #818384', background: 'transparent', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem' }}>?</button>
+                    <div style={{ cursor: 'pointer' }} onClick={() => setScreen(reto ? 'RETO' : 'CONFIG')}><X color="white" /></div>
+                </div>
             </div>
+            {verAyuda && (
+                <div onClick={() => setVerAyuda(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 10001, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}><AyudaColores /></div>
+                    <button onClick={() => setVerAyuda(false)} style={{ ...styles.btn, ...styles.btnPrimary, maxWidth: 200 }}>Entendido</button>
+                </div>
+            )}
 
             <div style={styles.gridScroll}>
                 <div style={styles.gridContainer}>
@@ -524,6 +561,7 @@ export default function MathWordleGame({ usuario, onExit }) {
             </div>
 
             <div style={{ ...styles.toast, opacity: message ? 1 : 0 }}>{message}</div>
+            <AyudaColores compacta />
 
             <div style={styles.keyboard}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (

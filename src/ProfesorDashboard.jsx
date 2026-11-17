@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useLayoutEffect, lazy, Suspense } from 'react';
+﻿import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import CargandoChunk from './components/CargandoChunk';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy, limit, arrayRemove, deleteField } from 'firebase/firestore';
@@ -129,7 +129,7 @@ const INSTRUCCIONES_CREACION = {
 // ¿La URL es la vista alumno del profe (/alumno o /alumno/<app>)?
 const esRutaAlumno = (url = window.location.pathname) => /^\/alumno(?=[/?#]|$)/i.test(url);
 
-function ProfesorDashboardInterno({ usuario, googleToken }) {
+function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = false }) {
     const [juegoSeleccionado, setJuegoSeleccionado] = useState('PASAPALABRA');
     const [vista, setVista] = useState('MIS_RECURSOS'); // 'MIS_RECURSOS', 'BIBLIOTECA'
     const [recursos, setRecursos] = useState([]);
@@ -171,7 +171,18 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
     const [hostGameData, setHostGameData] = useState(null);
     const [modalCopiarApp, setModalCopiarApp] = useState(null);
     const [datosEditor, setDatosEditor] = useState({ id: null, titulo: '', temas: '', profesorNombre: '', pais: '', region: '', poblacion: '', config: {}, hojas: [], isPrivate: false });
-    const [modoVista, setModoVista] = useState(() => esRutaAlumno() ? 'ALUMNO' : 'PROFESOR');
+    const [modoVista, setModoVista] = useState(() => {
+        if (esRutaAlumno()) return 'ALUMNO';
+        // Enlace compartido de un juego (pikt.es/<app>, /?juego=…) abierto con sesión de profesor:
+        // se abre en la Vista Alumno (/alumno/<app>), donde LandingGames lo lee de la URL.
+        // «Salir modo alumno» devuelve al panel.
+        if (abrirEnlaceJuego) {
+            const { pathname, search, hash } = window.location;
+            window.history.replaceState(window.history.state, '', '/alumno' + (pathname === '/' ? '' : pathname) + search + hash);
+            return 'ALUMNO';
+        }
+        return 'PROFESOR';
+    });
     // Menú hamburguesa de la portada pública dentro de la Vista Alumno
     const [vistaMenuAlumno, setVistaMenuAlumno] = useState(null); // null | 'POPULARES' | 'PAGINAS' | 'COMUNIDADES'
     const [paginaAlumnoSlug, setPaginaAlumnoSlug] = useState(null);
@@ -213,8 +224,15 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
             window.removeEventListener('popstate', alVolver);
             h.pushState = pushState;
             h.replaceState = replaceState;
-            if (esRutaAlumno()) replaceState.call(h, {}, '', '/');
         };
+    }, [modoVista]);
+    // /alumno se deshace solo al salir de verdad de la vista alumno, no en la limpieza del
+    // efecto de arriba: StrictMode y los Suspense (lazy) la ejecutan y vuelven a montar al
+    // cargar, y se perdía /alumno/<app> de un enlace compartido.
+    const modoVistaPrevio = useRef(modoVista);
+    useEffect(() => {
+        if (modoVistaPrevio.current === 'ALUMNO' && modoVista !== 'ALUMNO' && esRutaAlumno()) window.history.replaceState({}, '', '/');
+        modoVistaPrevio.current = modoVista;
     }, [modoVista]);
     const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);

@@ -15,7 +15,7 @@ import {
     Eye, RefreshCw, CheckCircle, ChevronLeft, Lock, Globe, UserCircle,
     Mail, Send, MessageSquare, UserPlus, Clock, Check, ExternalLink,
     FileText, LayoutGrid, ShieldCheck, ChevronRight, GraduationCap, ClipboardList, Calendar,
-    MoreVertical, Pencil, Image as ImageIcon, Download, Printer
+    MoreVertical, Pencil, Image as ImageIcon, Download, Printer, Link2
 } from 'lucide-react';
 import { EditorAula } from './MapaAula';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -507,11 +507,66 @@ function VistaPublicaComunidad({ usuario, comunidad, onBack, onCambio }) {
     );
 }
 
+// ─── Enlaces en los mensajes (se abren siempre en otra pestaña) ──────────────
+// Acepta «https://…», «http://…» y también «pikt.es/…» o «www.…» sin protocolo.
+const normalizarUrl = (u) => {
+    let s = (u || '').trim();
+    if (!s) return null;
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+    try {
+        const url = new URL(s);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+        if (!url.hostname.includes('.')) return null;
+        return url.href;
+    } catch { return null; }
+};
+const esPikt = (href) => { try { return /(^|\.)pikt\.es$/i.test(new URL(href).hostname); } catch { return false; } };
+const hostDe = (href) => { try { return new URL(href).hostname.replace(/^www\./, ''); } catch { return href; } };
+
+const RE_URL = /((?:https?:\/\/|www\.|pikt\.es\/)[^\s<]+[^\s<.,;:!?)\]'"»])/gi;
+function TextoConEnlaces({ texto, mio }) {
+    const partes = String(texto || '').split(RE_URL);
+    return partes.map((p, i) => {
+        if (i % 2 === 1) {
+            const href = normalizarUrl(p);
+            if (href) return (
+                <a key={i} href={href} target="_blank" rel="noopener noreferrer"
+                    style={{ color: mio ? 'white' : AZUL, textDecoration: 'underline', wordBreak: 'break-all' }}>{p}</a>
+            );
+        }
+        return <React.Fragment key={i}>{p}</React.Fragment>;
+    });
+}
+
+function TarjetaEnlace({ enlace, mio }) {
+    const href = normalizarUrl(enlace?.url);
+    if (!href) return null;
+    const pikt = esPikt(href);
+    return (
+        <a href={href} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, padding: '7px 10px', borderRadius: 10, textDecoration: 'none',
+                background: mio ? 'rgba(255,255,255,0.18)' : '#eef4ff', color: mio ? 'white' : '#2c3e50', border: mio ? '1px solid rgba(255,255,255,0.35)' : '1px solid #d6e4ff' }}>
+            <span style={{ fontSize: '1.2rem' }}>{pikt ? '🎮' : '🔗'}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {enlace.titulo || (pikt ? 'Abrir en Pikt' : hostDe(href))}
+                </span>
+                <span style={{ display: 'block', fontSize: '0.68rem', opacity: 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hostDe(href)}</span>
+            </span>
+            <ExternalLink size={14} style={{ flexShrink: 0, opacity: 0.8 }} />
+        </a>
+    );
+}
+
 // ─── Panel: mensajes entre miembros ───────────────────────────────────────────
 function PanelMensajes({ usuario, comunidad }) {
     const [mensajes, setMensajes] = useState([]);
     const [texto, setTexto]       = useState('');
     const [enviando, setEnviando] = useState(false);
+    const [verEnlace, setVerEnlace] = useState(false);
+    const [enlaceUrl, setEnlaceUrl] = useState('');
+    const [enlaceTitulo, setEnlaceTitulo] = useState('');
+    const enlaceValido = enlaceUrl.trim() ? normalizarUrl(enlaceUrl) : null;
     const finRef = useRef();
 
     // Marca esta comunidad como "leída" para el aviso de la campanita
@@ -531,13 +586,16 @@ function PanelMensajes({ usuario, comunidad }) {
 
     const enviar = async () => {
         const t = texto.trim();
-        if (!t) return;
+        if (verEnlace && enlaceUrl.trim() && !enlaceValido) { alert('El enlace no es válido. Pega una dirección web, p. ej. https://pikt.es/...'); return; }
+        const enlace = verEnlace && enlaceValido ? { url: enlaceValido, titulo: enlaceTitulo.trim().slice(0, 120) } : null;
+        if (!t && !enlace) return;
         setEnviando(true);
         try {
             await addDoc(collection(db, 'comunidades', comunidad.id, 'mensajes'), {
                 autorUid: usuario.uid,
                 autorNombre: usuario.displayName || usuario.email || 'Profesor/a',
                 texto: t,
+                ...(enlace ? { enlace } : {}),
                 fecha: serverTimestamp(),
             });
             // Resumen para el aviso de la campanita (sin texto: el doc es público)
@@ -546,6 +604,7 @@ function PanelMensajes({ usuario, comunidad }) {
                 ultimoMensajePor: usuario.uid,
             }).catch(() => {});
             setTexto('');
+            setEnlaceUrl(''); setEnlaceTitulo(''); setVerEnlace(false);
         } catch (e) { alert('No se pudo enviar: ' + e.message); }
         setEnviando(false);
     };
@@ -563,7 +622,8 @@ function PanelMensajes({ usuario, comunidad }) {
                         <div key={m.id} style={{ display: 'flex', justifyContent: mio ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                             <div style={{ maxWidth: '78%', background: mio ? AZUL : 'white', color: mio ? 'white' : '#2c3e50', borderRadius: 12, padding: '7px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                 {!mio && <div style={{ fontSize: '0.7rem', fontWeight: 700, color: AZUL, marginBottom: 2 }}>{m.autorNombre}</div>}
-                                <div style={{ fontSize: '0.88rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.texto}</div>
+                                {m.texto && <div style={{ fontSize: '0.88rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}><TextoConEnlaces texto={m.texto} mio={mio} /></div>}
+                                {m.enlace && <TarjetaEnlace enlace={m.enlace} mio={mio} />}
                                 <div style={{ fontSize: '0.62rem', opacity: 0.6, textAlign: 'right', marginTop: 2 }}>{fmtFecha(m.fecha)}</div>
                             </div>
                         </div>
@@ -571,11 +631,25 @@ function PanelMensajes({ usuario, comunidad }) {
                 })}
                 <div ref={finRef} />
             </div>
+            {verEnlace && (
+                <div style={{ background: '#eef4ff', border: '1px solid #d6e4ff', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#5d6d7e', marginBottom: 6 }}>
+                        Pega el enlace de un juego de Pikt (botón <strong>Compartir</strong> del juego) o de cualquier web. Se abrirá en otra pestaña.
+                    </div>
+                    <input value={enlaceUrl} onChange={e => setEnlaceUrl(e.target.value)} autoFocus
+                        placeholder="https://pikt.es/..." style={{ ...st.input, marginBottom: 6, borderColor: enlaceUrl.trim() && !enlaceValido ? '#e74c3c' : undefined }} />
+                    <input value={enlaceTitulo} onChange={e => setEnlaceTitulo(e.target.value)} maxLength={120}
+                        placeholder="Título (opcional), p. ej. «Ahorcado de verbos 2ºA»" style={{ ...st.input, marginBottom: 0 }} />
+                    {enlaceValido && <TarjetaEnlace enlace={{ url: enlaceValido, titulo: enlaceTitulo.trim() }} mio={false} />}
+                </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setVerEnlace(v => !v)} title="Compartir un enlace"
+                    style={{ ...st.btnPrimary, background: verEnlace ? AZUL : '#ecf0f1', color: verEnlace ? 'white' : '#2c3e50' }}><Link2 size={16} /></button>
                 <input value={texto} onChange={e => setTexto(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && enviar()}
-                    placeholder="Escribe un mensaje…" style={{ ...st.input, marginBottom: 0, flex: 1 }} />
-                <button onClick={enviar} disabled={enviando || !texto.trim()} style={st.btnPrimary}><Send size={16} /></button>
+                    placeholder={verEnlace ? 'Añade un comentario (opcional)…' : 'Escribe un mensaje…'} style={{ ...st.input, marginBottom: 0, flex: 1 }} />
+                <button onClick={enviar} disabled={enviando || (!texto.trim() && !enlaceValido)} style={st.btnPrimary}><Send size={16} /></button>
             </div>
         </div>
     );

@@ -4,9 +4,11 @@
 // Money Board, Bunker… o en el juego para el que se imprimió.
 // Las preguntas de escribir se convierten en opciones (respuestas de las otras preguntas, sin azar)
 // para los juegos que solo funcionan con opciones.
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { normalizarPregunta, conOpcionesParaElegir } from '../utils/normalizarPreguntas';
 import { recursoDeFicha } from '../utils/fichaCodigo';
+
+const ModalPdfRecurso = lazy(() => import('./ModalPdfRecurso'));
 
 const NOMBRE_JUEGO = {
     PASAPALABRA: '🔤 Pasapalabra', APAREJADOS: '🃏 AparejaDOS', RULETA: '🎡 Ruleta', WORDLE: '🟩 Wordle', SOPA: '🔠 Sopa de letras',
@@ -27,12 +29,14 @@ export function recursoPreguntas(recurso, { opciones = false } = {}) {
     const planas = [];
     hojas.forEach((h, i) => (h.preguntas || []).forEach((p) => {
         const q = normalizarPregunta(p?.terminoA !== undefined ? { pregunta: p.terminoA, respuesta: p.terminoB } : p);
-        if (q && q.tipo !== 'ORDENAR') planas.push({ q, i });
+        // Ordenar solo en los juegos que lo admiten (Luz roja, Money Board): no en los de opciones
+        if (q && (q.tipo !== 'ORDENAR' || !opciones)) planas.push({ q, i });
     }));
     const convertidas = opciones ? conOpcionesParaElegir(planas.map((x) => x.q)) : planas.map((x) => x.q);
     const nuevas = hojas.map((h) => ({ nombreHoja: h.nombreHoja || recurso.titulo || 'Preguntas', preguntas: [] }));
     convertidas.forEach((q, k) => {
-        const p = q.tipo === 'MULTIPLE' ? { pregunta: q.enunciado, respuesta: q.correcta, incorrectas: q.opciones.filter((o) => o !== q.correcta) }
+        const p = q.tipo === 'ORDENAR' ? { tipo: 'ORDENAR', pregunta: q.enunciado, bloques: q.bloques, respuesta: q.correcta }
+            : q.tipo === 'MULTIPLE' ? { pregunta: q.enunciado, respuesta: q.correcta, incorrectas: q.opciones.filter((o) => o !== q.correcta) }
             : q.tipo === 'RELLENAR' ? { tipo: 'RELLENAR', pregunta: q.enunciado, bloques: q.bloques, respuesta: q.correcta }
                 : { tipo: 'SIMPLE', pregunta: q.enunciado, respuesta: q.correcta };
         nuevas[planas[k].i].preguntas.push(p);
@@ -40,23 +44,32 @@ export function recursoPreguntas(recurso, { opciones = false } = {}) {
     return { ...recurso, tipoJuego: 'CAZABURBUJAS', tipo: undefined, hojas: nuevas.filter((h) => h.preguntas.length) };
 }
 
+const chipTema = (on) => ({
+    padding: '6px 11px', borderRadius: 18, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'inherit',
+    border: `2px solid ${on ? '#7c3aed' : '#e2e8f0'}`, background: on ? '#7c3aed' : 'white', color: on ? 'white' : '#475569',
+});
+
 const cuenta = (r, soloOpciones) => (r?.hojas || []).reduce((s, h) =>
     s + h.preguntas.filter((p) => !soloOpciones || (p.incorrectas?.length || 0) > 0).length, 0);
 
 /** Juegos con los que se pueden jugar las preguntas de la ficha. */
 export function juegosDeFicha(ficha) {
-    const base = recursoDeFicha(ficha);
+    // Sin código (recurso de PiKT abierto desde el Banco): orden normal de cada juego
+    const conCodigo = !!ficha.codigo;
+    const base = conCodigo ? recursoDeFicha(ficha) : ficha.recurso;
     const out = [];
     const esInvasores = ficha.juego === 'INVASORES' && String(ficha.enlace || '').startsWith('/invasores');
     const escritas = base ? recursoPreguntas(base) : null;
     const conOpc = base ? recursoPreguntas(base, { opciones: true }) : null;
     const nTodas = cuenta(escritas, false);
+    // Invasión Pi no juega las de ordenar
+    const nInv = (escritas?.hojas || []).reduce((s, h) => s + h.preguntas.filter((p) => p.tipo !== 'ORDENAR').length, 0);
     const nOpc = cuenta(conOpc, true);
-    const fijo = (r) => r && { ...r, config: { ...(r.config || {}), aleatorio: false }, ordenFicha: ficha.codigo };
+    const fijo = (r) => (r && conCodigo ? { ...r, config: { ...(r.config || {}), aleatorio: false }, ordenFicha: ficha.codigo } : r);
 
     // Invasión Pi: la ficha de Invasión Pi se abre con su enlace (mismas opciones A-D y enunciados de Math World)
     if (esInvasores || nTodas) {
-        out.push({ id: 'INV_DISPARA', titulo: '👾 Invasión Pi · Dispara al responder', desc: 'Escribe la respuesta o elígela (A-D).', n: esInvasores ? null : nTodas,
+        out.push({ id: 'INV_DISPARA', titulo: '👾 Invasión Pi · Dispara al responder', desc: 'Escribe la respuesta o elígela (A-D).', n: esInvasores ? null : nInv,
             accion: esInvasores ? { tipo: 'ENLACE', enlace: ficha.enlace, extra: 'var=DISPARA' } : { tipo: 'INVASORES', variante: 'DISPARA', recurso: fijo(escritas) } });
         out.push({ id: 'INV_FILTRO', titulo: '👾 Invasión Pi · Filtro de respuestas', desc: 'Derriba las respuestas incorrectas y deja pasar la buena.', n: esInvasores ? null : nOpc,
             accion: esInvasores ? { tipo: 'ENLACE', enlace: ficha.enlace, extra: 'var=FILTRO' } : { tipo: 'INVASORES', variante: 'FILTRO', recurso: fijo(conOpc) } });
@@ -78,7 +91,7 @@ export function juegosDeFicha(ficha) {
     if (original) {
         const k = out.findIndex((j) => j.id === original);
         if (k >= 0) out.unshift({ ...out.splice(k, 1)[0], deLaFicha: true });
-    } else if (base) {
+    } else if (base && ficha.juego) {
         out.unshift({ id: 'ORIGINAL', deLaFicha: true, titulo: NOMBRE_JUEGO[ficha.juego] || 'El juego de la ficha', desc: 'Como se imprimió.', accion: { tipo: 'JUEGO', modo: ficha.modo || null, recurso: base } });
     } else if (ficha.enlace) {
         out.unshift({ id: 'ORIGINAL', deLaFicha: true, titulo: NOMBRE_JUEGO[ficha.juego] || 'El juego de la ficha', desc: 'Como se imprimió.', accion: { tipo: 'ENLACE', enlace: ficha.enlace } });
@@ -86,22 +99,68 @@ export function juegosDeFicha(ficha) {
     return out;
 }
 
+/** Solo las hojas (temas) elegidas; el título lleva el tema si es uno solo. */
+function fichaConTemas(ficha, sel) {
+    const hojas = ficha.recurso?.hojas || [];
+    if (!sel.length || sel.length >= hojas.length) return ficha;
+    const elegidas = hojas.filter((_, i) => sel.includes(i));
+    const titulo = elegidas.length === 1 ? `${ficha.recurso.titulo || ''} · ${elegidas[0].nombreHoja}` : ficha.recurso.titulo;
+    return { ...ficha, recurso: { ...ficha.recurso, titulo, hojas: elegidas } };
+}
+
+// ficha.temasIniciales: índices de hojas ya elegidas (/?jp=…&temas=2,5 desde el Banco)
 export default function ElegirJuegoFicha({ ficha, onElegir, onSalir }) {
-    const juegos = useMemo(() => juegosDeFicha(ficha), [ficha]);
+    const hojas = ficha.recurso?.hojas || [];
+    // La ficha propia de Invasión Pi se abre con su enlace (todas sus preguntas): sin elegir temas
+    const conTemas = hojas.length > 1 && !(ficha.juego === 'INVASORES' && ficha.enlace);
+    const [sel, setSel] = useState(() => (Array.isArray(ficha.temasIniciales) ? ficha.temasIniciales.filter((i) => i >= 0 && i < hojas.length) : []));
+    const alternar = (i) => setSel((s) => (s.includes(i) ? s.filter((x) => x !== i) : [...s, i].sort((a, b) => a - b)));
+    const fichaSel = useMemo(() => (conTemas ? fichaConTemas(ficha, sel) : ficha), [ficha, sel, conTemas]);
+    const juegos = useMemo(() => juegosDeFicha(fichaSel), [fichaSel]);
+    // Ficha PDF de los temas elegidos (con su código: luego se juega con esas mismas preguntas)
+    const [pdf, setPdf] = useState(false);
+    const recursoPdf = fichaSel.recurso && (fichaSel.recurso.hojas || []).length ? fichaSel.recurso : null;
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#1e1b4b,#4c1d95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: "'Segoe UI', system-ui, sans-serif", boxSizing: 'border-box' }}>
             <div style={{ background: 'white', borderRadius: 20, width: '100%', maxWidth: 620, padding: '22px 20px', boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '2rem' }}>🎟️</span>
                     <div style={{ flex: 1, minWidth: 200 }}>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#7c3aed', letterSpacing: 1 }}>FICHA {ficha.codigo}</div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#7c3aed', letterSpacing: 1 }}>{ficha.codigo ? `FICHA ${ficha.codigo}` : 'PREGUNTAS DE PIKT'}</div>
                         <h2 style={{ margin: '2px 0 0', color: '#1e1b4b', fontSize: '1.3rem' }}>{ficha.titulo || 'Preguntas de la ficha'}</h2>
                     </div>
+                    {recursoPdf && (
+                        <button onClick={() => setPdf(true)} title={sel.length ? 'Ficha en papel con los temas elegidos' : 'Ficha en papel con todos los temas'}
+                            style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: '#6d28d9', cursor: 'pointer', fontWeight: 800, color: 'white' }}>
+                            🖨️ Ficha PDF{conTemas && sel.length ? ` (${sel.length} tema${sel.length > 1 ? 's' : ''})` : ''}
+                        </button>
+                    )}
                     <button onClick={onSalir} style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, color: '#475569' }}>✕ Salir</button>
                 </div>
                 <p style={{ color: '#475569', fontSize: '0.9rem', margin: '10px 0 14px' }}>
-                    ¿A qué jugamos con estas preguntas? En todos salen <b>las mismas y en el mismo orden</b> que en el papel.
+                    ¿A qué jugamos con estas preguntas?{ficha.codigo ? <> En todos salen <b>las mismas y en el mismo orden</b> que en el papel.</> : ' Las de escribir se convierten en opciones en los juegos que lo necesitan.'}
                 </p>
+                {conTemas && (
+                    <div style={{ margin: '0 0 14px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569', marginBottom: 6 }}>
+                            📑 TEMAS {sel.length ? `(${sel.length} elegido${sel.length > 1 ? 's' : ''})` : '(todos)'}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 190, overflowY: 'auto' }}>
+                            <button onClick={() => setSel([])} style={chipTema(!sel.length)}>Todos</button>
+                            {hojas.map((h, i) => (
+                                <button key={i} onClick={() => alternar(i)} style={chipTema(sel.includes(i))}>
+                                    {h.nombreHoja || `Tema ${i + 1}`} <span style={{ opacity: 0.6 }}>({(h.preguntas || []).length})</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 5 }}>Pulsa uno o varios. Money Board necesita al menos 2 (cada tema es una categoría).</div>
+                    </div>
+                )}
+                {pdf && recursoPdf && (
+                    <Suspense fallback={null}>
+                        <ModalPdfRecurso recurso={recursoPdf} onClose={() => setPdf(false)} />
+                    </Suspense>
+                )}
                 {juegos.length === 0 && <p style={{ color: '#b91c1c' }}>Esta ficha no tiene preguntas que se puedan jugar.</p>}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>
                     {juegos.map((j) => (

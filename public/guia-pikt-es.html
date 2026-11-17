@@ -89,6 +89,12 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
 .tut-arriba { display: inline-block; margin-top: 10px; font-size: 0.8em; color: #6c63ff; text-decoration: none; font-weight: 600; }
 .mb-tabla td .tag { margin: 2px 2px 0 0; }
 @media print { .tut-arriba { display: none; } .tut { page-break-inside: auto; } }
+.mat-pdfs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.mat-pdfs a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; text-decoration: none; color: #fff; background: var(--c); font-weight: 700; font-size: 0.92em; transition: transform 0.2s, box-shadow 0.2s; }
+.mat-pdfs a:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
+.mat-pdfs .e { font-size: 1.35em; line-height: 1; }
+.mat-pdfs .t { flex: 1; min-width: 0; }
+.mat-pdfs .d { background: rgba(255,255,255,0.25); border-radius: 8px; padding: 3px 8px; font-size: 0.9em; }
 /* Evitar desbordes horizontales y permitir que palabras largas/enlaces se partan */
 html, body { max-width: 100%; overflow-x: hidden; }
 .section p, .app-card p, .steps li .step-text, .btn-item, .info-box, .alert { overflow-wrap: break-word; word-break: break-word; }
@@ -1192,6 +1198,25 @@ html, body { max-width: 100%; overflow-x: hidden; }
       </span>
       <span style="background:#fff;color:#1e3a8a;font-weight:800;border-radius:10px;padding:8px 12px;white-space:nowrap;font-size:0.88em;">⬇ Descargar</span>
     </a>
+
+    <!-- TUTORIALES POR MATERIA EN PDF (2 caras cada uno) -->
+    <div id="tutoriales-materias" style="margin:18px 0 6px;">
+      <h3 style="margin:0 0 4px;">📚 Tutoriales por materia en PDF (2 caras) <span class="new-badge">NUEVO</span></h3>
+      <p style="font-size:0.9em;line-height:1.55;margin:0 0 10px;">Las herramientas y los juegos de cada materia, cómo se usan y un ejemplo de sesión de 50 minutos. Una hoja A4 por las dos caras, para imprimir o para cursos de formación.</p>
+      <div class="mat-pdfs">
+        <a href="/descargas/tutoriales/tutorial-matematicas-pikt.pdf" target="_blank" rel="noopener" download style="--c:#009688;"><span class="e">🔢</span><span class="t">Matemáticas</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-lengua-pikt.pdf" target="_blank" rel="noopener" download style="--c:#7B1FA2;"><span class="e">📖</span><span class="t">Lengua</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-idiomas-pikt.pdf" target="_blank" rel="noopener" download style="--c:#1565C0;"><span class="e">🌐</span><span class="t">Idiomas</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-geografia-historia-pikt.pdf" target="_blank" rel="noopener" download style="--c:#E65100;"><span class="e">🌍</span><span class="t">Geografía e Historia</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-fisica-quimica-pikt.pdf" target="_blank" rel="noopener" download style="--c:#C62828;"><span class="e">⚗️</span><span class="t">Física y Química</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-biologia-pikt.pdf" target="_blank" rel="noopener" download style="--c:#2E7D32;"><span class="e">🔬</span><span class="t">Biología</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-musica-pikt.pdf" target="_blank" rel="noopener" download style="--c:#5E35B1;"><span class="e">🎵</span><span class="t">Música</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-tecnologia-pikt.pdf" target="_blank" rel="noopener" download style="--c:#546E7A;"><span class="e">⚙️</span><span class="t">Tecnología</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-plastica-pikt.pdf" target="_blank" rel="noopener" download style="--c:#AD1457;"><span class="e">🎨</span><span class="t">Plástica</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-educacion-fisica-pikt.pdf" target="_blank" rel="noopener" download style="--c:#15803d;"><span class="e">🏃</span><span class="t">Educación Física</span><span class="d">⬇</span></a>
+        <a href="/descargas/tutoriales/tutorial-tutoria-pikt.pdf" target="_blank" rel="noopener" download style="--c:#c2410c;"><span class="e">🍎</span><span class="t">Tutoría y aula</span><span class="d">⬇</span></a>
+      </div>
+    </div>
 
     <!-- TUTORIAL 1 -->
     <div class="tut" id="tut-crear">

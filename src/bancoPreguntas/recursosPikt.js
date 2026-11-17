@@ -25,6 +25,9 @@ const ORDEN_ETAPAS = ['pri', 'eso', 'bach'];
 
 const MATERIAS = {
     matematicas:  { label: 'Matemáticas',        emoji: '🔢' },
+    lengua:       { label: 'Lengua y Literatura', emoji: '📖' },
+    catalan:      { label: 'Llengua catalana',   emoji: '📕' },
+    tecnologia:   { label: 'Tecnología',         emoji: '⚙️' },
     geografia:    { label: 'Geografía',          emoji: '🌍' },
     historia:     { label: 'Historia',           emoji: '🏛️' },
     ciencias:     { label: 'Ciencias',           emoji: '🔬' },
@@ -84,26 +87,49 @@ export function cargarPreguntasPikt() {
             import('./datos/plataformas.js'),
             import('./datos/calamar.js'),
             import('./datos/inglesEso.js'),
-        ]).then(([pri, eso, bach, inv, bunker, plataformas, calamar, inglesEso]) => {
+            import('./datos/lengua.js'),
+            import('./datos/frances.js'),
+            import('./datos/catalan.js'),
+            import('./datos/tecnologia.js'),
+        ]).then(([pri, eso, bach, inv, bunker, plataformas, calamar, inglesEso, lengua, frances, catalan, tecnologia]) => {
             const out = [];
             const vistos = new Set();
-            // extra: { tema, curso, rellenar } (rellenar = la pregunta es una frase con un hueco «___»)
+            // extra: { tema, curso, rellenar, ordenar, imp } (rellenar = la pregunta es una frase con un hueco «___»;
+            // ordenar = la respuesta es una oración cuyas palabras se ordenan; imp = «⭐ Imprescindibles»)
             const meter = (etapa, materia, pregunta, respuesta, incorrectas, extra = {}) => {
                 pregunta = String(pregunta ?? '').trim(); respuesta = String(respuesta ?? '').trim();
                 const mal = (incorrectas || []).map(x => String(x ?? '').trim()).filter(x => x && norm(x) !== norm(respuesta));
-                if (!pregunta || !respuesta || mal.length < 3) return; // solo las de 4 opciones
-                const clave = `${etapa}|${materia}|${norm(pregunta)}`;
+                const palabras = respuesta.split(' ').filter(Boolean);
+                const ordenar = !!extra.ordenar && palabras.length >= 3;
+                if (!pregunta || !respuesta || (!ordenar && mal.length < 3)) return; // solo las de 4 opciones (u ordenar)
+                const clave = `${etapa}|${materia}|${norm(pregunta)}${ordenar ? '|' + norm(respuesta) : ''}`;
                 if (vistos.has(clave)) return;
                 vistos.add(clave);
                 const p = { pregunta, respuesta, incorrectas: mal.slice(0, 3), etapa, materia };
+                if (ordenar) p.ordenar = palabras;
                 if (extra.tema) p.tema = extra.tema;
                 if (extra.curso) p.curso = extra.curso;
+                if (extra.imp) p.imp = true;
                 if (extra.rellenar && pregunta.split('___').length === 2) {
                     const [antes, despues] = pregunta.split('___');
                     p.bloques = [antes.trim(), respuesta, despues.trim()];
                 }
                 out.push(p);
             };
+            // Lengua castellana y Literatura (Primaria y ESO) por temas y cursos
+            (lengua.LENGUA || []).forEach(({ tema, etapa, curso, imp, preguntas }) => {
+                (preguntas || []).forEach(([tipo, q, ok, mal]) => meter(etapa, 'lengua', q, ok, mal, { tema, curso, imp, rellenar: tipo === 'r', ordenar: tipo === 'o' }));
+            });
+            // Francés (Primaria 3.º-6.º y ESO) por temas y cursos (mismo formato que Lengua)
+            (frances.FRANCES || []).forEach(({ tema, etapa, curso, imp, preguntas }) => {
+                (preguntas || []).forEach(([tipo, q, ok, mal]) => meter(etapa, 'frances', q, ok, mal, { tema, curso, imp, rellenar: tipo === 'r', ordenar: tipo === 'o' }));
+            });
+            // Llengua catalana (Primaria y ESO) y Tecnología (ESO): mismo formato
+            [['catalan', catalan.CATALAN], ['tecnologia', tecnologia.TECNOLOGIA]].forEach(([materia, lista]) => {
+                (lista || []).forEach(({ tema, etapa, curso, imp, preguntas }) => {
+                    (preguntas || []).forEach(([tipo, q, ok, mal]) => meter(etapa, materia, q, ok, mal, { tema, curso, imp, rellenar: tipo === 'r', ordenar: tipo === 'o' }));
+                });
+            });
             // Inglés de ESO por contenidos (temas y cursos)
             (inglesEso.INGLES_ESO || []).forEach(({ tema, curso, preguntas }) => {
                 (preguntas || []).forEach(([tipo, q, ok, mal]) => meter('eso', 'ingles', q, ok, mal, { tema, curso, rellenar: tipo === 'r' }));
@@ -183,14 +209,19 @@ function aPasapalabra(preguntas) {
 // opts.rellenar: el juego sabe pedir que se ESCRIBA la palabra del hueco (tipo RELLENAR de
 // utils/normalizarPreguntas: Money Board, Luz roja, Invasión Pi). Si no, la frase con «___» se
 // juega como opción múltiple (Pikatron, Burbujas, Bunker…).
+// Las de ORDENAR (p.ordenar = palabras de la oración) solo van a los juegos que las admiten
+// (opts.rellenar: Money Board, Luz roja…); en el resto de formatos se quitan.
 const aFormato = (formato, preguntas, opts = {}) => {
-    if (formato === 'pasapalabra') return aPasapalabra(preguntas);
-    if (formato === 'parejas') return preguntas
+    const conOpciones = preguntas.filter(p => !p.ordenar);
+    if (formato === 'pasapalabra') return aPasapalabra(conOpciones);
+    if (formato === 'parejas') return conOpciones
         .filter(p => p.pregunta.length <= 90 && p.respuesta.length <= 30)
         .map(p => ({ terminoA: p.pregunta, terminoB: p.respuesta }));
-    return preguntas.map(p => (opts.rellenar && p.bloques
-        ? { tipo: 'RELLENAR', pregunta: 'Complete the sentence', bloques: p.bloques, respuesta: p.respuesta, incorrectas: p.incorrectas }
-        : { pregunta: p.pregunta, respuesta: p.respuesta, incorrectas: p.incorrectas }));
+    return (opts.rellenar ? preguntas : conOpciones).map(p => (p.ordenar
+        ? { tipo: 'ORDENAR', pregunta: p.pregunta, bloques: p.ordenar, respuesta: p.respuesta }
+        : opts.rellenar && p.bloques
+            ? { tipo: 'RELLENAR', pregunta: { ingles: 'Complete the sentence', frances: 'Complète la phrase', catalan: 'Completa el que falta' }[p.materia] || 'Completa lo que falta', bloques: p.bloques, respuesta: p.respuesta, incorrectas: p.incorrectas }
+            : { pregunta: p.pregunta, respuesta: p.respuesta, incorrectas: p.incorrectas }));
 };
 
 // Hojas de un conjunto de preguntas: una por tema si las preguntas traen tema; si no, una sola
@@ -250,6 +281,12 @@ export async function recursosPikt(tipoJuego = 'CAZABURBUJAS', opts = {}) {
             if (preguntas.length < 4) return;
             hojas.push({ nombreHoja: m.label, preguntas });
             if (formato === 'pasapalabra') return;
+            // ⭐ Imprescindibles: los temas clásicos que todo docente usa algún día (una hoja por tema)
+            const imprescindibles = hojasPorTema(deMateria.filter(p => p.imp), m.label, formato, opts);
+            if (imprescindibles.length) {
+                out.push(recursoBase(tipoJuego, etapa, `${materia}-imp`, `⭐ Imprescindibles de ${m.label} · ${ETAPAS[etapa].label}`,
+                    imprescindibles.map(h => h.nombreHoja).join(', '), imprescindibles));
+            }
             out.push(recursoBase(tipoJuego, etapa, materia, `${m.emoji} ${m.label} · ${ETAPAS[etapa].label}`, m.label,
                 hojasPorTema(deMateria, m.label, formato, opts)));
             // Un recurso por curso (si las preguntas lo indican)
@@ -270,10 +307,10 @@ export async function recursosPikt(tipoJuego = 'CAZABURBUJAS', opts = {}) {
 }
 
 /** Recurso virtual a partir de su id (enlace ?r=pikt--…). null si no existe. */
-export async function recursoPiktPorId(id) {
+export async function recursoPiktPorId(id, opts = {}) {
     if (!String(id || '').startsWith(PREFIJO_PIKT)) return null;
     const [tipoJuego] = id.slice(PREFIJO_PIKT.length).split('--');
-    const lista = await recursosPikt(tipoJuego);
+    const lista = await recursosPikt(tipoJuego, opts);
     return lista.find(r => r.id === id) || null;
 }
 

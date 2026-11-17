@@ -15,7 +15,8 @@ import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
 import startSoundFile from './assets/inicio-juego.mp3';
 import { TIPOS_AVANZADOS, CLAVES_AVANZADAS, esTipoAvanzado, generarAvanzada, comprobarMulti, textoSoluciones } from './ecuaciones/ecuacionesAvanzadas';
-import { ElementoAvanzado, esElementoAvanzado, EntradaSoluciones, SolucionMulti, FraccionMath } from './ecuaciones/UIEcuaciones';
+import { ElementoAvanzado, esElementoAvanzado, EntradaSoluciones, SolucionMulti, FraccionMath, MathText, FeedbackMulti } from './ecuaciones/UIEcuaciones';
+import { cuadCompleta, cuadIncompleta, cuadCompleja } from './ecuaciones/segundoGrado';
 import { CalculadoraFlotante as CalculadoraCasio } from './calculadora/CalculadoraInteractiva';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,6 +98,8 @@ export const DEFAULT_CONFIG = {
     conEnunciados: false,
     numPantallas: 1,   // 1 | 2 | 3
     numAlumnos: 1,     // 1 = sin etiquetas, >1 = cicla por alumnos
+    // 2.º grado: completas · incompletas (alternan b = 0 y c = 0) · complejas (trasponer, paréntesis, denominadores)
+    cuadCompletas: true, cuadIncompletas: true, cuadComplejas: false,
     // Ecuaciones avanzadas y problemas (src/ecuaciones/ecuacionesAvanzadas.js)
     ...Object.fromEntries(CLAVES_AVANZADAS.map(k => [k, false])),
 };
@@ -128,7 +131,14 @@ const MODOS_PRESET = [
     {
         id: 'QUADRATIC', icon: '📈', label: '2.º Grado', desc: 'Completas e incompletas', color: '#9b59b6',
         cfg: { tiempo: 180, minNum: 1, maxNum: 7, primerGrado: false, soloBasico: false,
-               segundoGrado: true, conDenominadores: false, conParentesis: false, conEnunciados: false }
+               segundoGrado: true, conDenominadores: false, conParentesis: false, conEnunciados: false,
+               cuadCompletas: true, cuadIncompletas: true, cuadComplejas: false }
+    },
+    {
+        id: 'QUADRATIC_PRO', icon: '🧮', label: '2.º Grado avanzado', desc: 'Trasponer, quitar paréntesis y denominadores', color: '#6c3483',
+        cfg: { tiempo: 300, minNum: 1, maxNum: 7, primerGrado: false, soloBasico: false,
+               segundoGrado: true, conDenominadores: false, conParentesis: false, conEnunciados: false,
+               cuadCompletas: false, cuadIncompletas: false, cuadComplejas: true }
     },
     {
         id: 'TEXT', icon: '🗣️', label: 'Enunciados', desc: 'Asocia el texto a su ecuación', color: '#34495e',
@@ -167,7 +177,7 @@ export const resumenEcuaciones = (c) => {
     return [
         preset ? `${preset.icon} ${preset.label}` : null,
         !preset && cfg.primerGrado && '1.er grado',
-        !preset && cfg.segundoGrado && '2.º grado',
+        !preset && cfg.segundoGrado && `2.º grado (${[cfg.cuadCompletas !== false && 'completas', cfg.cuadIncompletas !== false && 'incompletas', cfg.cuadComplejas && 'con ( ) y fracciones'].filter(Boolean).join(', ') || 'completas'})`,
         !preset && cfg.conParentesis && '( ) Paréntesis',
         !preset && cfg.conDenominadores && '¹⁄ₓ Denominadores',
         !preset && cfg.conEnunciados && '🗣️ Enunciados',
@@ -206,8 +216,11 @@ const generarEcuacion = (cfg, enunciadosBag = null) => {
         }
     }
     if (segundoGrado) {
-        // Tres subtipos de cuadrática con igual probabilidad
-        opciones.push('CUAD_COMPLETA', 'CUAD_SIN_B', 'CUAD_SIN_C');
+        // Completas · incompletas (alternan b = 0 y c = 0) · complejas (src/ecuaciones/segundoGrado.js)
+        if (cfg.cuadCompletas !== false) opciones.push('CUAD_COMPLETA');
+        if (cfg.cuadIncompletas !== false) opciones.push('CUAD_INCOMPLETA');
+        if (cfg.cuadComplejas) opciones.push('CUAD_COMPLEJA');
+        if (cfg.cuadCompletas === false && cfg.cuadIncompletas === false && !cfg.cuadComplejas) opciones.push('CUAD_COMPLETA');
     }
     if (conEnunciados) opciones.push('ENUNCIADO');
     TIPOS_AVANZADOS.forEach(t => { if (cfg[t.key]) opciones.push(t.tipo); });
@@ -218,6 +231,9 @@ const generarEcuacion = (cfg, enunciadosBag = null) => {
     }
 
     tipo = opciones[Math.floor(Math.random() * opciones.length)];
+    if (tipo === 'CUAD_COMPLETA') return cuadCompleta(lim);
+    if (tipo === 'CUAD_INCOMPLETA') return cuadIncompleta(lim);
+    if (tipo === 'CUAD_COMPLEJA') return cuadCompleja(lim);
     if (esTipoAvanzado(tipo)) return generarAvanzada(tipo);
 
     if (tipo === 'BASICA') {
@@ -430,6 +446,28 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
                     </div>
                 </div>
 
+                {/* Opciones 2.º grado */}
+                {local.segundoGrado && (
+                    <div style={mSt.section}>
+                        <div style={mSt.sTitle}>Opciones para 2.º grado</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {[
+                                { key: 'cuadCompletas', label: 'Completas', def: true },
+                                { key: 'cuadIncompletas', label: 'Incompletas (alterna b = 0 y c = 0)', def: true },
+                                { key: 'cuadComplejas', label: 'Trasponer, ( ) y denominadores', def: false },
+                            ].map(({ key, label, def }) => {
+                                const on = local[key] ?? def;
+                                return (
+                                    <button key={key} onClick={() => set(key, !on)}
+                                        style={{ ...mSt.chip, background: on ? '#9b59b6' : '#f0f0f0', color: on ? 'white' : '#555' }}>
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {/* Opciones 1er grado */}
                 {local.primerGrado && (
                     <div style={mSt.section}>
@@ -483,6 +521,7 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
                             { n: 1, label: '1 pantalla', icon: '🖥️' },
                             { n: 2, label: '2 pantallas', icon: '👥' },
                             { n: 3, label: '3 pantallas', icon: '👨‍👩‍👦' },
+                            { n: 4, label: '4 pantallas', icon: '👨‍👩‍👧‍👦' },
                         ].map(({ n, label, icon }) => (
                             <button key={n} onClick={() => set('numPantallas', n)}
                                 style={{ ...mSt.chip, background: local.numPantallas === n ? '#27ae60' : '#f0f0f0', color: local.numPantallas === n ? 'white' : '#555', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '10px 14px' }}>
@@ -551,6 +590,7 @@ function EcuacionesGameLocal({ onExit }) {
     const [ans1, setAns1] = useState('');
     const [ans2, setAns2] = useState('');
     const [feedback, setFeedback] = useState(null);
+    const [revision, setRevision] = useState(null); // texto de la última respuesta incorrecta (varias soluciones)
     const [showSolution, setShowSolution] = useState(false);
     const [alumnoActual, setAlumnoActual] = useState(1);
     const ordenAlumnosRef = useRef([]); // lista barajada una sola vez al iniciar
@@ -652,7 +692,7 @@ function EcuacionesGameLocal({ onExit }) {
 
     const siguienteEcuacion = () => {
         setCurrentEq(generarEcuacion(config, enunciadosBagRef.current));
-        setAns1(''); setAns2('');
+        setAns1(''); setAns2(''); setRevision(null);
         setShowSolution(false);
         setFeedback(null);
         setDrawMode(false);
@@ -704,6 +744,7 @@ function EcuacionesGameLocal({ onExit }) {
         } else {
             setScore(s => Math.max(0, s - 5));
             setFeedback('INCORRECT');
+            if (esMulti) setRevision(ans1); // dice qué soluciones están bien y cuáles no
             playSound('WRONG');
             triggerFlash('INCORRECT');
             setTimeout(() => setFeedback(null), 600);
@@ -730,6 +771,7 @@ function EcuacionesGameLocal({ onExit }) {
                 conParentesis: liveConfig.conParentesis, conDenominadores: liveConfig.conDenominadores,
                 conEnunciados: liveConfig.conEnunciados, soloBasico: false, forceExperto: false,
                 minNum: liveConfig.minNum, maxNum: liveConfig.maxNum,
+                cuadCompletas: liveConfig.cuadCompletas !== false, cuadIncompletas: liveConfig.cuadIncompletas !== false, cuadComplejas: !!liveConfig.cuadComplejas,
                 ...Object.fromEntries(CLAVES_AVANZADAS.map(k => [k, !!liveConfig[k]])),
             };
             const preguntas = Array.from({ length: liveConfig.numPreguntas }, () =>
@@ -781,7 +823,16 @@ function EcuacionesGameLocal({ onExit }) {
         if (esMulti) return <SolucionMulti eq={currentEq} />;
         if (esCuadratica) {
             const [r1, r2] = currentEq.correctAnswers;
-            return <div style={st.solutionBox}>✅ X₁ = <b>{r1}</b> · X₂ = <b>{r2}</b></div>;
+            return (
+                <div style={st.solutionBox}>
+                    ✅ X₁ = <b>{r1}</b> · X₂ = <b>{r2}</b>
+                    {currentEq.pasos?.length > 0 && (
+                        <ol style={{ textAlign: 'left', margin: '8px 0 0', paddingLeft: 22, fontSize: '0.95rem', lineHeight: 1.8 }}>
+                            {currentEq.pasos.map((p, i) => <li key={i}><MathText v={p} /></li>)}
+                        </ol>
+                    )}
+                </div>
+            );
         }
         return <div style={st.solutionBox}>✅ X = <b>{currentEq.correctAnswers[0]}</b></div>;
     };
@@ -850,6 +901,7 @@ function EcuacionesGameLocal({ onExit }) {
                                     { key: 'conParentesis', label: '( ) Paréntesis', color: '#f39c12' },
                                     { key: 'conDenominadores', label: '¹⁄ₓ Denominadores', color: '#e67e22' },
                                     { key: 'segundoGrado', label: '2.º Grado', color: '#9b59b6' },
+                                    { key: 'cuadComplejas', label: '2.º con ( ) y fracciones', color: '#6c3483' },
                                     { key: 'conEnunciados', label: '🗣️ Enunciados', color: '#34495e' },
                                     ...TIPOS_AVANZADOS.map(t => ({ key: t.key, label: `${t.icon} ${t.label}`, color: t.color })),
                                 ].map(({ key, label, color }) => (
@@ -1096,7 +1148,10 @@ function EcuacionesGameLocal({ onExit }) {
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                                 {esMulti ? (
-                                    <EntradaSoluciones key={questionKey} eq={currentEq} value={ans1} onChange={setAns1} onSubmit={() => comprobarSolucion()} compacto={isMobile} />
+                                    <>
+                                    <EntradaSoluciones key={questionKey} eq={currentEq} value={ans1} onChange={v => { setAns1(v); setRevision(null); }} onSubmit={() => comprobarSolucion()} compacto={isMobile} />
+                                    {revision && <FeedbackMulti eq={currentEq} texto={revision} compacto={isMobile} />}
+                                    </>
                                 ) : (
                                 <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2030,6 +2085,7 @@ function PanelAvanzadas({ estado, setEstado, onStart }) {
                     <button disabled={vacio} onClick={() => onStart(1)} style={btnModo('#27ae60')}><span style={{ fontSize: '1.3rem' }}>▶</span>Jugar</button>
                     <button disabled={vacio} onClick={() => onStart(2)} style={btnModo('#3498db')}><span style={{ fontSize: '1.3rem' }}>👥</span>Modo dual</button>
                     <button disabled={vacio} onClick={() => onStart(3)} style={btnModo('#e67e22')}><span style={{ fontSize: '1.3rem' }}>👨‍👩‍👦</span>3 pantallas</button>
+                    <button disabled={vacio} onClick={() => onStart(4)} style={btnModo('#8e44ad')}><span style={{ fontSize: '1.3rem' }}>👨‍👩‍👧‍👦</span>4 pantallas</button>
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 14 }}>
                     <button onClick={() => setEstado(null)} style={mSt.btnSec}>Cancelar</button>
@@ -2090,8 +2146,8 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
         setAlumnos(prev => prev.map((a, i) => i === panelIdx ? siguiente : a));
     };
 
-    const COLORS = ['#3498db', '#e74c3c', '#f39c12'];
-    const LABELS = ['🔵', '🔴', '🟡'];
+    const COLORS = ['#3498db', '#e74c3c', '#f39c12', '#27ae60'];
+    const LABELS = ['🔵', '🔴', '🟡', '🟢'];
 
     const triggerFlash = (idx, type) => {
         setFlashes(f => { const n = [...f]; n[idx] = type; return n; });
@@ -2115,6 +2171,7 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
         setPanels(prev => prev.map((p, i) => i !== idx ? p : {
             ...p,
             feedback: ok ? 'CORRECT' : 'INCORRECT',
+            revision: !ok && side.eq.tipo === 'MULTI' ? side.ans1 : null,
             score: ok ? p.score + 20 : Math.max(0, p.score - 5),
             total: p.total + 1,
         }));
@@ -2129,14 +2186,14 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
 
     const siguientePanel = (idx) => {
         const eq = generarEcuacion(config);
-        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, eq, ans1:'', ans2:'', feedback:null, showSol:false }));
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, eq, ans1:'', ans2:'', feedback:null, showSol:false, revision:null }));
         setDrawKeys(prev  => prev.map((k, i) => i !== idx ? k : k + 1));
         setDrawModes(prev => prev.map((d, i) => i !== idx ? d : false));
         if (numAlumnos > 1) avanzarAlumnoPanel(idx);
     };
 
     const setAns = (idx, field, val) => {
-        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, [field]: val }));
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, [field]: val, revision: null }));
     };
 
     const Fraction = FraccionMath;
@@ -2219,8 +2276,11 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                     ) : (
                         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, width:'100%' }}>
                             {side.eq?.tipo === 'MULTI' ? (
+                                <>
                                 <EntradaSoluciones eq={side.eq} value={side.ans1} onChange={v => setAns(idx, 'ans1', v)}
                                     onSubmit={() => comprobarPanel(idx)} soloTeclado compacto conBotonComprobar color={color} autoFocus={false} />
+                                {side.revision && <FeedbackMulti eq={side.eq} texto={side.revision} compacto />}
+                                </>
                             ) : (<>
                             <VirtualKeypad
                                 value={side.ans1}
@@ -2256,7 +2316,7 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
         );
     };
 
-    const modeLabel = numPantallas === 3 ? '👨‍👩‍👦 Modo Triple' : '👥 Modo Dual';
+    const modeLabel = numPantallas === 4 ? '👨‍👩‍👧‍👦 4 pantallas' : numPantallas === 3 ? '👨‍👩‍👦 Modo Triple' : '👥 Modo Dual';
 
     return (
         <div style={st.container}>
@@ -2274,6 +2334,12 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                     <button onClick={() => setDismissed(true)} style={{ background:'#f39c12', color:'white', border:'none', borderRadius:20, padding:'4px 12px', cursor:'pointer', fontWeight:'bold', fontSize:'0.75rem' }}>OK</button>
                 </div>
             )}
+            {numPantallas === 4 ? (
+                // 4 pantallas: cuadrícula 2 × 2
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, alignItems:'start' }}>
+                    {Array.from({ length: 4 }, (_, i) => <React.Fragment key={i}>{Panel({ idx: i })}</React.Fragment>)}
+                </div>
+            ) : (
             <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
                 {Array.from({ length: numPantallas }, (_, i) => (
                     <React.Fragment key={i}>
@@ -2282,6 +2348,7 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                     </React.Fragment>
                 ))}
             </div>
+            )}
             <style>{`@keyframes ecuFlash { 0%{transform:scale(0.4);opacity:0} 40%{transform:scale(1.2);opacity:1} 100%{transform:scale(1);opacity:0} }`}</style>
         </div>
     );

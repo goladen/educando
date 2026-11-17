@@ -9,6 +9,7 @@ export default function PaginaBanco({ usuario, cargando, onExit }) {
     const ruta = window.location.pathname.replace(/\/+$/, '').toLowerCase();
     const nuevo = ruta.endsWith('/nuevo');
     const fichas = ruta.endsWith('/fichas');
+    const jugar = ruta.endsWith('/jugar');
     const sinCuenta = !usuario || usuario.isAnonymous;
     const entrar = async () => {
         try { await signInWithPopup(auth, new GoogleAuthProvider()); }
@@ -41,7 +42,7 @@ export default function PaginaBanco({ usuario, cargando, onExit }) {
                                 </button>
                             </div>
                         )}
-                        <BancoRecursos key={usuario?.uid || 'publico'} usuario={sinCuenta ? null : usuario} abrirNuevo={nuevo} seccionInicial={fichas ? 'fichas' : 'recursos'} onVolver={onExit} />
+                        <BancoRecursos key={usuario?.uid || 'publico'} usuario={sinCuenta ? null : usuario} abrirNuevo={nuevo} seccionInicial={fichas ? 'fichas' : jugar ? 'jugar' : 'recursos'} onVolver={onExit} />
                     </>
                 )}
             </div>

@@ -113,6 +113,19 @@ function PantallaInicio({ onElegir, onSalir, onPatio }) {
                     <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#2b1d4e' }}>▶</div>
                 </button>
 
+                {/* ⭐ Imprescindibles de Lengua (Preguntas de PiKT, bancoPreguntas/datos/lengua.js): selector de juego /?jp= */}
+                <div style={{ marginTop: 18, padding: '14px 16px', borderRadius: 18, background: 'linear-gradient(135deg,#fff7ed,#fef3c7)', border: '2px solid #f59e0b', textAlign: 'left' }}>
+                    <div style={{ fontWeight: 900, fontSize: '1.15rem', color: '#92400e' }}>⭐ Imprescindibles de Lengua para jugar en clase</div>
+                    <div style={{ fontSize: '0.86rem', color: '#78350f', margin: '4px 0 10px', lineHeight: 1.4 }}>
+                        b/v, h, acentuación, tilde diacrítica, sinónimos, refranes, figuras literarias, géneros, autores y obras… en Invasión Pi, Luz roja, Money Board, Test o Burbujas.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button onClick={() => { window.location.href = '/?jp=pikt--CAZABURBUJAS--pri--lengua-imp'; }} style={{ padding: '9px 14px', borderRadius: 12, border: 'none', background: '#d97706', color: 'white', fontWeight: 800, cursor: 'pointer' }}>🎒 Primaria</button>
+                        <button onClick={() => { window.location.href = '/?jp=pikt--CAZABURBUJAS--eso--lengua-imp'; }} style={{ padding: '9px 14px', borderRadius: 12, border: 'none', background: '#b45309', color: 'white', fontWeight: 800, cursor: 'pointer' }}>🎓 ESO</button>
+                        <button onClick={() => { window.location.href = '/banco/jugar?materia=lengua'; }} style={{ padding: '9px 14px', borderRadius: 12, border: '2px solid #d97706', background: 'white', color: '#92400e', fontWeight: 800, cursor: 'pointer' }}>📚 Todo por cursos y temas</button>
+                    </div>
+                </div>
+
                 {/* Fichas imprimibles de Lengua (para el profesor) */}
                 <div style={{ marginTop: 18, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>
                     <BotonFichas materia="sintaxis" color="#7B1FA2" texto="Fichas de Lengua para imprimir" subtexto="Sintaxis, ortografía, morfología y léxico · PDF y corrección en la pizarra" />

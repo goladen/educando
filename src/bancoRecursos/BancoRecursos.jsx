@@ -17,6 +17,7 @@ import {
 } from './constantes';
 
 const FichasPikt = lazy(() => import('./FichasPikt'));
+const JugarPikt = lazy(() => import('./JugarPikt'));
 
 const COL = 'banco_recursos';
 const ADMIN_EMAIL = 'goladen@gmail.com';
@@ -437,13 +438,13 @@ function BotonCompartirBanco() {
 //   abrirNuevo  → abre el formulario de alta al entrar (enlace /banco/nuevo)
 //   onVolver    → muestra el botón «← Volver»
 //   comunidad   → { nombre, miembros[] }: modo embebido, solo recursos de esos profes
-//   seccionInicial → 'recursos' | 'fichas' (enlace /banco/fichas)
+//   seccionInicial → 'recursos' | 'jugar' (enlace /banco/jugar) | 'fichas' (enlace /banco/fichas)
 export default function BancoRecursos({ usuario, abrirNuevo = false, onVolver = null, comunidad = null, seccionInicial = 'recursos' }) {
     const [seccion, setSeccion] = useState(comunidad || abrirNuevo ? 'recursos' : seccionInicial);
     const irSeccion = (s) => {
         setSeccion(s);
         // Refleja la sección en la URL solo en la página propia del banco
-        if (/^\/banco(\/|$)/i.test(window.location.pathname)) window.history.replaceState({}, '', s === 'fichas' ? '/banco/fichas' : '/banco');
+        if (/^\/banco(\/|$)/i.test(window.location.pathname)) window.history.replaceState({}, '', s === 'fichas' ? '/banco/fichas' : s === 'jugar' ? '/banco/jugar' : '/banco');
     };
     const uid = usuario?.uid;
     const esAdmin = usuario?.email === ADMIN_EMAIL;
@@ -578,11 +579,11 @@ export default function BancoRecursos({ usuario, abrirNuevo = false, onVolver = 
                 <>
                     <div style={{ textAlign: 'center', marginBottom: 14 }}>
                         <h1 style={{ color: '#1a237e', margin: '0 0 4px' }}>📚 Banco de recursos</h1>
-                        <p style={{ color: '#455a64', margin: 0 }}>Materiales compartidos por el profesorado y todas las fichas en PDF que puedes generar en PiKT.</p>
+                        <p style={{ color: '#455a64', margin: 0 }}>Materiales compartidos por el profesorado, bancos de preguntas de PiKT para jugar en clase y todas las fichas en PDF que puedes generar.</p>
                     </div>
 
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 16, borderBottom: '2px solid #c5cae9', flexWrap: 'wrap' }}>
-                        {[['recursos', '🤝 Recursos compartidos'], ['fichas', '🖨️ Fichas PDF de PiKT']].map(([s, l]) => (
+                        {[['recursos', '🤝 Recursos compartidos'], ['jugar', '🎮 Para jugar (PiKT)'], ['fichas', '🖨️ Fichas PDF de PiKT']].map(([s, l]) => (
                             <button key={s} onClick={() => irSeccion(s)}
                                 style={{ border: 'none', background: 'none', padding: '10px 16px', cursor: 'pointer', fontSize: '1rem', marginBottom: -2,
                                     fontWeight: seccion === s ? 800 : 600, color: seccion === s ? '#1a237e' : '#78909c',
@@ -592,7 +593,11 @@ export default function BancoRecursos({ usuario, abrirNuevo = false, onVolver = 
                 </>
             )}
 
-            {!comunidad && seccion === 'fichas' ? (
+            {!comunidad && seccion === 'jugar' ? (
+                <Suspense fallback={<div style={{ textAlign: 'center', color: '#607d8b', margin: 30 }}>Cargando…</div>}>
+                    <JugarPikt />
+                </Suspense>
+            ) : !comunidad && seccion === 'fichas' ? (
                 <Suspense fallback={<div style={{ textAlign: 'center', color: '#607d8b', margin: 30 }}>Cargando fichas…</div>}>
                     <FichasPikt />
                 </Suspense>

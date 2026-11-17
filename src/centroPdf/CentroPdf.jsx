@@ -91,6 +91,10 @@ const ITEMS = [
         donde: 'Dentro del creador → botón de imprimir / PDF.', etapas: ['Primaria', 'ESO'], materias: 'Lengua, Idiomas, Todas', accion: { ir: 'comic' },
         claves: 'vinetas historieta plantilla' },
     // ── Aula y profesorado
+    { id: 'dinamicas', bloque: 'AULA', emoji: '🎉', nombre: 'Dinámicas de aula', estetica: 'Fichas de la dinámica y recortables', color: '#ec4899',
+        desc: 'Para cada una de las 10 dinámicas (KABOOM, sobres, citas rápidas, mímica, dado…): ficha del profe con QR, ficha por equipo o por alumno y recortables (tarjetas, palitos, sobres, dado).',
+        donde: 'Elige una dinámica y la materia → «🖨️ Fichas PDF» → «🖨️ Imprimir / PDF» (en la ventana de impresión, «Guardar como PDF»).', etapas: ['Primaria', 'ESO', 'Bachillerato'], materias: 'Todas, Idiomas, Tutoría', accion: { ir: 'dinamicas' },
+        claves: 'dinamicas kaboom sobres citas rapidas mimica silla caliente dado tablero piedra papel baile semaforo luz roja verde equipos tarjetas recortables' },
     { id: 'gestion', bloque: 'AULA', emoji: '🏫', nombre: 'Gestión de Aula', estetica: 'Documentos de clase', color: '#e67e22',
         desc: 'Plano de clase, grupos, listas y horarios listos para imprimir.',
         donde: 'Abre la herramienta (p. ej. Plano de clase) → «🖨 Imprimir».', etapas: ['Primaria', 'ESO', 'Bachillerato'], materias: 'Tutoría', accion: { ir: 'gestion' },

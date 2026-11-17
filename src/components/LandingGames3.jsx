@@ -1481,9 +1481,9 @@ export const GAME_INFO = {
         etapas: ['ESO', 'Bachillerato'],
     },
     SIMULADORES_FISICA: {
-        descripcion: 'Colección de 6 simuladores de Física interactivos: colisiones, plano inclinado, tiro parabólico, caída libre, péndulo y Ley de Ohm. Permite experimentar con parámetros.',
-        tipoPreguntas: 'No hay preguntas. Son simuladores visuales para experimentar con leyes físicas modificando variables.',
-        biblioteca: 'Sí, 6 simuladores incorporados listos para usar sin configuración.',
+        descripcion: 'Colección de 13 simuladores interactivos de Física y Química: caída libre, plano inclinado, tiro parabólico, péndulo, colisiones, Ley de Ohm, sistema solar, eclipse, caída en escalada, átomos, enlace de moléculas, ajuste de reacciones y Ley de Gay-Lussac. Se cambian las variables y se observa el resultado.',
+        tipoPreguntas: 'La mayoría incluyen un test. Con 🧮 Problemas se generan problemas con números nuevos y solución paso a paso, y con 🖨️ Ficha PDF una ficha editable con teoría, actividades, test y problemas.',
+        biblioteca: 'Sí, 13 simuladores listos para usar, más un banco de problemas por temas al que puedes añadir los tuyos.',
         multiplayer: 'Individual (o proyección para toda la clase).',
         materias: ['Física', 'Ciencias Naturales'],
         etapas: ['ESO', 'Bachillerato'],
@@ -2002,7 +2002,11 @@ const enVistaAlumno = () => /^\/alumno(\/|$)/i.test(window.location.pathname);
 
 // Montado en la portada: al volver de una app abierta sin URL propia, deshace su /alumno/<id>
 function RestaurarRutaAlumno({ rutaRef }) {
+    // Solo si la ruta ya estaba apuntada al pintar la portada (vuelta de la app). La que apunta
+    // checkURL al cargar /alumno/<id> llega después, y StrictMode repite este efecto y la deshacía.
+    const alPintar = useRef(rutaRef.current);
     useEffect(() => {
+        if (!alPintar.current) return;
         const r = rutaRef.current;
         if (!r) return;
         rutaRef.current = null;
@@ -3055,6 +3059,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 else if (destino === 'gestion') setGestionAula(true);
                 else if (destino === 'orientacion') { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); }
                 else if (destino === 'quienesquien') { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }
+                else if (destino === 'dinamicas') { setDinamicasApp(true); window.history.pushState({}, '', '/dinamicas'); }
                 else if (destino === 'comunidades') { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }
             }}
         />

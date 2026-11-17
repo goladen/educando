@@ -1102,7 +1102,7 @@ const ENTORNO = [
 ];
 // Texto «L = R» de la pregunta (ecuación del problema o la propia ecuación del ast)
 export const ecuacionTexto = (eq) => eq.ecuacion || (eq.ast || [])
-    .map((el) => (el.t === 'm' || el.t === 'text' ? el.v : el.t === 'mfrac' ? `((${el.n})/(${el.d}))` : ''))
+    .map((el) => (el.t === 'm' || el.t === 'text' ? el.v : el.t === 'mfrac' || el.t === 'frac' ? `((${el.n})/(${el.d}))` : ''))
     .join('');
 // Datos mínimos (serializables) para dibujar la solución gráfica
 export const datosGrafica = (eq) => ({
@@ -1183,7 +1183,7 @@ export const aMathRender = (s) => {
     }
     return out;
 };
-export const tieneMarcado = (s) => /[\^_√]\{/.test(String(s));
+export const tieneMarcado = (s) => /[\^_√]\{|FRAC\(/.test(String(s));
 export const astAMathRender = (ast) => (ast || [])
     .map((el) => (el.t === 'mfrac' ? `FRAC(${aMathRender(el.n)},${aMathRender(el.d)})` : el.t === 'm' || el.t === 'text' ? aMathRender(el.v) : ''))
     .join('');
@@ -1214,7 +1214,12 @@ export const parseListaSoluciones = (txt) => {
     if (partes.length === 1 && /\sy\s/i.test(s)) partes = s.split(/\s+y\s+/i);
     return partes.map((p) => p.trim()).filter(Boolean).map(parseNum);
 };
+// «Sin solución»: ∅, «sin solución», «no tiene», «ninguna»
+export const esSinSolucion = (txt) => /∅|sin\s*soluci|no\s*tiene|ningun/i.test(String(txt || ''));
 export const comprobarMulti = (eq, txt) => {
+    const sinSol = esSinSolucion(txt);
+    if ((eq.correctAnswers || []).length === 0) return sinSol;
+    if (sinSol) return false;
     let vals = parseListaSoluciones(txt);
     if (!vals.length || vals.some((v) => !isFinite(v))) return false;
     if (eq.grados) vals = vals.map((v) => ((v % 360) + 360) % 360);
@@ -1222,6 +1227,26 @@ export const comprobarMulti = (eq, txt) => {
     // eq.tol: tolerancia absoluta (respuestas redondeadas) · eq.tolRel: relativa (p. ej. 1e-5 mol/L)
     const tol = (x) => Math.max(1e-6, eq.tol || 0, (eq.tolRel || 0) * Math.abs(x));
     return u.length === c.length && u.every((v, i) => Math.abs(v - c[i]) <= tol(c[i]));
+};
+// Revisión de una respuesta incorrecta: qué valores son solución, cuáles no y cuántas faltan.
+// → { bien: [v], mal: [v], faltan, ilegibles } (null si no hay nada escrito)
+// sinSolMal: dijo «sin solución» y sí la tiene · tieneSinSol: la ecuación no tiene solución real
+export const revisarMulti = (eq, txt) => {
+    const nSol = (eq.correctAnswers || []).length;
+    if (esSinSolucion(txt)) return nSol ? { bien: [], mal: [], faltan: nSol, ilegibles: 0, sinSolMal: true } : null;
+    const crudos = parseListaSoluciones(txt);
+    if (!crudos.length) return null;
+    const ilegibles = crudos.filter((v) => !isFinite(v)).length;
+    let vals = crudos.filter((v) => isFinite(v));
+    if (eq.grados) vals = vals.map((v) => ((v % 360) + 360) % 360);
+    const c = eq.correctAnswers || [];
+    const tol = (x) => Math.max(1e-6, eq.tol || 0, (eq.tolRel || 0) * Math.abs(x));
+    const usadas = new Set(), bien = [], mal = [];
+    for (const v of uniqSort(vals)) {
+        const i = c.findIndex((x, k) => !usadas.has(k) && Math.abs(v - x) <= tol(x));
+        if (i >= 0) { usadas.add(i); bien.push(v); } else mal.push(v);
+    }
+    return { bien, mal, faltan: c.length - usadas.size, ilegibles, tieneSinSol: c.length === 0 };
 };
 const SUP_EXP = (n) => String(n).replace('-', '⁻').replace(/\d/g, (d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
 export const decimalEs = (v, d = 2) => String(+(+v).toFixed(d)).replace('-', MENOS).replace('.', ',');
@@ -1235,7 +1260,7 @@ export const formatoSolucion = (eq, v) => {
 };
 export const textoSoluciones = (eq) => {
     const c = eq?.correctAnswers || [];
-    if (!c.length) return 'Sin solución';
+    if (!c.length) return eq?.sub === 'CUAD' ? 'Sin solución real (∅)' : 'Sin solución';
     const pre = String(eq.sub || '').startsWith('PROB') ? '' : 'x = ';
     return c.map((v) => pre + formatoSolucion(eq, v)).join(' ; ') + (eq.unidad ? ` ${eq.unidad}` : '');
 };

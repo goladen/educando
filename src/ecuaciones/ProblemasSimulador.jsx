@@ -7,7 +7,7 @@
 import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { plantillasPara, generarDesdePlantilla, TIPOS_ECU } from './problemasCiencias';
 import { comprobarMulti } from './ecuacionesAvanzadas';
-import { EntradaSoluciones, SolucionMulti } from './UIEcuaciones';
+import { EntradaSoluciones, SolucionMulti, FeedbackMulti } from './UIEcuaciones';
 import { sonidoCorrecto, sonidoIncorrecto } from '../utils/sonidosFeedback';
 
 const CalculadoraFlotante = lazy(() => import('../calculadora/CalculadoraInteractiva').then((m) => ({ default: m.CalculadoraFlotante })));
@@ -64,6 +64,7 @@ export default function ProblemasSimulador({ simKey, simNombre, onClose, onFicha
                         <EntradaSoluciones key={clave} eq={eq} value={resp} onChange={(v) => { setResp(v); if (estado === 'mal') setEstado(null); }} onSubmit={comprobar} color="#0891b2" compacto />
                     )}
                     {estado === 'mal' && <div style={{ textAlign: 'center', color: '#c0392b', fontWeight: 800, marginTop: 8 }}>❌ No es correcto. Revisa el planteamiento o mira la solución.</div>}
+                    {estado === 'mal' && eq.correctAnswers.length > 1 && <FeedbackMulti eq={eq} texto={resp} compacto />}
                     {estado === 'bien' && <div style={{ textAlign: 'center', color: '#1e8449', fontWeight: 900, fontSize: '1.1rem', marginBottom: 8 }}>✅ ¡Correcto!</div>}
                     {resuelto && <SolucionMulti key={'s' + clave} eq={eq} />}
                 </div>

@@ -9,7 +9,6 @@ import SelectorNombresGlobal from './components/SelectorNombresGlobal.jsx'
 
 // Registro de fallos de los usuarios (errores_web, panel 🐞 del admin)
 instalarCapturaErrores();
-
 // When a new Service Worker takes control, reload the page so users get
 // the latest bundles instead of the old cached version.
 // Only when replacing an existing SW: on the first visit the SW claims the page

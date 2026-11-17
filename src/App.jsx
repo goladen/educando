@@ -11,7 +11,7 @@ const MarcoMitadDual = lazy(() => import('./components/JuegoDual').then(m => ({ 
 const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
 const FuncionesEjecutivas = lazy(() => import('./FuncionesEjecutivas'));
 const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
-import { SolarSystemViewer } from './components/LandingGames3';
+import { SolarSystemViewer, APPS } from './components/LandingGames3';
 const ImperiosGame = lazy(() => import('./components/ImperiosGame'));
 const Orientacion = lazy(() => import('./orientacion/Orientacion'));
 const DinamicasAula = lazy(() => import('./dinamicasAula/DinamicasAula'));
@@ -67,6 +67,59 @@ const TUTORIAL_ALUMNO = [
         texto: 'Puedes guardar tus resultados para que tu profesor los vea, y modificar tu perfil desde el menú superior. ¡A jugar!'
     },
 ];
+
+const RUTAS_RESERVADAS = new Set([
+  'partes_planta',
+  'populares','inicio',
+  'pasapalabra','cazaburbujas','burbujas',
+  'pikatron','pikatron_2','plataformas',
+  'kartinged','karting','kartinged_multi','karting_multi',
+  'aparejados','ruleta','wordle','mathle',
+  'thinkhoot','pilive','mathlive','olympiclive','olympic_live',
+  'sopa','sopa_letras','question_sender','q-sender',
+  'omninteractive','videoquizz','sintaxis','listening',
+  'etiquetas','etiquetame',
+  'geometrix','calculo','calculadora','pizarras_verticales','pizarrasverticales','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
+  'ecuaciones','oca','domino','musica',
+  'algebra','polinomios','estadistica','probabilidad',
+  'api','admin','login','app','join','alumno',
+  'irregular_verbs','sistema_solar',
+  'retos','conectapuntos','sudoku',
+  'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
+  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','invasores','manos','avatar','orientacion','dinamicas',
+  'comunidades','comunidad','competicion','banco','pdf','imprimir',
+  'fisica',
+  'math_world','primaria','feria','patio',
+  'arkade',
+  // Vistas por materia (pikt.es/<materia>)
+  'mates','matematicas','matecas',
+  'lengua','lenguaje',
+  'gyh','geohistoria','geo-historia','sociales',
+  'fyq','fisic','fisica-quimica','fisicaquimica',
+  'bio','biologia',
+  'music',
+  'tecno','tecnologia',
+  'plastica','plastik',
+  'idiomas','ingles',
+  'edfisica','educacion-fisica',
+  'tutoria',
+]);
+
+// Enlace compartido de un juego o app (pikt.es/<app>, /fisica/…, /?juego=…). Un profesor con
+// sesión ve su panel y no la portada, así que ProfesorDashboard lo abre en la Vista Alumno.
+const NO_SON_JUEGO = new Set(['api', 'admin', 'login', 'app', 'join', 'alumno', 'inicio', 'populares']);
+const PARAMS_JUEGO = ['juego', 'sopa', 'live', 'sala', 'pizarra', 'gestion'];
+function esEnlaceDeJuego() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (PARAMS_JUEGO.some(p => params.get(p))) return true;
+        const slug = window.location.pathname.replace(/^\/+|\/+$/g, '').trim().toLowerCase();
+        if (!slug || NO_SON_JUEGO.has(slug) || slug.startsWith('alumno/')) return false;
+        return RUTAS_RESERVADAS.has(slug)
+            || ['fisica/', 'primaria/', 'fichas/', 'calculadora/', 'patio/'].some(p => slug.startsWith(p))
+            || APPS.some(a => String(a.id).toLowerCase() === slug);
+    } catch { return false; }
+}
 
 function App() {
     const [usuario, setUsuario] = useState(null);
@@ -170,42 +223,6 @@ function App() {
       if (slug === 'competicion' || slug.startsWith('competicion/')) { setRutaPublica('competicion'); return; }
       // Banco de recursos del profesorado (/banco, /banco/nuevo)
       if (slug === 'banco' || slug.startsWith('banco/')) { setRutaPublica('banco'); return; }
-      const RUTAS_RESERVADAS = new Set([
-        'partes_planta',
-        'populares','inicio',
-        'pasapalabra','cazaburbujas','burbujas',
-        'pikatron','pikatron_2','plataformas',
-        'kartinged','karting','kartinged_multi','karting_multi',
-        'aparejados','ruleta','wordle','mathle',
-        'thinkhoot','pilive','mathlive','olympiclive','olympic_live',
-        'sopa','sopa_letras','question_sender','q-sender',
-        'omninteractive','videoquizz','sintaxis','listening',
-        'etiquetas','etiquetame',
-        'geometrix','calculo','calculadora','pizarras_verticales','pizarrasverticales','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
-        'ecuaciones','oca','domino','musica',
-        'algebra','polinomios','estadistica','probabilidad',
-        'api','admin','login','app','join','alumno',
-        'irregular_verbs','sistema_solar',
-        'retos','conectapuntos','sudoku',
-        'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','invasores','manos','avatar','orientacion','dinamicas',
-        'comunidades','comunidad','competicion','banco','pdf','imprimir',
-        'fisica',
-        'math_world','primaria','feria','patio',
-        'arkade',
-        // Vistas por materia (pikt.es/<materia>)
-        'mates','matematicas','matecas',
-        'lengua','lenguaje',
-        'gyh','geohistoria','geo-historia','sociales',
-        'fyq','fisic','fisica-quimica','fisicaquimica',
-        'bio','biologia',
-        'music',
-        'tecno','tecnologia',
-        'plastica','plastik',
-        'idiomas','ingles',
-        'edfisica','educacion-fisica',
-        'tutoria',
-      ]);
       if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/') && !slug.startsWith('fichas/') && !slug.startsWith('calculadora/') && !slug.startsWith('alumno/')) {
         // Check if it's a professor page slug
         getDocs(query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true)))
@@ -234,6 +251,16 @@ function App() {
         const codigoFicha = params.get('fc');
         if (codigoFicha) {
             import('./utils/fichaCodigo').then(m => m.abrirCodigoFicha(codigoFicha)).then(f => setFichaElegir(f)).catch(e => { console.error('Ficha por código:', e); alert(e.message || 'No se pudo abrir la ficha.'); });
+            return;
+        }
+        // Recurso de PiKT para jugar (/?jp=pikt--…, Banco de recursos «Para jugar»): elegir el juego
+        const piktJugar = params.get('jp');
+        if (piktJugar) {
+            import('./bancoPreguntas/recursosPikt').then(m => m.recursoPiktPorId(piktJugar, { rellenar: true })).then(recurso => {
+                // &temas=2,5: temas (hojas) ya elegidos desde el Banco
+                const temasIniciales = String(params.get('temas') || '').split(',').filter(Boolean).map(Number).filter(Number.isInteger);
+                if (recurso) setFichaElegir({ codigo: null, juego: null, titulo: recurso.titulo, recurso, temasIniciales });
+            }).catch(e => console.error('Recurso PiKT:', e));
             return;
         }
         const recursoId = params.get('r');
@@ -544,7 +571,7 @@ function App() {
                                 </div>
                                 <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: 'red', cursor: 'pointer', fontWeight: 'bold' }}>Salir</button>
                             </div>
-                            <ProfesorDashboard usuario={usuario} googleToken={googleToken} />
+                            <ProfesorDashboard usuario={usuario} googleToken={googleToken} abrirEnlaceJuego={esEnlaceDeJuego()} />
                         </div>
                     ) : (
                             <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #0f172a 0%, #1e3a8a 55%, #312e81 100%)' }}>

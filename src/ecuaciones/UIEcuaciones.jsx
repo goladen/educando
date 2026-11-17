@@ -1,7 +1,7 @@
 // Piezas de interfaz para las ecuaciones avanzadas (tipo 'MULTI') de Ecuaciones.jsx:
 // texto matemático con marcado, fracciones, entrada de varias soluciones y solución paso a paso.
 import React, { useState } from 'react';
-import { parseListaSoluciones, formatoSolucion, textoSoluciones, aMathRender, datosGrafica } from './ecuacionesAvanzadas';
+import { parseListaSoluciones, formatoSolucion, textoSoluciones, aMathRender, datosGrafica, revisarMulti, esSinSolucion } from './ecuacionesAvanzadas';
 import { renderMath } from '../utils/MathRender';
 import GraficaEcuacion from './GraficaEcuacion';
 
@@ -40,7 +40,16 @@ const TECLAS = ['7', '8', '9', '⌫', '4', '5', '6', ';', '1', '2', '3', '-', '0
 
 export function EntradaSoluciones({ eq, value, onChange, onSubmit, oscuro = false, soloTeclado = false, compacto = false, color = '#3498db', conBotonComprobar = false, autoFocus = true }) {
     const [teclado, setTeclado] = useState(soloTeclado);
-    const valores = parseListaSoluciones(value);
+    const sinSol = esSinSolucion(value);
+    const valores = sinSol ? [] : parseListaSoluciones(value);
+    // «∅ Sin solución» (ecuaciones de 2.º grado que pueden no tener solución real)
+    const botonSinSol = eq?.sinSolucionPosible && (
+        <button type="button" onClick={() => onChange(sinSol ? '' : 'sin solución')} title="La ecuación no tiene solución real"
+            style={{ padding: '6px 10px', borderRadius: 10, border: `2px solid ${color}`, cursor: 'pointer', fontWeight: 'bold', fontSize: compacto ? '0.8rem' : '0.9rem',
+                background: sinSol ? color : (oscuro ? 'rgba(255,255,255,0.1)' : 'white'), color: sinSol ? 'white' : color }}>
+            ∅ Sin solución
+        </button>
+    );
     const etiqueta = eq?.etiqueta || 'x =';
     const instr = eq?.instruccion || (eq?.sub?.startsWith('PROB')
         ? 'Escribe el resultado (si hay varios, sepáralos con ;)'
@@ -76,6 +85,7 @@ export function EntradaSoluciones({ eq, value, onChange, onSubmit, oscuro = fals
                         style={caja} />
                 )}
                 {eq?.unidad && <span style={{ color: suave, fontWeight: 'bold', fontSize: compacto ? '0.85rem' : '1rem' }}>{eq.unidad}</span>}
+                {!soloTeclado && botonSinSol}
                 {!soloTeclado && (
                     <button type="button" onClick={() => setTeclado((t) => !t)} title="Teclado en pantalla"
                         style={{ padding: '6px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: teclado ? color : (oscuro ? 'rgba(255,255,255,0.15)' : '#ecf0f1'), color: teclado ? 'white' : tx, fontSize: '1rem' }}>
@@ -83,6 +93,8 @@ export function EntradaSoluciones({ eq, value, onChange, onSubmit, oscuro = fals
                     </button>
                 )}
             </div>
+            {sinSol && <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 'bold', background: oscuro ? 'rgba(52,152,219,0.25)' : '#eaf2fb', color: oscuro ? '#aed6f1' : '#2471a3' }}>∅ sin solución real</span>}
+            {soloTeclado && botonSinSol}
             {valores.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                     {valores.map((v, i) => (
@@ -112,6 +124,34 @@ export function EntradaSoluciones({ eq, value, onChange, onSubmit, oscuro = fals
                     ✓ Comprobar
                 </button>
             )}
+        </div>
+    );
+}
+
+// ─── Revisión de una respuesta incorrecta: cuál está bien y cuál no ──────────
+export function FeedbackMulti({ eq, texto, oscuro = false, compacto = false }) {
+    const r = revisarMulti(eq, texto);
+    if (!r) return null;
+    const verde = oscuro ? '#a9f5c9' : '#1e8449', rojo = oscuro ? '#f5b7b1' : '#c0392b';
+    const chip = (v, ok) => (
+        <span key={(ok ? 'b' : 'm') + v} style={{ display: 'inline-block', margin: '2px 3px', padding: '2px 10px', borderRadius: 20, fontWeight: 'bold', fontSize: compacto ? '0.75rem' : '0.85rem',
+            background: ok ? (oscuro ? 'rgba(46,204,113,0.2)' : '#e8f8f0') : (oscuro ? 'rgba(231,76,60,0.25)' : '#fdecea'), color: ok ? verde : rojo }}>
+            {ok ? '✔' : '✘'} {formatoSolucion(eq, v)}
+        </span>
+    );
+    const sobran = r.mal.length === 0 && r.faltan === 0;
+    return (
+        <div style={{ textAlign: 'center', marginTop: 6, fontSize: compacto ? '0.78rem' : '0.9rem', color: oscuro ? '#eee' : '#34495e' }}>
+            {r.bien.map((v) => chip(v, true))}
+            {r.mal.map((v) => chip(v, false))}
+            <div style={{ marginTop: 3 }}>
+                {r.sinSolMal && <span style={{ color: rojo, fontWeight: 'bold' }}>Sí tiene solución real: revisa el discriminante o el despeje. </span>}
+                {r.bien.length > 0 && <span style={{ color: verde, fontWeight: 'bold' }}>{r.bien.length === 1 ? 'Esta es solución. ' : 'Estas son soluciones. '}</span>}
+                {r.mal.length > 0 && <span style={{ color: rojo, fontWeight: 'bold' }}>{r.mal.length === 1 ? 'La marcada con ✘ no es solución. ' : 'Las marcadas con ✘ no son solución. '}</span>}
+                {r.faltan > 0 && <span style={{ fontWeight: 'bold' }}>{r.faltan === 1 ? 'Te falta 1 solución.' : `Te faltan ${r.faltan} soluciones.`}</span>}
+                {r.ilegibles > 0 && <span style={{ color: rojo }}> Hay algo que no se entiende: usa números separados por ;</span>}
+                {sobran && !r.ilegibles && <span>Revisa: has escrito alguna solución repetida.</span>}
+            </div>
         </div>
     );
 }

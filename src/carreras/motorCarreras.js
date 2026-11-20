@@ -95,11 +95,15 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
     const r = rng(1234 + op.circuito.length * 97);
     const aLimpiar = [];
 
+    // 1 a 4 jugadores en pantalla partida. Con 3-4 se dibuja 3-4 veces la escena: sin sombras y a
+    // resolución 1:1 para que siga fluido en el ordenador del aula.
+    const nJug = clamp(Math.round(op.jugadores || 1), 1, 4);
+    const ligero = nJug >= 3;
     // ── Renderer y escena ──
-    const renderer = new THREE.WebGLRenderer({ antialias: !esMovil, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, esMovil ? 1.5 : 2));
+    const renderer = new THREE.WebGLRenderer({ antialias: !esMovil && !ligero, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, ligero ? 1 : esMovil ? 1.5 : 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = !ligero; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const ancho = () => contenedor.clientWidth || window.innerWidth, alto = () => contenedor.clientHeight || window.innerHeight;
     renderer.setSize(ancho(), alto());
     renderer.domElement.style.display = 'block'; renderer.domElement.style.touchAction = 'none';
@@ -380,14 +384,15 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
     const tipoV = op.vehiculo === 'moto' ? 'moto' : 'coche';
     const PV = VEHICULO[tipoV];
     const nRivales = clamp(op.rivales, 1, 5);
-    const nJug = op.jugadores === 2 ? 2 : 1;
-    const COLOR_JUG = [0x1565c0, 0xe91e63];
+    const COLOR_JUG = [0x1565c0, 0xe91e63, 0x00c853, 0xff9100];
+    // la IA no repite el color de ningún jugador (con 3-4 jugadores se quitan el verde y el naranja)
+    const coloresIA = COLORES_IA.filter(c => !(nJug >= 3 && c === 0x43a047) && !(nJug >= 4 && c === 0xff6d00));
     const vehiculos = [];
     const total = nRivales + nJug;
     for (let k = 0; k < total; k++) {
         const jIdx = k - nRivales;                  // los jugadores salen los últimos
         const esJugador = jIdx >= 0;
-        const color = esJugador ? COLOR_JUG[jIdx] : COLORES_IA[k % COLORES_IA.length];
+        const color = esJugador ? COLOR_JUG[jIdx] : coloresIA[k % coloresIA.length];
         const grupo = tipoV === 'moto' ? crearMoto(matsV) : crearCoche(color, matsV);
         if (tipoV === 'moto') grupo.userData.cuerpo.children.forEach(c => { if (c.material === matsV.colorCoche(0xc62828)) c.material = matsV.colorCoche(color); });
         escena.add(grupo);
@@ -408,7 +413,7 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
         res: { aciertos: 0, fallos: 0, penalizacion: 0, puntos: 0, preguntas: [] },
         cpSig: 0, esperando: null, vista: 'exterior', camIniciada: false, posCam: new THREE.Vector3(),
         camara: p.jIdx === 0 ? camara : new THREE.PerspectiveCamera(62, 1, 0.1, 900),
-        tactil: { steer: 0, acel: 0, freno: 0, atras: 0 }, autoIA: false,
+        tactil: { steer: 0, acel: 0, freno: 0, atras: 0 }, mando: { steer: 0, acel: 0, freno: 0, atras: 0 }, autoIA: false,
     }));
     const jug = jugadores[0];
 
@@ -443,14 +448,16 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
             acel = Math.max(T('arrowup'), T('w')); freno = T(' '); atras = Math.max(T('arrowdown'), T('s'));
         } else if (p.jIdx === 0) {
             steer = T('d') - T('a'); acel = T('w'); freno = T(' '); atras = T('s');
+        } else if (p.jIdx >= 2) {
+            steer = 0; acel = 0; freno = 0; atras = 0;
         } else {
             steer = T('arrowright') - T('arrowleft'); acel = T('arrowup'); atras = T('arrowdown');
             freno = codigos.has('Enter') || codigos.has('NumpadEnter') || codigos.has('ShiftRight') || codigos.has('ControlRight') ? 1 : 0;
         }
-        steer += p.tactil.steer; acel = Math.max(acel, p.tactil.acel); freno = Math.max(freno, p.tactil.freno); atras = Math.max(atras, p.tactil.atras);
+        steer += p.tactil.steer + p.mando.steer; acel = Math.max(acel, p.tactil.acel, p.mando.acel); freno = Math.max(freno, p.tactil.freno, p.mando.freno); atras = Math.max(atras, p.tactil.atras, p.mando.atras);
         const mandos = (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(g => g && g.connected);
         mandos.forEach((gp, i) => {
-            if (nJug === 2 && i !== p.jIdx) return; // mando 1 → J1, mando 2 → J2
+            if (nJug > 1 && i !== p.jIdx) return; // mando 1 → J1, mando 2 → J2…
             if (Math.abs(gp.axes[0] || 0) > 0.08) steer += gp.axes[0];
             acel = Math.max(acel, gp.buttons[7]?.value || 0, gp.buttons[0]?.pressed ? 1 : 0);
             atras = Math.max(atras, gp.buttons[6]?.value || 0);
@@ -657,7 +664,7 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
         const clasif = clasificacion();
         const lista = jugadores.map(p => resumenJugador(p, clasif));
         setTimeout(() => cb.onMeta?.({
-            ...lista[0], total, dosJugadores: nJug === 2, jugadores: lista,
+            ...lista[0], total, dosJugadores: nJug > 1, nJugadores: nJug, jugadores: lista,
             clasificacion: clasif.map(o => ({ nombre: o.nombre, color: '#' + new THREE.Color(o.color).getHexString(), esJugador: o.esJugador, tiempo: o.tiempoFin != null ? formatoTiempo(o.tiempoFin) : null })),
             circuito: def.nombre, vehiculo: tipoV, vueltas: op.vueltas,
         }), 1500);
@@ -884,6 +891,12 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
     const vistas = () => {
         const w = ancho(), h = alto();
         if (nJug === 1) return [[0, 0, w, h]];
+        if (nJug >= 3) {
+            const w2 = Math.floor(w / 2), h2 = Math.floor(h / 2), arriba = h - h2;
+            const r = [[0, h2, w2, arriba], [w - w2, h2, w2, arriba]];
+            if (nJug === 3) r.push([0, 0, w, h2]); else r.push([0, 0, w2, h2], [w - w2, 0, w2, h2]);
+            return r;
+        }
         return w >= h ? [[0, 0, Math.floor(w / 2), h], [Math.ceil(w / 2), 0, Math.floor(w / 2), h]] : [[0, Math.ceil(h / 2), w, Math.floor(h / 2)], [0, 0, w, Math.floor(h / 2)]];
     };
     function estadoJugador(p, clasif) {
@@ -906,14 +919,14 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
             const ests = jugadores.map(p => estadoJugador(p, clasif));
             cb.onEstado?.({
                 ...ests[0], vueltas: op.vueltas, total, nCP, cuenta: enCarrera ? null : Math.ceil(cuenta),
-                jugadores: ests, dosJugadores: nJug === 2, division: ancho() >= alto() ? 'vertical' : 'horizontal', cierre: cierreEn != null ? Math.ceil(cierreEn) : null,
+                jugadores: ests, dosJugadores: nJug > 1, nJugadores: nJug, division: nJug >= 3 ? 'cuadrantes' : ancho() >= alto() ? 'vertical' : 'horizontal', cierre: cierreEn != null ? Math.ceil(cierreEn) : null,
                 clasif: clasif.map(o => ({ nombre: o.nombre, esJugador: o.esJugador, color: '#' + new THREE.Color(o.color).getHexString() })),
             });
             dibujarMinimapa();
         }
         const rects = vistas();
         renderer.shadowMap.autoUpdate = nJug === 1;
-        renderer.setScissorTest(nJug === 2);
+        renderer.setScissorTest(nJug > 1);
         jugadores.forEach((p, i) => {
             actualizarCamara(p, dt);
             const [x, y, w, h] = rects[i];
@@ -921,10 +934,10 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
             // sombras y cielo centrados en cada jugador
             sol.target.position.set(p.x, 0, p.z); sol.position.copy(sol.target.position).add(OFFSET_SOL);
             cielo.position.set(p.x, 0, p.z);
-            if (nJug === 2) { renderer.shadowMap.needsUpdate = true; renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); }
+            if (nJug > 1) { if (!ligero) renderer.shadowMap.needsUpdate = true; renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); }
             renderer.render(escena, p.camara);
         });
-        if (nJug === 2) { renderer.setScissorTest(false); renderer.setViewport(0, 0, ancho(), alto()); }
+        if (nJug > 1) { renderer.setScissorTest(false); renderer.setViewport(0, 0, ancho(), alto()); }
     }
     const reloj = new THREE.Clock();
     renderer.setAnimationLoop(() => {
@@ -952,6 +965,8 @@ export function crearCarrera(contenedor, opciones = {}, cb = {}) {
             if (nJug === 1) { marcarCheckpoint(cp, ok ? 'bien' : 'mal'); if (!ok) p.vF *= 0.55; reanudarEn = 0.6; }
         },
         setEntradaTactil(o, jIdx = 0) { Object.assign((jugadores[jIdx] || jug).tactil, o); },
+        /** Mandos micro:bit (o cualquier mando externo): se suma al teclado y a la pantalla táctil. */
+        setEntradaMando(o, jIdx = 0) { const p = jugadores[jIdx]; if (p) Object.assign(p.mando, o); },
         alternarCamara,
         pausar(b) { if (!preguntaActiva) pausado = !!b; reloj.getDelta(); },
         setSonido(on) { audio.on = !!on; if (!on) audio.el?.pause(); else despertarAudio(); },

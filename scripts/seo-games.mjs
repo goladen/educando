@@ -140,6 +140,13 @@ export const GAMES = [
     nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
   },
   {
+    slug: 'aviones', emoji: '✈️', color: '#29b6f6',
+    h1: 'Pilota el avión: simulador de vuelo con preguntas',
+    title: 'Simulador de vuelo 3D con preguntas para clase, gratis | PiKT',
+    desc: 'Despega, vuela entre montañas por un circuito de aros y responde pasando por el aro de la respuesta correcta. Aterriza en la pista al final. Preguntas de cualquier materia, en el ordenador, el móvil o la pantalla táctil.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
+  },
+  {
     slug: 'conducir', emoji: '🚗', color: '#fb8c00',
     h1: 'Simulador de conducción y educación vial',
     title: 'Simulador de conducción 3D, señales y test DGT gratis | PiKT',

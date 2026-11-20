@@ -35,6 +35,7 @@ const QuizMandos = lazy(() => import('./mandos/QuizMandos.jsx'));
 const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const OvniAbduccion = lazy(() => import('./OvniAbduccion'));
 const RacingGame3D = lazy(() => import('./RacingGame3D'));
+const AvionesGame3D = lazy(() => import('./AvionesGame3D'));
 const SimuladorConduccion = lazy(() => import('./conduccion/SimuladorConduccion'));
 const InvasoresArcade = lazy(() => import('./invasores/InvasoresArcade'));
 const VaniLa = lazy(() => import('./vanila/VaniLa'));
@@ -88,7 +89,7 @@ const RUTAS_RESERVADAS = new Set([
   'irregular_verbs','sistema_solar',
   'retos','conectapuntos','sudoku',
   'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','invasores','manos','avatar','orientacion','dinamicas',
+  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','invasores','manos','avatar','orientacion','dinamicas',
   'comunidades','comunidad','competicion','banco','pdf','imprimir',
   'fisica',
   'math_world','primaria','feria','patio',
@@ -214,7 +215,7 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'comic' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'conducir' || slug === 'carreras' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'conducir' || slug === 'carreras' || slug === 'aviones' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas') {
         setRutaPublica(slug);
         return;
       }
@@ -426,6 +427,7 @@ function App() {
     if (rutaPublica === 'vanila') return <><VaniLa onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conducir') return <><SimuladorConduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'carreras') return <><RacingGame3D usuario={usuario} alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'aviones') return <><AvionesGame3D alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'ovni') return <><OvniAbduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'invasores') return <><InvasoresArcade onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'labmicrobit') return <><LabMicrobit onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

@@ -4,10 +4,9 @@
 // derecha), calles de sentido único, pasos de cebra con peatones y tráfico.
 // Detecta las infracciones y las clasifica como en el examen práctico.
 // Vistas: cabina (también en gafas VR con WebXR) y exterior; gafas de cartón
-// con StereoEffect + giroscopio.
+// con un estéreo propio (StereoCamera) + giroscopio.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js';
 import { senalCanvas } from './senales';
 
 // ═══════════════════════════════ MAPA ═══════════════════════════════════════
@@ -525,8 +524,27 @@ export function crearMotor(contenedor, opciones = {}, cb = {}) {
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.touchAction = 'none';
     contenedor.appendChild(renderer.domElement);
-    const estereo = new StereoEffect(renderer);
-    estereo.setEyeSeparation(0.064);
+    // Estéreo para gafas de cartón (como StereoEffect, pero copiando las capas de la cámara)
+    const camEstereo = new THREE.StereoCamera(); camEstereo.aspect = 0.5; camEstereo.eyeSep = 0.064;
+    const tamEst = new THREE.Vector2();
+    const estereo = {
+        setSize() { /* usa el tamaño del renderer */ },
+        render(esc, cam) {
+            esc.updateMatrixWorld();
+            if (cam.parent === null && cam.matrixWorldAutoUpdate === true) cam.updateMatrixWorld();
+            camEstereo.update(cam);
+            camEstereo.cameraL.layers.mask = cam.layers.mask; camEstereo.cameraR.layers.mask = cam.layers.mask;
+            renderer.getSize(tamEst);
+            if (renderer.autoClear) renderer.clear();
+            renderer.setScissorTest(true);
+            renderer.setScissor(0, 0, tamEst.width / 2, tamEst.height); renderer.setViewport(0, 0, tamEst.width / 2, tamEst.height);
+            renderer.render(esc, camEstereo.cameraL);
+            renderer.setScissor(tamEst.width / 2, 0, tamEst.width / 2, tamEst.height); renderer.setViewport(tamEst.width / 2, 0, tamEst.width / 2, tamEst.height);
+            renderer.render(esc, camEstereo.cameraR);
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, tamEst.width, tamEst.height);
+        },
+    };
 
     const escena = new THREE.Scene();
     const HORIZONTE = 0xd4e6f2;
@@ -1941,7 +1959,31 @@ export function crearMotor(contenedor, opciones = {}, cb = {}) {
     // Campo de visión horizontal ≈ 95° (como un conductor real), sin pasarse en vertical
     const CAMPOS = [95, 110, 80];
     let campo = 0;
-    const fovCabina = () => clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(CAMPOS[campo] / 2)) / camara.aspect)), 45, 95);
+    const FOV_CARTON = 80; // vertical; cada ojo tiene aspecto ≈ 1
+    const fovCabina = () => carton ? FOV_CARTON : clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(CAMPOS[campo] / 2)) / camara.aspect)), 45, 95);
+    // ── Viñeta de confort (gafas) ──
+    // Técnica habitual en realidad virtual contra el mareo: mientras el coche gira o frena fuerte, se
+    // oscurece la periferia (donde el cerebro nota el movimiento que el cuerpo no siente).
+    const confort = { on: op.confort !== false, nivel: 0 };
+    const vineta = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.ShaderMaterial({
+        transparent: true, depthTest: false, depthWrite: false, fog: false,
+        uniforms: { nivel: { value: 0 } },
+        vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+        fragmentShader: 'uniform float nivel; varying vec2 vP; void main(){ float r = length(vP); float r0 = mix(0.22, 0.075, nivel); float a = smoothstep(r0, r0 + 0.09, r) * clamp(nivel * 1.4, 0.0, 0.92); gl_FragColor = vec4(0.0, 0.0, 0.0, a); }',
+    }));
+    vineta.position.set(0, 0, -0.15); vineta.renderOrder = 999; vineta.frustumCulled = false; vineta.visible = false;
+    const CAPA_VINETA = 4; vineta.layers.set(CAPA_VINETA); camara.layers.enable(CAPA_VINETA);
+    camara.add(vineta);
+    function actualizarConfort(dt, acc) {
+        const gafas = enVR || carton;
+        if (!gafas || !confort.on) { vineta.visible = false; confort.nivel = 0; return; }
+        const giro = Math.abs((jug.v / L_EJES) * Math.tan(jug.steer)); // rad/s
+        const objetivo = clamp(Math.max(0, giro - 0.12) / 0.5 + Math.max(0, Math.abs(acc) - 2.5) / 6, 0, 1);
+        confort.nivel += (objetivo - confort.nivel) * Math.min(1, dt * (objetivo > confort.nivel ? 5 : 2));
+        vineta.material.uniforms.nivel.value = confort.nivel;
+        vineta.visible = confort.nivel > 0.02;
+    }
+
     function aplicarVista() {
         const cabina = vista === 'cabina' || enVR || carton;
         interior.visible = cabina;
@@ -2197,7 +2239,9 @@ export function crearMotor(contenedor, opciones = {}, cb = {}) {
         const acc = (jug.v - vAnterior) / Math.max(dt, 1e-3); vAnterior = jug.v;
         cabeceo += (clamp(acc, -9, 4) * 0.0045 - cabeceo) * Math.min(1, dt * 6);
         jugGrupo.position.set(jug.x, 0, jug.z); if (esMoto) { const curv = Math.tan(jug.steer) / L_EJES; ladeo += (clamp(Math.atan((jug.v * jug.v * curv) / 9.8), -0.75, 0.75) - ladeo) * Math.min(1, dt * 5); }
-        jugGrupo.rotation.set(enVR ? 0 : cabeceo, jug.yaw, esMoto && !enVR ? -ladeo : 0, 'YXZ');
+        const gafas = enVR || carton;
+        jugGrupo.rotation.set(gafas ? 0 : cabeceo, jug.yaw, esMoto && !gafas ? -ladeo : 0, 'YXZ');
+        actualizarConfort(dt, acc);
         if (esMoto) volante.rotation.y = -jug.steer * 1.3; else volante.rotation.z = -jug.steer * 4;
         matFreno.emissive.setHex(ent.freno > 0.1 ? 0xff1a1a : 0x3a0000);
         const fase = Math.floor(tiempo * 2.5), on = !!jug.intermitente && fase % 2 === 0;
@@ -2213,7 +2257,7 @@ export function crearMotor(contenedor, opciones = {}, cb = {}) {
         sol.target.position.set(jug.x, 0, jug.z); sol.position.copy(sol.target.position).add(OFFSET_SOL);
         cielo.position.set(jug.x, 0, jug.z);
         // espejos (cada 2 fotogramas, solo en cabina)
-        if (op.espejos !== false && interior.visible && (++frameEspejo % (esMovil ? 3 : 2) === 0)) {
+        if (op.espejos !== false && interior.visible && (++frameEspejo % (carton ? 4 : esMovil ? 3 : 2) === 0)) {
             const xr = renderer.xr.enabled; renderer.xr.enabled = false;
             const sombras = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false;
             espejos.forEach(({ rt, cam }) => { renderer.setRenderTarget(rt); renderer.render(escena, cam); });
@@ -2337,7 +2381,13 @@ export function crearMotor(contenedor, opciones = {}, cb = {}) {
             await renderer.xr.setSession(ses);
         },
         salirVR() { renderer.xr.getSession?.()?.end(); },
-        setCarton(on) { carton = !!on; activarOrient(carton); activarMotion(carton); aplicarVista(); onResize(); },
+        setCarton(on) {
+            carton = !!on; activarOrient(carton); activarMotion(carton);
+            renderer.setPixelRatio(carton ? 1 : Math.min(window.devicePixelRatio || 1, esMovil ? 1.5 : 2));
+            aplicarVista(); onResize();
+        },
+        /** Viñeta de confort con gafas (por defecto, activada). */
+        setConfort(on) { confort.on = !!on; },
         setInclinacion(on, invertir = false) { inclinacion.activa = !!on; inclinacion.invertir = !!invertir; activarMotion(on); },
         recentrar() { orient.alpha0 = orient.alpha; mirada.objYaw = 0; mirada.objPitch = 0; },
         setMirarRaton(on) { mirada.raton = !!on; mirada.objYaw = 0; mirada.objPitch = 0; },

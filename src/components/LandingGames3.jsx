@@ -22,6 +22,7 @@ import LanguageSelector from '../i18n/LanguageSelector';
 import FullscreenBtn from '../MiniArcade/FullscreenBtn';
 const KartingTrack = lazy(() => import('../KartingTrack'));
 const RacingGame3D = lazy(() => import('../RacingGame3D'));
+const AvionesGame3D = lazy(() => import('../AvionesGame3D'));
 const ThinkHootGame = lazy(() => import('../ThinkHootGame'));
 const PiLiveSolo = lazy(() => import('../PiLiveSolo'));
 const RuletaGame = lazy(() => import('../RuletaGame'));
@@ -687,6 +688,16 @@ export const APPS = [
         shareUrl: `${window.location.origin}/carreras`
     },
     {
+        id: 'AVIONES',
+        name: 'Pilota el avión',
+        desc: 'Despega, vuela por los aros entre montañas y responde pasando por el aro correcto. ¡Y aterriza!',
+        color: '#29b6f6',
+        emoji: '✈️',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/aviones`
+    },
+    {
         id: 'MANSION_PITAGORICA',
         name: 'Mansión Pitagórica',
         desc: 'Explora la mansión respondiendo preguntas de opción múltiple.',
@@ -1069,6 +1080,14 @@ export const GAME_INFO = {
         multiplayer: 'Individual contra la IA (3 o 4 rivales). Ranking por recurso, hoja y circuito; al acabar se puede enviar el informe al profesor con las preguntas falladas.',
         materias: ['Universal'],
         etapas: ['ESO', 'Bachillerato'],
+    },
+    AVIONES: {
+        descripcion: 'Simulador de vuelo en 3D: despega desde el aeropuerto, sigue el circuito de aros entre valles, montañas nevadas y la costa, y aterriza en la pista al final. En las puertas de pregunta aparecen 4 aros de colores (A, B, C y D): se responde pasando con el avión por el aro de la respuesta correcta. Acierto = turbo, fallo = +5 s; si te estrellas vuelves al último aro con +10 s. Puntos por aros, aciertos, tiempo y un bonus por aterrizaje suave. Teclado (W/S potencia, flechas para el morro y para inclinarse), mando o pantalla táctil (joystick y palanca de potencia). Cámara por detrás o desde la cabina.',
+        tipoPreguntas: 'Opción múltiple (las de escribir se convierten en opciones) de cualquier materia: recursos públicos del profesor o preguntas de PiKT por etapa y materia. También se puede volar sin preguntas.',
+        biblioteca: 'No necesita recursos: incluye las preguntas de PiKT. También admite los recursos públicos del profesor.',
+        multiplayer: 'Individual (pronto, dos pilotos en pantalla partida). Al acabar se puede enviar el informe al profesor con las preguntas falladas.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     MANSION_PITAGORICA: {
         descripcion: 'Aventura de exploración por una mansión misteriosa. El alumno responde preguntas de opción múltiple para desbloquear habitaciones y avanzar por la historia.',
@@ -2221,6 +2240,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CONDUCCION' });
             } else if (path === 'carreras' || path === 'racing3d') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'RACING3D' });
+            } else if (path === 'aviones' || path === 'avion') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'AVIONES' });
             } else if (path === 'ovni') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
             } else if (path === 'invasores') {
@@ -2673,6 +2694,11 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         if (appId === 'RACING3D') {
             window.history.pushState({}, '', '/carreras');
             setJuegoActivo({ tipoJuego: 'RACING3D' });
+            return;
+        }
+        if (appId === 'AVIONES') {
+            window.history.pushState({}, '', '/aviones');
+            setJuegoActivo({ tipoJuego: 'AVIONES' });
             return;
         }
         if (appId === 'MANSION_PITAGORICA') {
@@ -3486,6 +3512,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         );
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingTrack alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'AVIONES') return <AvionesGame3D alTerminar={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'INVASORES') return <ConAvisoEncaje recurso={juegoActivo.recurso || null} juego="INVASORES" onCancelar={() => setJuegoActivo(null)}>{(rc) => <InvasoresArcade recurso={rc} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />}</ConAvisoEncaje>;

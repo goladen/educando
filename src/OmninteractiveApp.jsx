@@ -90,7 +90,30 @@ function useMotorMates(activo = true) {
   return motorListo();
 }
 
+// Huecos «sin orden»: el ejercicio pide palabras sueltas (sin frase) o el profe lo marca así.
+// Cada respuesta vale si coincide con cualquier solución todavía no usada.
+const huecosDe = (item) => {
+  const ansLen = Array.isArray(item.ans) ? item.ans.length : 1;
+  return Math.max((item.parts || ['']).length - 1, ansLen);
+};
+const esSinOrden = (ex) => (ex.tipo === 'fill' || ex.tipo === 'wordbank') && (ex.sinOrden === true ||
+  (ex.sinOrden !== false && (ex.items || []).length > 1 && ex.items.every(it => (it.parts || []).every(p => !String(p).trim()))));
+function asignarSinOrden(ex, ans) {
+  const pool = [];
+  ex.items.forEach(it => { for (let i = 0; i < huecosDe(it); i++) pool.push({ sol: (it.ans || [])[i] || '', alts: it.alts?.[i] || [], usada: false }); });
+  const ok = new Set();
+  ex.items.forEach(it => {
+    for (let i = 0; i < huecosDe(it); i++) {
+      const k = `${it.id}-${i}`, v = ans[k] || '';
+      const p = pool.find(x => !x.usada && okAns(v, x.sol, x.alts));
+      if (p) { p.usada = true; ok.add(k); }
+    }
+  });
+  return { ok, faltan: pool.filter(x => !x.usada).map(x => x.sol), total: pool.length };
+}
+
 function calcScore(ex, ans) {
+  if (esSinOrden(ex)) { const r = asignarSinOrden(ex, ans); return { c: r.ok.size, t: r.total }; }
   if (ex.tipo === 'crossword') return puntuarCrucigrama(ex, ans);
   if (ex.tipo === 'wordsearch') return puntuarSopa(ex, ans);
   let c = 0, t = 0;
@@ -164,7 +187,8 @@ function CorrectAnswer({ text }) {
 }
 
 // ─── FILL ────────────────────────────────────────────────────────────────────
-function FillEx({ ex, ans, setAns, checked }) {
+function FillEx({ ex, ans, setAns, checked, onFoco }) {
+  if (esSinOrden(ex)) return <FillSinOrdenEx ex={ex} ans={ans} setAns={setAns} checked={checked} onFoco={onFoco} />;
   return (
     <div>
       {ex.items.map(item => {
@@ -188,6 +212,7 @@ function FillEx({ ex, ans, setAns, checked }) {
                 <input
                   value={val}
                   onChange={e => setAns(`${item.id}-${i}`, e.target.value)}
+                  onFocus={() => onFoco?.(`${item.id}-${i}`)}
                   readOnly={checked}
                   placeholder="···"
                   style={{
@@ -251,17 +276,68 @@ function ChoiceEx({ ex, ans, setAns, checked }) {
   );
 }
 
+// ─── HUECOS SIN ORDEN (palabras sueltas: vale cualquier orden) ───────────────
+function FillSinOrdenEx({ ex, ans, setAns, checked, onFoco }) {
+  const res = checked ? asignarSinOrden(ex, ans) : null;
+  const huecos = ex.items.flatMap(it => Array.from({ length: huecosDe(it) }, (_, i) => ({ it, i, k: `${it.id}-${i}` })));
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10 }}>✨ Puedes escribirlas en cualquier orden.</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        {huecos.map(({ it, i, k }, n) => {
+          const v = ans[k] || '';
+          const st = res ? (res.ok.has(k) ? 'ok' : 'err') : '';
+          const lbl = String(it.lbl || '').trim();
+          return (
+            <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: '#94A3B8', minWidth: 18 }}>{lbl && lbl !== '-' ? lbl : `${n + 1}.`}</span>
+              <input value={v} onChange={e => setAns(k, e.target.value)} onFocus={() => onFoco?.(k)} readOnly={checked} placeholder="···"
+                style={{ flex: 1, minWidth: 0, height: 34, padding: '0 10px', borderRadius: 8, fontFamily: 'inherit', fontSize: 14, outline: 'none',
+                  border: `1.5px solid ${st === 'ok' ? '#059669' : st === 'err' ? '#DC2626' : '#CBD5E1'}`,
+                  background: st === 'ok' ? '#DCFCE7' : st === 'err' ? '#FEE2E2' : 'white' }} />
+            </label>
+          );
+        })}
+      </div>
+      {res && res.faltan.length > 0 && (
+        <div style={{ marginTop: 12, fontSize: 13, color: '#059669' }}>→ Te faltan: <b>{res.faltan.join(' · ')}</b></div>
+      )}
+    </div>
+  );
+}
+
 // ─── WORDBANK ─────────────────────────────────────────────────────────────────
+// Toca una palabra del banco para ponerla en el hueco seleccionado; las usadas se ven tachadas.
 function WordbankEx({ ex, ans, setAns, checked }) {
+  const [foco, setFoco] = useState(null);
+  // Banco de sílabas o trozos (las soluciones no están en el banco): cada toque se añade al hueco
+  const banco = (ex.wordbank || []).map(w => nm(w));
+  const trozos = ex.items.some(it => (it.ans || []).some(a => a && !banco.includes(nm(a))));
+  const usadas = trozos ? [] : Object.values(ans || {}).map(v => nm(String(v)));
+  const poner = (w) => {
+    if (checked) return;
+    if (trozos && foco) { setAns(foco, (ans[foco] || '') + w); return; }
+    let k = foco;
+    if (!k || ans[k]) {   // sin foco o ya relleno → primer hueco vacío
+      const libre = ex.items.flatMap(it => Array.from({ length: huecosDe(it) }, (_, i) => `${it.id}-${i}`)).find(x => !ans[x]);
+      k = libre || k;
+    }
+    if (k) setAns(k, w);
+  };
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '10px 14px', background: '#FFFBEB', border: '1px dashed #FCD34D', borderRadius: 10, marginBottom: 20 }}>
         <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: '#92400E', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>Word bank</div>
-        {ex.wordbank.map(w => (
-          <span key={w} style={{ padding: '3px 12px', background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 20, fontSize: 13, color: '#78350F' }}>{w}</span>
-        ))}
+        {(ex.wordbank || []).map((w, j) => {
+          const usada = usadas.includes(nm(w));
+          return (
+            <button key={`${w}-${j}`} type="button" onClick={() => poner(w)} disabled={checked}
+              style={{ padding: '3px 12px', background: usada ? '#F1F5F9' : '#FEF3C7', border: `1px solid ${usada ? '#CBD5E1' : '#F59E0B'}`, borderRadius: 20, fontSize: 13,
+                color: usada ? '#94A3B8' : '#78350F', textDecoration: usada ? 'line-through' : 'none', cursor: checked ? 'default' : 'pointer', fontFamily: 'inherit' }}>{w}</button>
+          );
+        })}
       </div>
-      <FillEx ex={ex} ans={ans} setAns={setAns} checked={checked} />
+      <FillEx ex={ex} ans={ans} setAns={setAns} checked={checked} onFoco={setFoco} />
     </div>
   );
 }
@@ -697,6 +773,26 @@ function OpenEx({ ex, ans, setAns, checked }) {
   );
 }
 
+// ─── TEXTO DE LECTURA (comprensión lectora): visible en todos los ejercicios ──
+function PanelLectura({ recurso, isMobile }) {
+  const [abierto, setAbierto] = useState(true);
+  const color = recurso.color || '#6D28D9';
+  return (
+    <div style={{ background:'#FFFDF5', border:'1px solid #FDE68A', borderRadius:isMobile ? 14 : 18, marginBottom:14, overflow:'hidden' }}>
+      <button onClick={() => setAbierto(a => !a)} style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'10px 16px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
+        <span style={{ fontSize:18 }}>📖</span>
+        <b style={{ flex:1, color:'#78350F', fontSize:15 }}>{recurso.lecturaTitulo || 'Texto'}</b>
+        <span style={{ fontSize:12, color, fontWeight:700 }}>{abierto ? 'Ocultar ▲' : 'Leer el texto ▼'}</span>
+      </button>
+      {abierto && (
+        <div style={{ padding:'0 18px 16px', maxHeight:isMobile ? '45vh' : '50vh', overflowY:'auto', fontSize:15, lineHeight:1.7, color:'#1F2937' }}>
+          {String(recurso.lectura).split(/\n\s*\n/).map((p, i) => <p key={i} style={{ margin:'0 0 10px', whiteSpace:'pre-line' }}><MathText text={p} /></p>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── EXERCISE RENDERER ────────────────────────────────────────────────────────
 function ExRenderer({ ex, ans, setAns, checked }) {
   const props = { ex, ans, setAns, checked };
@@ -1059,6 +1155,7 @@ function PlayScreen({ recurso, onBack }) {
 
         {/* Content */}
         <div style={{ flex:1, overflowY:'auto', padding:isMobile ? '12px 10px 32px' : '24px 28px 40px' }}>
+          {recurso.lectura && <PanelLectura recurso={recurso} isMobile={isMobile} />}
           <div style={{ background:'white', borderRadius:isMobile ? 14 : 18, border:'1px solid #E2E8F0', overflow:'hidden', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
 
             {/* Exercise header */}

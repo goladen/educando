@@ -29,7 +29,49 @@ Te adjunto una ficha de ejercicios (PDF, foto o documento). Conviértela en un J
 - Fórmulas y expresiones matemáticas en LaTeX entre signos de dólar: $\\frac{3}{4}$, $x^2+1$, $\\sqrt{2}$.
 - Idioma de los contenidos: el de la ficha (si no se distingue, ${idioma}). Nivel: ${nivel}.${asignatura ? ` Asignatura: ${asignatura}.` : ''}
 ${extra ? `- Indicaciones del profesor: ${extra}\n` : ''}
-Para cada ejercicio elige el "tipo" que mejor reproduzca cómo se responde en papel:
+${formatoOmni(nivel, asignatura)}`;
+}
+
+// Tema → recurso nuevo: N ejercicios, cada uno con M apartados
+export function promptTemaOmni({ idioma = 'Español', nivel = '1 ESO', asignatura = '', tema = '', nEjercicios = 5, nApartados = 5, tipos = [], extra = '' } = {}) {
+  return `Eres un profesor experto en crear actividades interactivas de calidad.
+
+Crea un recurso de ejercicios para la plataforma PIKT (pikt.es) sobre este tema: «${tema || 'el tema que indique el profesor'}».
+- Nivel: ${nivel}.${asignatura ? ` Asignatura: ${asignatura}.` : ''} Idioma de los contenidos: ${idioma}.
+- Exactamente ${nEjercicios} ejercicios, cada uno con ${nApartados} apartados (items), de dificultad progresiva.
+- Varía los tipos de ejercicio${tipos.length ? ` y usa preferentemente estos: ${tipos.join(', ')}` : ''}.
+- Frases y contextos originales, cercanos a alumnos de esa edad. Nada copiado de libros de texto.
+- Resuelve cada apartado e incluye la respuesta correcta y las alternativas válidas (contracciones, sinónimos…).
+${extra ? `- Indicaciones del profesor: ${extra}\n` : ''}
+${formatoOmni(nivel, asignatura)}`;
+}
+
+// Texto → comprensión lectora: el texto va incrustado en el recurso («lectura») y se ve en todos los ejercicios
+export function promptLecturaOmni({ idioma = 'Español', nivel = '1 ESO', asignatura = '', texto = '', nEjercicios = 4, nApartados = 5, tipos = [], extra = '',
+  crearTexto = false, temaTexto = '', nivelTexto = '', palabras = 250, generoTexto = '' } = {}) {
+  const origen = crearTexto
+    ? `PRIMERO escribe tú un texto ORIGINAL (no copiado de ningún libro ni web):
+- Tema: ${temaTexto.trim() || 'libre, interesante para alumnos de esa edad'}.${generoTexto ? `\n- Tipo de texto: ${generoTexto}.` : ''}
+- Idioma: ${idioma}. Nivel de dificultad: ${nivelTexto || nivel}${nivelTexto ? ` (ajusta vocabulario, tiempos verbales y longitud de las frases a ese nivel)` : ''}.
+- Longitud: unas ${palabras} palabras (entre ${Math.round(palabras * 0.9)} y ${Math.round(palabras * 1.1)}), en varios párrafos y con un título.
+- Que tenga datos concretos (nombres, lugares, cifras, causas y consecuencias) para poder hacer buenas preguntas.`
+    : texto.trim() ? `Este es el texto:\n"""\n${texto.trim()}\n"""` : 'Te adjunto el texto (documento, PDF o foto).';
+  return `Eres un profesor experto en comprensión lectora.
+
+${origen}
+
+Crea una actividad de COMPRENSIÓN LECTORA sobre ese texto para la plataforma PIKT (pikt.es):
+- Copia el texto COMPLETO y literal en el campo "lectura" del JSON (con sus párrafos separados por \\n\\n) y su título en "lecturaTitulo". El alumno lo tendrá a la vista en todos los ejercicios.
+- Nivel: ${nivel}.${asignatura ? ` Asignatura: ${asignatura}.` : ''} Preguntas en el idioma del texto (si no se distingue, ${idioma}).
+- ${nEjercicios} ejercicios con ${nApartados} apartados cada uno, de lo literal a lo inferencial: verdadero/falso (con la frase corregida si es falso), test, completar con palabras del texto, vocabulario (unir palabra-significado), ordenar los hechos, una pregunta abierta de opinión.${tipos.length ? ` Usa preferentemente: ${tipos.join(', ')}.` : ''}
+- Todas las respuestas deben poder justificarse con el texto.
+${extra ? `- Indicaciones del profesor: ${extra}\n` : ''}
+${formatoOmni(nivel, asignatura)}
+Recuerda incluir "lectura" y "lecturaTitulo" en el primer nivel del JSON, junto a "titulo".`;
+}
+
+function formatoOmni(nivel, asignatura) {
+  return `Para cada ejercicio elige el "tipo" que mejor reproduzca cómo se responde:
 - "fill": completar huecos en una frase (puede haber varios huecos: "parts" tiene un trozo más que "ans").
 - "wordbank": completar huecos con palabras de un recuadro (las palabras van en "wordbank").
 - "choice": elegir entre 2-3 opciones dentro de la frase.
@@ -73,9 +115,13 @@ Devuelve SOLO el JSON (sin explicaciones ni bloques de código) con esta estruct
  {"id":"ex10","tipo":"short","titulo":"10. Calcula","enunciado":"Calcula y simplifica.","items":[{"id":1,"lbl":"a)","question":"$\\\\frac{1}{2}+\\\\frac{1}{4}$","ans":"3/4","alts":["0,75"]}]},
  {"id":"ex11","tipo":"expr","titulo":"11. Deriva e integra","enunciado":"Calcula.","items":[{"id":1,"lbl":"a)","question":"$f(x)=x^3+x^2$, $f'(x)=$","ans":"$3x^2+2x$","modo":"equiv"},{"id":2,"lbl":"b)","question":"$\\\\int 3x^2\\\\,dx$","ans":"$x^3$","modo":"constante"}]},
  {"id":"ex12","tipo":"matrix","titulo":"12. Matrices","enunciado":"Calcula A+B.","items":[{"id":1,"lbl":"a)","question":"$A+B$","ans":[["2","1"],["0","5"]],"corchetes":"pmatrix"}]},
- {"id":"ex13","tipo":"open","titulo":"13. Explica","enunciado":"...","items":[{"id":1,"lbl":"a)","question":"¿Por qué...?","ans":"Respuesta modelo / criterios","lineas":4}]}
+ {"id":"ex13","tipo":"open","titulo":"13. Explica","enunciado":"...","items":[{"id":1,"lbl":"a)","question":"¿Por qué...?","ans":"Respuesta modelo / criterios","lineas":4}]},
+ {"id":"ex14","tipo":"crossword","titulo":"14. Crucigrama","enunciado":"...","items":[{"id":1,"ans":"SHOWER","clue":"🚿 You wash here."}]},
+ {"id":"ex15","tipo":"wordsearch","titulo":"15. Sopa de letras","enunciado":"...","mostrarPalabras":false,"items":[{"id":1,"ans":"SOFA","clue":"🛋️"}]},
+ {"id":"ex16","tipo":"wordbank","sinOrden":true,"titulo":"16. Forma palabras","enunciado":"Forma 4 adjetivos con las sílabas.","wordbank":["ti","mide","têtu"],"items":[{"id":1,"lbl":"1.","parts":["",""],"ans":["timide"]}]}
 ]}
-"lbl" es la etiqueta de la pregunta tal como aparece en la ficha (a), b), 1., 2....). Usa solo los campos de cada tipo.`;
+"lbl" es la etiqueta de la pregunta tal como aparece en la ficha (a), b), 1., 2....). Usa solo los campos de cada tipo.
+"sinOrden": true cuando el ejercicio pide una lista de palabras que el alumno puede escribir en cualquier orden (huecos sin frase).`;
 }
 
 // Saca el primer objeto/array JSON de un texto (quita ```json, explicaciones, etc.)
@@ -239,6 +285,7 @@ export function normalizarRecursoOmni(datos, config = {}) {
       titulo: str(ex.titulo || `Ejercicio ${i + 1}`), enunciado: str(ex.enunciado), imagen: ex.imagen || null,
       ...(tipo === 'wordbank' ? { wordbank: arr(ex.wordbank).map(str).filter(Boolean) } : {}),
       ...(ex.tiempo ? { tiempo: Number(ex.tiempo) || 0 } : {}),
+      ...(ex.sinOrden === true ? { sinOrden: true } : {}),
       items,
       ...puzzleDe(tipo, ex, items, i),   // crucigrama / sopa: añade la cuadrícula y sustituye items (con posiciones)
     };
@@ -252,6 +299,7 @@ export function normalizarRecursoOmni(datos, config = {}) {
     tema: str(d.tema || ''), descripcion: str(d.descripcion || ''), tags: arr(d.tags).map(str).slice(0, 8),
     ciclo: cicloDeNivel(nivel), color: /^#[0-9a-f]{6}$/i.test(d.color || '') ? d.color : '#6D28D9',
     ordenFijo: d.ordenFijo !== false, origenPapel: true,
+    ...(str(d.lectura).trim() ? { lectura: str(d.lectura).trim(), lecturaTitulo: str(d.lecturaTitulo).trim() } : {}),
     ejercicios,
   };
 }

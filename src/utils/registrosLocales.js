@@ -62,6 +62,7 @@ export const JUEGOS_REGISTRO_META = {
     CUERPO_HUMANO:       { nombre: 'Cuerpo humano 3D',    emoji: '🦴', color: '#38bdf8' },
     OVNI:                { nombre: 'Ovni Abducción',      emoji: '🛸', color: '#22d3ee' },
     RACING3D:            { nombre: 'Racing 3D',           emoji: '🏁', color: '#00C6FF' },
+    AVIONES:             { nombre: 'Pilota el avión',     emoji: '✈️', color: '#29b6f6' },
     CONDUCCION:          { nombre: 'Simulador de conducción', emoji: '🛞', color: '#fb8c00' },
     INVASORES:           { nombre: 'Invasión Pi',         emoji: '👾', color: '#22d3ee' },
     VANILA:              { nombre: 'VaniLa',              emoji: '🔤', color: '#A78BFA' },

@@ -177,6 +177,9 @@ export function htmlOmni(recurso, { soluciones = false, numeroExamen = true } = 
   .mat-vmatrix { border-left: 2px solid #222; border-right: 2px solid #222; }
   .mat-eq { margin-left: 4px; }
   .caja-sol { border: 1px dashed #15803d; border-radius: 6px; padding: 4px 8px; margin-top: 4px; font-weight: 500; }
+  .lectura { border: 1.5px solid #d4b106; background: #fffdf2; border-radius: 8px; padding: 8px 14px; margin-bottom: 16px; }
+  .lectura h2 { font-size: 13pt; margin: 2px 0 6px; }
+  .lectura p { margin: 0 0 7px; text-align: justify; }
   .puzzle { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
   .cruci { border-collapse: separate; border-spacing: 0; }
   .cruci td { width: 26px; height: 26px; padding: 0; }
@@ -196,6 +199,7 @@ export function htmlOmni(recurso, { soluciones = false, numeroExamen = true } = 
   <div><h1>${tx(r.titulo)}</h1><div class="meta">${esc([r.asignatura, r.nivel, r.tema].filter(Boolean).join(' · '))}</div></div>
   ${soluciones ? '<div class="badge-sol">SOLUCIONES</div>' : numeroExamen ? '<div class="nexamen">Nº / código: <span></span></div>' : ''}
 </header>
+${r.lectura ? `<section class="lectura">${r.lecturaTitulo ? `<h2>📖 ${tx(r.lecturaTitulo)}</h2>` : ''}${String(r.lectura).split(/\n\s*\n/).map(p => `<p>${tx(p).replace(/\n/g, '<br>')}</p>`).join('')}</section>` : ''}
 ${ejercicios}
 <footer>Hoja creada con PIKT · pikt.es</footer>
 <script>window.addEventListener('load', () => setTimeout(() => window.print(), 600));</script>

@@ -92,6 +92,7 @@ function Menu({ onElegir, onExit }) {
             <div style={{ marginTop: 22, background: C.panel, border: `1px solid ${C.borde}`, borderRadius: 14, padding: '14px 16px', color: C.suave, fontSize: '0.86rem', lineHeight: 1.6 }}>
                 <b style={{ color: C.texto }}>🥽 Modo inmersivo</b><br />
                 · <b>Gafas VR</b> (Meta Quest, Pico…): abre esta página en el navegador de las gafas y pulsa «Gafas VR» dentro del simulador. Gatillo derecho = acelerar, gatillo izquierdo = frenar, joystick = volante.<br />
+                · <b>Si te mareas:</b> conduce despacio, gira con suavidad, siéntate (no de pie) y descansa cada 10-15 minutos. Con gafas, el botón «🌫️ Confort» oscurece los bordes al girar.<br />
                 · <b>Gafas de cartón</b> en el móvil: pantalla partida y miras girando la cabeza; inclina la cabeza para girar el volante y toca la pantalla para frenar (también se puede usar un mando bluetooth).<br />
                 · <b>Ordenador:</b> W/↑ acelerar · S/↓/Espacio frenar · A/D ←/→ dirección · Q/E intermitentes · C cinturón / casco · R marcha atrás · T / G subir / bajar marcha y Shift embrague (cambio manual) · V cambiar vista · F campo de visión · <b>mueve el ratón hacia un borde de la pantalla para mirar a ese lado</b> (o mantén Z / X para echar un vistazo a la izquierda / derecha). También funciona con mando o volante USB.
             </div>
@@ -475,6 +476,7 @@ function Conduccion({ config, onSalir, onFin }) {
     const [voz, setVoz] = useState(leerLS(KEY_VOZ, true));
     const [raton, setRaton] = useState(leerLS(KEY_RATON, true));
     const [volante, setVolante] = useState(0);
+    const [confort, setConfort] = useState(true);
     const [placas, setPlacas] = useState({});
     const terminado = useRef(false);
     const [vertical, setVertical] = useState(() => window.innerHeight > window.innerWidth);
@@ -550,6 +552,7 @@ function Conduccion({ config, onSalir, onFin }) {
                     <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }} onPointerDown={e => e.stopPropagation()}>
                         <button style={btn} onClick={salirCarton}>✕ Salir de las gafas</button>
                         <button style={btn} onClick={() => m().recentrar()}>🎯 Centrar</button>
+                        <button style={{ ...btn, background: confort ? '#1565c0' : btn.background }} title="Oscurece los bordes al girar o frenar: reduce el mareo" onClick={() => { m().setConfort(!confort); setConfort(!confort); }}>🌫️ Confort</button>
                         <button style={btn} onClick={() => m().alternarCinturon()}>{est?.cinturon ? '🔒' : '🔓'} {est?.vehiculo === 'moto' ? 'Casco' : 'Cinturón'}</button>
                     </div>
                 </div>

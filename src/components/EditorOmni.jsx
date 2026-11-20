@@ -2,7 +2,9 @@
 // Uso: <EditorOmni recursoInicial={null} usuario={...} onBack={...} />
 // Si recursoInicial viene de FotoARecurso, lo carga directamente para editar antes de guardar.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import EjercicioVisual from './EditorOmniVisual';
+import CrearConIAOmni from './CrearConIAOmni';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Image as ImgIcon, Globe, Lock } from 'lucide-react';
@@ -12,6 +14,8 @@ import { imprimirOmni } from '../utils/pdfOmni';
 import MathText from './MathText';
 import { cargarMotor, motorListo, equivalentes, aLatex } from '../utils/mathEquiv';
 import { generarCrucigrama, generarSopa, normPalabra, solucionCrucigrama, numerarCrucigrama, filasSopa, celdasSopa } from '../utils/puzzlesPalabras';
+
+const OmninteractiveApp = lazy(() => import('../OmninteractiveApp'));
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const uid = () => 'ex_' + Math.random().toString(36).slice(2, 8);
@@ -617,6 +621,26 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
   const [saving, setSaving] = useState(false);
   const [showConfig, setShowConfig] = useState(!recursoInicial);
   const [modalPublicar, setModalPublicar] = useState(null);
+  // Vista visual (como el alumno, se edita ahí mismo) o formulario clásico; se recuerda en este navegador
+  const [vista, setVistaState] = useState(() => { try { return localStorage.getItem('omni_editor_vista') || 'visual'; } catch { return 'visual'; } });
+  const setVista = (v) => { setVistaState(v); try { localStorage.setItem('omni_editor_vista', v); } catch { /* sin almacenamiento */ } };
+  const [iaAbierto, setIaAbierto] = useState(false);
+  const [probando, setProbando] = useState(false);
+
+  // Respuesta de la IA → al editor (sustituye o añade ejercicios)
+  const cargarDeIA = (nuevo, { anadir }) => {
+    setRecurso(r => {
+      if (anadir) {
+        const sufijo = Date.now().toString(36);
+        return { ...r, ...(nuevo.lectura && !r.lectura ? { lectura: nuevo.lectura, lecturaTitulo: nuevo.lecturaTitulo } : {}),
+          ejercicios: [...r.ejercicios, ...nuevo.ejercicios.map(e => ({ ...e, id: `${e.id}_${sufijo}` }))] };
+      }
+      const { id, ...resto } = nuevo;
+      return { ...r, ...resto, id: r.id || id, color: r.color || resto.color };
+    });
+    setIaAbierto(false);
+    setShowConfig(false);
+  };
 
   useEffect(() => {
     if (!recurso.pais && usuario?.pais) setRecurso(r => ({ ...r, pais: usuario.pais, region: usuario.region || '', poblacion: usuario.poblacion || '' }));
@@ -701,6 +725,17 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
           <div style={{ fontWeight: 700, fontSize: 16, color: '#0F172A' }}>Editor Omni</div>
           <div style={{ fontSize: 12, color: '#94A3B8' }}>{recurso.titulo || 'Nuevo recurso'}</div>
         </div>
+        <button onClick={() => setIaAbierto(true)} title="Crear ejercicios con tu IA: por tema, desde una ficha o de comprensión lectora" style={{ border: 'none', background: 'linear-gradient(135deg,#7C3AED,#DB2777)', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+          ✨ Crear con IA
+        </button>
+        <div style={{ display: 'flex', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }} title="Cómo se ve el editor">
+          {[['visual', '👁 Visual'], ['form', '☰ Formulario']].map(([v, t]) => (
+            <button key={v} onClick={() => setVista(v)} style={{ border: 'none', background: vista === v ? '#EEF2FF' : 'white', color: vista === v ? '#4338CA' : '#64748B', padding: '7px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>{t}</button>
+          ))}
+        </div>
+        <button onClick={() => setProbando(true)} title="Hacer la hoja como un alumno" style={{ border: '1px solid #E2E8F0', background: 'white', color: '#0F766E', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          ▶ Probar
+        </button>
         <button onClick={() => setShowConfig(c => !c)} style={{ border: '1px solid #E2E8F0', background: showConfig ? '#EEF2FF' : 'white', color: showConfig ? '#4338CA' : '#64748B', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           ⚙ Configuración
         </button>
@@ -741,6 +776,15 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
         )}
       </div>
 
+      {iaAbierto && <CrearConIAOmni recurso={recurso} onCargar={cargarDeIA} onCerrar={() => setIaAbierto(false)} />}
+      {probando && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2500, background: 'white' }}>
+          <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+            <OmninteractiveApp recursoDirecto={{ ...recurso, ejercicios: sanitizeEjercicios(recurso.ejercicios).map(ex => ({ ...ex, items: (ex.items || []).map(it => Array.isArray(it.alts) ? { ...it, alts: it.alts.map(a => String(a || '').split('|').filter(Boolean)) } : it) })) }} onBack={() => setProbando(false)} />
+          </Suspense>
+        </div>
+      )}
+
       <div style={{ maxWidth: 860, margin: '24px auto', padding: '0 16px 60px' }}>
         {/* config panel */}
         {showConfig && (
@@ -774,6 +818,11 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
               <div style={{ gridColumn: '1/-1' }}>
                 <label style={lbl}>Descripción</label>
                 <textarea style={{ ...inp, height: 56, resize: 'vertical' }} value={recurso.descripcion} onChange={e => setField('descripcion', e.target.value)} />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={lbl}>📖 Texto de lectura (opcional: el alumno lo ve en todos los ejercicios)</label>
+                <input style={{ ...inp, marginBottom: 6 }} value={recurso.lecturaTitulo || ''} onChange={e => setField('lecturaTitulo', e.target.value)} placeholder="Título del texto" />
+                <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={recurso.lectura || ''} onChange={e => setField('lectura', e.target.value)} placeholder="Pega aquí el texto para una comprensión lectora" />
               </div>
               <div>
                 <label style={lbl}>Tags (separados por coma)</label>
@@ -835,7 +884,17 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
               <Plus size={15} /> Añadir ejercicio
             </button>
           </div>
-          {recurso.ejercicios.map((ex, i) => (
+          {vista === 'visual' && recurso.lectura && (
+            <div style={{ background: '#FFFDF5', border: '1px solid #FDE68A', borderRadius: 14, padding: '10px 16px', marginBottom: 14, fontSize: 13, color: '#78350F' }}>
+              📖 <b>{recurso.lecturaTitulo || 'Texto de lectura'}</b> · {recurso.lectura.split(/\s+/).length} palabras · <button onClick={() => setShowConfig(true)} style={{ border: 'none', background: 'none', color: '#6D28D9', cursor: 'pointer', textDecoration: 'underline', fontSize: 13 }}>editar</button>
+            </div>
+          )}
+          {vista === 'visual' && recurso.ejercicios.map((ex, i) => (
+            <EjercicioVisual key={ex.id || i} ex={ex} idx={i} total={recurso.ejercicios.length} color={recurso.color || '#6D28D9'}
+              onUpdate={e => updateExercise(i, e)} onDelete={deleteExercise} onMove={moveExercise}
+              TIPOS={TIPOS} TIPO_LABEL={TIPO_LABEL} TIPO_COLOR={TIPO_COLOR} newItem={newItem} ItemEditor={ItemEditor} PanelPuzzle={PanelPuzzle} />
+          ))}
+          {vista === 'form' && recurso.ejercicios.map((ex, i) => (
             <ExercisePanel
               key={ex.id || i}
               ex={ex} idx={i} total={recurso.ejercicios.length}

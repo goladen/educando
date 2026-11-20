@@ -61,6 +61,8 @@ export const JUEGOS_REGISTRO_META = {
     LAB_MICROBIT:        { nombre: 'Laboratorio micro:bit', emoji: '🛰️', color: '#0369a1' },
     CUERPO_HUMANO:       { nombre: 'Cuerpo humano 3D',    emoji: '🦴', color: '#38bdf8' },
     OVNI:                { nombre: 'Ovni Abducción',      emoji: '🛸', color: '#22d3ee' },
+    RACING3D:            { nombre: 'Racing 3D',           emoji: '🏁', color: '#00C6FF' },
+    CONDUCCION:          { nombre: 'Simulador de conducción', emoji: '🛞', color: '#fb8c00' },
     INVASORES:           { nombre: 'Invasión Pi',         emoji: '👾', color: '#22d3ee' },
     VANILA:              { nombre: 'VaniLa',              emoji: '🔤', color: '#A78BFA' },
     CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
@@ -77,6 +79,7 @@ export const JUEGOS_REGISTRO_META = {
     AVATAR_CUERPO:       { nombre: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2' },
     ORIENTACION:         { nombre: 'Orientación',          emoji: '🚩', color: '#c026d3' },
     MBOT_RETOS:          { nombre: 'Retos del mBot2',     emoji: '🚗', color: '#0284c7' },
+    EMPRESA_SOLAR:       { nombre: 'Mi empresa solar',    emoji: '☀️', color: '#d97706' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

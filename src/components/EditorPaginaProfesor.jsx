@@ -22,7 +22,7 @@ const JUEGOS_DISPONIBLES = [
   { id:'pikatron',        nombre:'Pikatron',            emoji:'⚡', desc:'Runner con preguntas',          grupo:'general' },
   { id:'pikatron_2',      nombre:'Plataformas',         emoji:'🏃', desc:'Plataformas con preguntas',     grupo:'general' },
   { id:'kartinged',       nombre:'Karting',             emoji:'🚗', desc:'Carreras con preguntas',        grupo:'general' },
-  { id:'kartinged_multi', nombre:'Karting Multi',       emoji:'🏎️', desc:'Carreras multijugador',        grupo:'general' },
+  { id:'kartinged_multi', nombre:'Racing 3D',           emoji:'🏁', desc:'Carreras en coche o moto contra la IA', grupo:'general' },
   { id:'pilive',          nombre:'PiLive',              emoji:'🎯', desc:'Quiz en vivo',                  grupo:'vivo' },
   { id:'mathlive',        nombre:'MathLive',            emoji:'📊', desc:'Matemáticas en tiempo real',    grupo:'vivo' },
   { id:'olympiclive',     nombre:'Olympic Live',        emoji:'🏅', desc:'Minijuegos en directo',         grupo:'vivo' },
@@ -537,7 +537,7 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
 
   const SLUGS_RESERVADOS = new Set([
     'populares','inicio','pasapalabra','cazaburbujas','burbujas','pikatron','pikatron_2','plataformas',
-    'kartinged','karting','kartinged_multi','karting_multi','aparejados','ruleta','wordle','mathle',
+    'kartinged','karting','kartinged_multi','karting_multi','carreras','racing3d','aparejados','ruleta','wordle','mathle',
     'thinkhoot','pilive','mathlive','olympiclive','olympic_live','sopa','sopa_letras',
     'question_sender','q-sender','omninteractive','videoquizz','sintaxis','listening',
     'etiquetas','etiquetame','geometrix','calculo','funciones','funciones2',

@@ -45,7 +45,7 @@ const JUEGOS_INFO = {
   pikatron:        { nombre:'Pikatron',              emoji:'⚡', url:'/pikatron' },
   pikatron_2:      { nombre:'Plataformas',           emoji:'🏃', url:'/pikatron_2' },
   kartinged:       { nombre:'Karting',               emoji:'🚗', url:'/kartinged' },
-  kartinged_multi: { nombre:'Karting Multi',         emoji:'🏎️', url:'/kartinged_multi' },
+  kartinged_multi: { nombre:'Racing 3D',             emoji:'🏁', url:'/carreras' },
   pilive:          { nombre:'PiLive',                emoji:'🎯', url:'/thinkhoot' },
   mathlive:        { nombre:'MathLive',              emoji:'📊', url:'/mathlive' },
   olympiclive:     { nombre:'Olympic Live',          emoji:'🏅', url:'/olympiclive' },

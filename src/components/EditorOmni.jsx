@@ -11,23 +11,26 @@ import MathInput from './MathInput';
 import { imprimirOmni } from '../utils/pdfOmni';
 import MathText from './MathText';
 import { cargarMotor, motorListo, equivalentes, aLatex } from '../utils/mathEquiv';
+import { generarCrucigrama, generarSopa, normPalabra, solucionCrucigrama, numerarCrucigrama, filasSopa, celdasSopa } from '../utils/puzzlesPalabras';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const uid = () => 'ex_' + Math.random().toString(36).slice(2, 8);
 const itemUid = () => Math.random().toString(36).slice(2, 8);
 
-const TIPOS = ['fill', 'choice', 'wordbank', 'construct', 'match', 'order', 'truefalse', 'multichoice', 'error', 'short', 'expr', 'matrix', 'open'];
+const TIPOS = ['fill', 'choice', 'wordbank', 'construct', 'match', 'order', 'truefalse', 'multichoice', 'error', 'short', 'expr', 'matrix', 'open', 'crossword', 'wordsearch'];
 const TIPO_LABEL = {
   fill: 'Fill in the blank', choice: 'Choose the correct', wordbank: 'Word bank',
   construct: 'Write a sentence', match: 'Match', order: 'Order words',
   truefalse: 'True / False', multichoice: 'Multiple choice', error: 'Find the error',
   short: 'Respuesta corta (número, palabra…)', open: 'Respuesta abierta (no puntúa)',
   expr: 'Expresión matemática (equivalente)', matrix: 'Matriz',
+  crossword: 'Crucigrama', wordsearch: 'Sopa de letras',
 };
 const TIPO_COLOR = {
   fill: '#6D28D9', choice: '#1D4ED8', wordbank: '#B45309', construct: '#047857',
   match: '#0F766E', order: '#C2410C', truefalse: '#0369A1', multichoice: '#7E22CE', error: '#B91C1C',
   short: '#0E7490', open: '#64748B', expr: '#1D4ED8', matrix: '#9333EA',
+  crossword: '#0F766E', wordsearch: '#B45309',
 };
 const NIVELES = ['1 ESO', '2 ESO', '3 ESO', '4 ESO', '1 Bach', '2 Bach', 'Primaria', 'FP', 'Otros'];
 const COLORES = ['#6D28D9', '#1D4ED8', '#047857', '#0F766E', '#C2410C', '#B45309', '#0369A1', '#7E22CE', '#B91C1C', '#BE185D'];
@@ -48,6 +51,8 @@ function newItem(tipo) {
     case 'open':        return { id, lbl: '', question: '', ans: '', lineas: 3 };
     case 'expr':        return { id, lbl: '', question: '', ans: '', alts: [], modo: 'equiv' };
     case 'matrix':      return { id, lbl: '', question: '', filas: 2, cols: 2, celdas: ['', '', '', ''], corchetes: 'pmatrix' };
+    case 'crossword':
+    case 'wordsearch':  return { id, ans: '', clue: '' };
     default:            return { id, lbl: '' };
   }
 }
@@ -361,8 +366,98 @@ function ItemEditorMatrix({ item, onChange, onMerge }) {
   );
 }
 
+function ItemEditorPalabra({ item, onChange, sopa }) {
+  return (
+    <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={lbl}>Palabra (solo cuentan las letras: «pencil case» → PENCILCASE)</label>
+      <input style={inp} value={item.ans || ''} onChange={e => onChange('ans', e.target.value)} placeholder="shower" />
+      <label style={lbl}>{sopa ? 'Pista (opcional: emoji, dibujo o definición)' : 'Pista (definición, frase con hueco o emoji)'}</label>
+      <MathInput value={item.clue || ''} onChange={v => onChange('clue', v)} placeholder={sopa ? '🚿' : '🚿 You wash your body here.'} />
+    </div>
+  );
+}
+
+const puzzleListo = (ex) => ex.tipo === 'crossword'
+  ? ex.filas > 0 && (ex.items || []).every(it => it.dir && Number.isInteger(it.row))
+  : !!ex.grid && (ex.items || []).every(it => Number.isInteger(it.dr));
+
+// Firma de las palabras: si cambia, hay que volver a generar la cuadrícula
+const firmaPuzzle = (ex) => (ex.items || []).map(it => normPalabra(it.ans)).join(',') + (ex.tipo === 'wordsearch' ? `#${ex.nivelSopa || 'medio'}` : '');
+
+function regenerarPuzzle(ex, semilla = Date.now()) {
+  const entradas = (ex.items || []).filter(it => normPalabra(it.ans).length >= 2);
+  if (ex.tipo === 'crossword') {
+    const r = generarCrucigrama(entradas, { semilla });
+    return { ex: { ...ex, filas: r.filas, cols: r.cols, items: r.items, firma: firmaPuzzle({ ...ex, items: r.items }) }, sinColocar: r.sinColocar };
+  }
+  const r = generarSopa(entradas, { semilla, nivel: ex.nivelSopa || 'medio' });
+  return { ex: { ...ex, grid: r.grid, items: r.items, firma: firmaPuzzle({ ...ex, items: r.items }) }, sinColocar: r.sinColocar };
+}
+
+function PanelPuzzle({ ex, onUpdate }) {
+  const [aviso, setAviso] = useState('');
+  const sucio = ex.firma !== firmaPuzzle(ex) || (ex.tipo === 'crossword' ? !ex.filas : !ex.grid);
+  const generar = () => {
+    const { ex: nuevo, sinColocar } = regenerarPuzzle(ex);
+    onUpdate(nuevo);
+    setAviso(sinColocar.length ? `No caben y se han quitado: ${sinColocar.map(e => normPalabra(e.ans)).join(', ')}. Pulsa otra vez o cambia alguna palabra.` : '');
+  };
+  let vista = null;
+  if (!sucio && ex.tipo === 'crossword') {
+    const sol = solucionCrucigrama(ex.items), { numeros } = numerarCrucigrama(ex.items);
+    vista = (
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${ex.cols}, 22px)`, gridAutoRows: '22px', gap: 1 }}>
+        {Array.from({ length: ex.filas * ex.cols }, (_, k) => {
+          const key = `${Math.floor(k / ex.cols)},${k % ex.cols}`, l = sol.get(key);
+          return l ? (
+            <div key={key} style={{ position: 'relative', border: '1px solid #334155', background: 'white', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {numeros.has(key) && <span style={{ position: 'absolute', top: 0, left: 1, fontSize: 7, color: '#64748B' }}>{numeros.get(key)}</span>}{l}
+            </div>
+          ) : <div key={key} />;
+        })}
+      </div>
+    );
+  } else if (!sucio) {
+    const marcadas = new Set(ex.items.flatMap(it => celdasSopa(it).map(([r, c]) => `${r},${c}`)));
+    vista = (
+      <div style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12, lineHeight: '17px', letterSpacing: 5 }}>
+        {filasSopa(ex.grid).map((f, r) => (
+          <div key={r}>{[...f].map((l, c) => {
+            const m = marcadas.has(`${r},${c}`);
+            return <span key={c} style={{ color: m ? '#B45309' : '#CBD5E1', fontWeight: m ? 800 : 400 }}>{l}</span>;
+          })}</div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginBottom: 14, padding: '10px 14px', background: '#F0FDFA', border: '1px dashed #5EEAD4', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={generar} style={{ border: 'none', background: '#0F766E', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+          🔀 {sucio ? 'Generar cuadrícula' : 'Otra distribución'}
+        </button>
+        {ex.tipo === 'wordsearch' && (<>
+          <select style={{ ...inp, width: 'auto' }} value={ex.nivelSopa || 'medio'} onChange={e => onUpdate({ ...ex, nivelSopa: e.target.value })}>
+            <option value="facil">Fácil (→ ↓)</option>
+            <option value="medio">Medio (+ diagonales)</option>
+            <option value="dificil">Difícil (+ al revés)</option>
+          </select>
+          <label style={{ fontSize: 12, color: '#475569', display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input type="checkbox" checked={ex.mostrarPalabras !== false} onChange={e => onUpdate({ ...ex, mostrarPalabras: e.target.checked })} /> Enseñar la lista de palabras
+          </label>
+        </>)}
+        {sucio && <span style={{ fontSize: 12, color: '#B45309' }}>Has cambiado las palabras: genera la cuadrícula (también se genera sola al guardar).</span>}
+      </div>
+      {aviso && <div style={{ fontSize: 12, color: '#B91C1C' }}>{aviso}</div>}
+      {vista && <div style={{ overflowX: 'auto' }}>{vista}</div>}
+    </div>
+  );
+}
+
 function ItemEditor({ tipo, item, onChange, onMerge }) {
   switch (tipo) {
+    case 'crossword':   return <ItemEditorPalabra item={item} onChange={onChange} />;
+    case 'wordsearch':  return <ItemEditorPalabra item={item} onChange={onChange} sopa />;
     case 'fill':        return <ItemEditorFill item={item} onChange={onChange} onMerge={onMerge} />;
     case 'choice':      return <ItemEditorChoice item={item} onChange={onChange} />;
     case 'wordbank':    return <ItemEditorFill item={item} onChange={onChange} onMerge={onMerge} />;
@@ -462,6 +557,8 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color }) {
             </div>
           )}
 
+          {(ex.tipo === 'crossword' || ex.tipo === 'wordsearch') && <PanelPuzzle ex={ex} onUpdate={onUpdate} />}
+
           {/* items */}
           <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 12 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#64748B', marginBottom: 8 }}>Preguntas / ítems ({ex.items.length})</div>
@@ -470,7 +567,7 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color }) {
                 <div style={{ background: '#F8FAFC', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
                   onClick={() => setOpenItems(o => ({ ...o, [i]: !o[i] }))}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', flex: 1 }}>
-                    Ítem {i + 1}{item.lbl ? ` — ${item.lbl}` : ''}
+                    Ítem {i + 1}{item.lbl ? ` — ${item.lbl}` : ''}{(ex.tipo === 'crossword' || ex.tipo === 'wordsearch') && item.ans ? ` — ${normPalabra(item.ans)}` : ''}
                   </span>
                   <button style={btnSm} onClick={e => { e.stopPropagation(); deleteItem(i); }}>✕</button>
                   {openItems[i] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -502,6 +599,8 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
         ...recursoInicial,
         ejercicios: (recursoInicial.ejercicios || []).map(ex => ({
           ...ex,
+          // Crucigrama / sopa que ya traen cuadrícula (p. ej. importados): se marcan como generados
+          ...((ex.tipo === 'crossword' || ex.tipo === 'wordsearch') && !ex.firma && puzzleListo(ex) ? { firma: firmaPuzzle(ex) } : {}),
           items: (ex.items || []).map(item => {
             if (!Array.isArray(item.alts)) return item;
             const altsRestored = item.alts.map(a =>
@@ -536,7 +635,10 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
   };
 
   // Firestore no admite arrays anidados: convierte alts [[a,b],[c]] → ["a|b","c"]
-  const sanitizeEjercicios = (ejercicios) => ejercicios.map(ex => ({
+  const sanitizeEjercicios = (ejercicios) => ejercicios
+    // Crucigrama / sopa con palabras cambiadas: se genera la cuadrícula al guardar
+    .map(ex0 => (ex0.tipo === 'crossword' || ex0.tipo === 'wordsearch') && ex0.firma !== firmaPuzzle(ex0) ? regenerarPuzzle(ex0).ex : ex0)
+    .map(ex => ({
     ...ex,
     items: (ex.items || []).map(item => {
       const clean = { ...item };

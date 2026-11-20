@@ -38,7 +38,7 @@ const PikatronRun      = lazy(() => import('./PikatronRun'));
 const AparejadosGame   = lazy(() => import('./AparejadosGame'));
 const SopaDeLetrasGame = lazy(() => import('./SopaDeLetrasGame'));
 const TextWordleGame   = lazy(() => import('./TextWordleGame'));
-const KartingedGame    = lazy(() => import('./KartingedGame'));
+const RacingGame3D     = lazy(() => import('./RacingGame3D'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mapa recurso → modos de juego puntuables disponibles.
@@ -49,7 +49,7 @@ export const MODOS_POR_TIPO = {
     CAZABURBUJAS: [
         { modo: 'BURBUJAS', label: 'Burbujas',  emoji: '🫧' },
         { modo: 'PIKATRON', label: 'Pikatron',  emoji: '🏃' },
-        { modo: 'KARTINGED', label: 'Karting',  emoji: '🏎️' },
+        { modo: 'KARTINGED', label: 'Racing 3D', emoji: '🏁' },
     ],
     WORDLE: [
         { modo: 'WORDLE', label: 'WordLe',          emoji: '🟩' },
@@ -129,7 +129,7 @@ export function JuegoOlimpicoRunner({ modo, recurso, hoja, tiempo, usuario, onFi
         case 'APAREJADOS':  Comp = AparejadosGame; break;
         case 'SOPA':        Comp = SopaDeLetrasGame; break;
         case 'WORDLE':      Comp = TextWordleGame; break;
-        case 'KARTINGED':   Comp = KartingedGame; break;
+        case 'KARTINGED':   Comp = RacingGame3D; break;
         default: return <div style={{ color: 'white', padding: 40, textAlign: 'center' }}>Juego no soportado.</div>;
     }
     return (

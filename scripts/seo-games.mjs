@@ -133,6 +133,20 @@ export const GAMES = [
     nivel: 'Primaria y Secundaria', materia: 'Lengua, Idiomas, Historia, Ciencias y Plástica',
   },
   {
+    slug: 'carreras', emoji: '🏁', color: '#00C6FF',
+    h1: 'Racing 3D: carreras con preguntas',
+    title: 'Racing 3D: carreras de coches y motos con preguntas | PiKT',
+    desc: 'Juego de carreras 3D en coche o en moto contra la IA en circuitos de asfalto, tierra y ciudad. Responde en los checkpoints para conseguir turbo. Preguntas de cualquier materia, gratis.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
+  },
+  {
+    slug: 'conducir', emoji: '🚗', color: '#fb8c00',
+    h1: 'Simulador de conducción y educación vial',
+    title: 'Simulador de conducción 3D, señales y test DGT gratis | PiKT',
+    desc: 'Aprende las señales, haz el test teórico tipo DGT (coche y moto) y conduce un coche o una moto por una ciudad 3D con glorieta, semáforos y tráfico. Examen práctico y pista de moto. Ordenador, móvil y gafas VR.',
+    nivel: 'Secundaria y Bachillerato', materia: 'Educación vial, Tutoría y Tecnología',
+  },
+  {
     slug: 'invasores', emoji: '👾', color: '#22d3ee',
     h1: 'Invasión Pi: arcade retro de preguntas',
     title: 'Invasión Pi: arcade retro de mates y preguntas para 1-4 jugadores | PiKT',

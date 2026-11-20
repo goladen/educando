@@ -21,7 +21,6 @@ import { useT } from '../i18n/LanguageContext';
 import LanguageSelector from '../i18n/LanguageSelector';
 import FullscreenBtn from '../MiniArcade/FullscreenBtn';
 const KartingTrack = lazy(() => import('../KartingTrack'));
-const KartingedMultiGame = lazy(() => import('../KartingedMultiGame'));
 const RacingGame3D = lazy(() => import('../RacingGame3D'));
 const ThinkHootGame = lazy(() => import('../ThinkHootGame'));
 const PiLiveSolo = lazy(() => import('../PiLiveSolo'));
@@ -40,6 +39,7 @@ const EnigmicLogic = lazy(() => import('../EnigmicLogic'));
 const SixSeven = lazy(() => import('../SixSeven'));
 const VaniLa = lazy(() => import('../vanila/VaniLa'));
 const OvniAbduccion = lazy(() => import('../OvniAbduccion'));
+const SimuladorConduccion = lazy(() => import('../conduccion/SimuladorConduccion'));
 const InvasoresArcade = lazy(() => import('../invasores/InvasoresArcade'));
 const Visor3D = lazy(() => import('../Visor3D'));
 const Esculpir3D = lazy(() => import('../Esculpir3D'));
@@ -68,6 +68,7 @@ const PerimetroArea = lazy(() => import('../PerimetroArea'));
 const Visor3dPoliedrosEuler = lazy(() => import('../Visor3dPoliedrosEuler'));
 const GranjaInteractiva = lazy(() => import('../GranjaInteractiva'));
 const ContabilidadSuper = lazy(() => import('../situaciones/ContabilidadSuper'));
+const EmpresaSolar = lazy(() => import('../situaciones/empresaSolar/EmpresaSolar'));
 const Plataformas = lazy(() => import('../Plataformas2'));
 const StoryCubes = lazy(() => import('../StoryCubes'));
 const FutbolQuizz = lazy(() => import('../FutbolQuizz'));
@@ -156,6 +157,7 @@ const ProgramacionRobotica = lazy(() => import('../ProgramacionRobotica'));
 import imgPiContento from '../assets/Pi-contento.png';
 import imgVaniLa from '../assets/icono_vanila.svg';
 import imgSixSeven from '../assets/icono_sixseven.svg';
+import imgVolante from '../assets/volante.svg';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -614,6 +616,17 @@ export const APPS = [
         shareUrl: `${window.location.origin}/sixseven`
     },
     {
+        id: 'CONDUCCION',
+        name: 'Simulador de conducción',
+        desc: 'Educación vial: señales, test teórico tipo DGT (coche y moto) y conducción 3D en coche o en moto por la ciudad (también con gafas VR).',
+        color: '#fb8c00',
+        emoji: '🛞',
+        img: imgVolante,
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/conducir`
+    },
+    {
         id: 'OVNI',
         name: 'Ovni Abducción',
         desc: 'Pilota un ovni sobre la granja y abduce los animales cuya palabra es de la categoría pedida.',
@@ -666,10 +679,12 @@ export const APPS = [
     {
         id: 'RACING3D',
         name: 'Racing 3D',
-        desc: 'Carreras 3D con preguntas en los checkpoints. 4 vueltas, 3 AI.',
+        desc: 'Carreras en coche o en moto contra la IA en 3 circuitos (asfalto, tierra y ciudad) con preguntas en los checkpoints.',
         color: '#00C6FF',
         emoji: '🏁',
-        shareable: true
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/carreras`
     },
     {
         id: 'MANSION_PITAGORICA',
@@ -951,6 +966,14 @@ export const GAME_INFO = {
         materias: ['Matemáticas', 'Geografía', 'Historia', 'Biología', 'Lengua y Literatura', 'Inglés'],
         etapas: ['Primaria', 'ESO'],
     },
+    CONDUCCION: {
+        descripcion: 'Simulador de conducción y educación vial en 3D. Catálogo de señales de tráfico (peligro, prioridad, prohibición, obligación, indicación, semáforos, agentes y marcas viales) con qué hacer ante cada una. Conducción libre o examen práctico, en coche o en moto, por una ciudad con avenidas de 50, calles de 30, calle residencial de 20, calles de sentido único, una glorieta, semáforos, STOP, ceda el paso, cruces sin señalizar, pasos de cebra con peatones, un colegio y tráfico. Para el permiso de moto incluye además una pista de maniobras (slalom, pasillo lento y frenada). Detecta las infracciones y las clasifica en eliminatorias, deficientes y leves como en el examen real. Vista desde el asiento (o el casco) o exterior, con retrovisores que reflejan el tráfico; en el ordenador se mira a los lados con el ratón. Modo inmersivo con gafas VR (WebXR) y gafas de cartón en el móvil. Fichas en PDF: test en papel con hoja de respuestas y lámina de señales.',
+        tipoPreguntas: 'Test teórico de 3 opciones: examen tipo DGT del permiso B o de moto A2 (30 preguntas, 30 minutos, máximo 3 fallos) o práctica por temas (señales, prioridad, velocidad, peatones, seguridad, normas y moto) con explicación de cada respuesta.',
+        biblioteca: 'No necesita recursos: incluye el banco de preguntas y las señales dibujadas.',
+        multiplayer: 'Individual. Ordenador (teclado, mando o volante USB), móvil o tablet (volante y pedales táctiles o inclinando el móvil) y gafas VR. Al acabar se puede enviar el informe al profesor con los fallos o las infracciones.',
+        materias: ['Tutoría', 'Tecnología'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
     OVNI: {
         descripcion: 'Juego 3D de clasificar palabras: pilotas un ovni de noche sobre una granja donde pasean vacas, ovejas, cerdos, gallinas y caballos, cada uno con un cartel con una palabra. El enunciado pide una categoría («Abduce: VERBOS») y hay que colocarse encima de los animales correctos y subirlos con el rayo tractor. Si abduces uno equivocado, la nave lo escupe y pierdes una vida. Los animales se asustan y huyen si te acercas (se puede elegir tranquilos, normales o asustadizos).',
         tipoPreguntas: 'Clasificación en categorías: cada ronda pide una categoría y los animales llevan palabras de esa y de otras. Bancos integrados por materia, por ejemplo: categorías gramaticales, géneros literarios, países por continentes, etapas de la historia, estados de la materia, fuentes de energía, vertebrados e invertebrados, huesos y músculos, aparatos del cuerpo, familias de instrumentos, materiales, colores y técnicas artísticas, verbos regulares e irregulares, play/go/do con deportes, vocabulario en inglés y francés, tipos de deportes, capacidades físicas, emociones y hábitos saludables. Además, un bloque de Números que genera rondas nuevas cada vez (Primaria o ESO): primos, compuestos, divisores de un número, múltiplos de un número, fracciones irreducibles, potencias de 2 y de 3, y mayores o menores que un número (en ESO con decimales y negativos); cada número equivocado explica por qué (por ejemplo, 21 = 3 × 7). Al final se muestra qué palabras se confundieron y a qué categoría pertenecían.',
@@ -1040,10 +1063,10 @@ export const GAME_INFO = {
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     RACING3D: {
-        descripcion: 'Carrera de coches en 3D contra IA. El alumno compite en 4 vueltas contra 3 vehículos con IA respondiendo preguntas en los checkpoints para ganar velocidad.',
-        tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
-        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
-        multiplayer: 'Individual contra IA (3 coches de inteligencia artificial).',
+        descripcion: 'Carrera en 3D, en coche o en moto, contra 3 o 4 rivales con IA. Tres circuitos: «Circuito Pi» de asfalto con pianos, gradas y boxes; «Rally de tierra» entre pinos y balas de paja, donde el coche derrapa; y un «Gran Premio urbano» por las calles de la ciudad del simulador de conducción. En cada checkpoint (3 a 5 por vuelta) la carrera se detiene para responder: acierto = turbo, fallo = +5 s y frenazo. Se elige el número de vueltas. Controles: flechas para acelerar y girar, espacio para frenar y flecha abajo para marcha atrás desde parado; en el móvil, botones táctiles.',
+        tipoPreguntas: 'Opción múltiple o respuesta corta (las de escribir se convierten en opciones) de cualquier materia: recursos del profesor, preguntas de PiKT por etapa y materia, o el banco de educación vial del test de conducir.',
+        biblioteca: 'No necesita recursos: incluye las preguntas de PiKT y las de educación vial. También admite los recursos públicos del profesor.',
+        multiplayer: 'Individual contra la IA (3 o 4 rivales). Ranking por recurso, hoja y circuito; al acabar se puede enviar el informe al profesor con las preguntas falladas.',
         materias: ['Universal'],
         etapas: ['ESO', 'Bachillerato'],
     },
@@ -1685,7 +1708,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'TECNOLOGIA', label: 'Tecnología', emoji: '⚙️', color: '#546E7A',
         keywords: ['tecnologia', 'tecno', 'informatica', 'robotica', 'circuito', 'maquina', 'programacion', 'dibujo tecnico', 'diseño', 'vistas', 'mecanismo'],
-        specificIds: ['VISTAS_DIDRICAS', 'ROBOTICA_BLOQUES', 'OVNI'],
+        specificIds: ['VISTAS_DIDRICAS', 'ROBOTICA_BLOQUES', 'CONDUCCION', 'OVNI'],
     },
     {
         id: 'PLASTICA', label: 'Plástica', emoji: '🎨', color: '#AD1457',
@@ -1705,7 +1728,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'TUTORIA', label: 'Tutoría y aula', emoji: '🍎', color: '#c2410c',
         keywords: ['tutoria', 'convivencia', 'emociones', 'valores', 'orientacion', 'cohesion de grupo', 'funciones ejecutivas', 'quien es quien'],
-        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN', 'DINAMICAS_AULA', 'OVNI'],
+        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN', 'DINAMICAS_AULA', 'CONDUCCION', 'OVNI'],
     },
 ];
 
@@ -2084,6 +2107,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
                 if (juegoParam.toLowerCase() === 'contabilidad') { setSituacionesAprendizaje(true); setSituacionActiva('CONTABILIDAD'); return; }
+                if (juegoParam.toLowerCase() === 'empresasolar') { setSituacionesAprendizaje(true); setSituacionActiva('EMPRESA_SOLAR'); return; }
                 if (juegoParam.toLowerCase() === 'linea_tiempo')    { setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }); return; }
                 let tourConfig = null;
                 const tcParam = params.get('tourconfig');
@@ -2193,6 +2217,10 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setCentroPdf(true);
             } else if (path === 'moneyboard' || path === 'piktboard') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
+            } else if (path === 'conducir') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CONDUCCION' });
+            } else if (path === 'carreras' || path === 'racing3d') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'RACING3D' });
             } else if (path === 'ovni') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
             } else if (path === 'invasores') {
@@ -2357,7 +2385,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
-    const REGISTRO_TIPO_DE = { SINTAXIS: 'LENGUA', GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA', MONEYBOARD: 'JEOPARDY', PATIO_JUEGOS: 'PATIO' };
+    const REGISTRO_TIPO_DE = { SINTAXIS: 'LENGUA', GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA', MONEYBOARD: 'JEOPARDY', PATIO_JUEGOS: 'PATIO', SITUACIONES_APRENDIZAJE: 'EMPRESA_SOLAR' };
     // Tipos de registro que pertenecen a Math World (para el recuento agregado del portal).
     const MATH_WORLD_TIPOS = ['CALCULO','DINERO','FRACCIONES','DIVISIBILIDAD','ALGEBRA','OCA','OAOA','ECUACIONES','FUNCIONES','FUNCIONES_ANALISIS','GEOMETRIX_COMPUESTO','MATHLE'];
 
@@ -2637,11 +2665,13 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         }
 
         if (appId === 'KARTINGED_MULTI') {
-            setJuegoActivo({ tipoJuego: 'KARTINGED_MULTI' });
+            window.history.pushState({}, '', '/carreras');
+            setJuegoActivo({ tipoJuego: 'RACING3D' });
             return;
         }
 
         if (appId === 'RACING3D') {
+            window.history.pushState({}, '', '/carreras');
             setJuegoActivo({ tipoJuego: 'RACING3D' });
             return;
         }
@@ -2680,6 +2710,11 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
             return;
         }
 
+        if (appId === 'CONDUCCION') {
+            window.history.pushState({}, '', '/conducir');
+            setJuegoActivo({ tipoJuego: 'CONDUCCION' });
+            return;
+        }
         if (appId === 'OVNI') {
             window.history.pushState({}, '', '/ovni');
             setJuegoActivo({ tipoJuego: 'OVNI' });
@@ -3052,7 +3087,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             onIr={(destino) => {
                 // Abre el generador elegido; al salir de él se vuelve a la página principal
                 setCentroPdf(false);
-                const RUTAS = { invasores: '/invasores', ovni: '/ovni', escape: '/escaperoom', calculadora: '/calculadora', pizarras: '/pizarras_verticales', patio: '/patio', fisica: '/fisica', comic: '/comic', oca: '/oca', domino: '/domino' };
+                const RUTAS = { invasores: '/invasores', ovni: '/ovni', conducir: '/conducir', escape: '/escaperoom', calculadora: '/calculadora', pizarras: '/pizarras_verticales', patio: '/patio', fisica: '/fisica', comic: '/comic', oca: '/oca', domino: '/domino' };
                 if (RUTAS[destino]) { window.history.pushState({}, '', RUTAS[destino]); window.dispatchEvent(new Event('popstate')); return; }
                 window.history.pushState({}, '', '/');
                 if (destino === 'puzzle') setJuegoActivo({ tipoJuego: 'PUZZLE_IMAGENES' });
@@ -3061,6 +3096,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 else if (destino === 'quienesquien') { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }
                 else if (destino === 'dinamicas') { setDinamicasApp(true); window.history.pushState({}, '', '/dinamicas'); }
                 else if (destino === 'comunidades') { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }
+                else if (destino === 'empresasolar') { setSituacionesAprendizaje(true); setSituacionActiva('EMPRESA_SOLAR'); }
             }}
         />
     );
@@ -3124,6 +3160,11 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 <ContabilidadSuper onBack={() => setSituacionActiva(null)} />
             </div>
         );
+        if (situacionActiva === 'EMPRESA_SOLAR') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#fffbeb', overflowY: 'auto' }}>
+                <Suspense fallback={<CargandoChunk />}><EmpresaSolar onBack={() => setSituacionActiva(null)} /></Suspense>
+            </div>
+        );
         return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f4fbf4', overflowY: 'auto' }}>
                 <button onClick={() => setSituacionesAprendizaje(false)} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#15803d', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
@@ -3153,6 +3194,16 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                             <div style={{ fontSize: 50, marginBottom: 15 }}>🏪📒</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#0f766e', fontSize: '1.4rem' }}>Contabilidad del supermercado</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Lleva las cuentas de un mes: asientos en el Debe y el Haber, IVA del 4, 10 y 21 %, luz, alquiler y la nómina del empleado.</p>
+                        </div>
+                        <div
+                            onClick={() => setSituacionActiva('EMPRESA_SOLAR')}
+                            style={{ background: '#FEF3C7', borderRadius: 20, padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #d97706' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: 50, marginBottom: 15 }}>☀️🏠</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#b45309', fontSize: '1.4rem' }}>Mi empresa de placas solares</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Crea tu empresa y su logo, diseña la instalación para el tejado de un cliente, calcula la producción, el presupuesto, la batería y la amortización.</p>
                         </div>
                     </div>
                 </div>
@@ -3434,11 +3485,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             </div>
         );
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingTrack alTerminar={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'INVASORES') return <ConAvisoEncaje recurso={juegoActivo.recurso || null} juego="INVASORES" onCancelar={() => setJuegoActivo(null)}>{(rc) => <InvasoresArcade recurso={rc} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />}</ConAvisoEncaje>;
+        if (juegoActivo.tipoJuego === 'CONDUCCION') return <SimuladorConduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'OVNI') return <OvniAbduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'LAB_MICROBIT') return <LabMicrobit onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;

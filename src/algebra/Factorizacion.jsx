@@ -542,14 +542,22 @@ export function M_Factorizacion({ onScore }) {
 // MÓDULO — Extraer factor común
 // ═══════════════════════════════════════════════════════════════════════════════
 const rI = (lo, hi) => Math.floor(Math.random() * (hi - lo + 1)) + lo;
-function genFactorComun() {
+// Factor común g·xᵐ·Q(x): casi siempre con número Y potencia de x (m ≥ 1 en el 85 %),
+// y la mayoría con 3 términos (70 %; si no, 2 o 4).
+export function genFactorComun() {
     for (;;) {
-        const g = [2, 2, 3, 3, 4, 5, 6, 1, -2, -3][rI(0, 9)];
-        const m = rI(0, 3);
+        const g = [2, 2, 3, 3, 4, 5, 6, 2, -2, -3, 1][rI(0, 10)];
+        const m = Math.random() < 0.85 ? rI(1, 3) : 0;
         if (g === 1 && m === 0) continue;
-        const deg = rI(1, 3);
-        const Q = Array.from({ length: deg + 1 }, (_, i) => i === deg ? rI(1, 5) : (Math.random() < 0.3 && i > 0 ? 0 : rI(-7, 7)));
-        if (!Q[0] || nTerminos(Q) < 2 || Q.reduce((a, v) => gcd(a, v), 0) !== 1) continue;
+        const nT = Math.random() < 0.7 ? 3 : [2, 4][rI(0, 1)];
+        const deg = rI(nT - 1, 3);
+        // Q ascendente: término independiente ≠ 0 (así xᵐ es la menor potencia), principal ≠ 0
+        const Q = Array(deg + 1).fill(0);
+        Q[0] = rI(1, 7) * (Math.random() < 0.5 ? -1 : 1);
+        Q[deg] = rI(1, 5);
+        const huecos = Array.from({ length: deg - 1 }, (_, i) => i + 1).sort(() => Math.random() - 0.5).slice(0, nT - 2);
+        huecos.forEach((i) => { Q[i] = rI(1, 7) * (Math.random() < 0.5 ? -1 : 1); });
+        if (nTerminos(Q) !== nT || Q.reduce((a, v) => gcd(a, v), 0) !== 1) continue;
         const P = norm(mul(Q, [...Array(m).fill(0), g]));
         if (P.some(v => Math.abs(v) > 80)) continue;
         return { P, g, m, Q };

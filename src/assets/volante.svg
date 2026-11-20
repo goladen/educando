@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="f" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#ffb74d"/><stop offset="1" stop-color="#ef6c00"/></radialGradient>
+    <linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4f57"/><stop offset="1" stop-color="#16181c"/></linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="62" fill="url(#f)"/>
+  <!-- aro -->
+  <circle cx="64" cy="64" r="42" fill="none" stroke="url(#a)" stroke-width="12"/>
+  <circle cx="64" cy="64" r="42" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2" transform="translate(0 -3)"/>
+  <!-- radios -->
+  <path d="M24 60 Q44 58 52 66 L76 66 Q84 58 104 60 L104 70 Q86 70 78 78 L74 104 L54 104 L50 78 Q42 70 24 70 Z" fill="url(#a)"/>
+  <!-- centro -->
+  <circle cx="64" cy="70" r="13" fill="#2b2f36" stroke="#5c636d" stroke-width="2"/>
+  <circle cx="64" cy="70" r="4" fill="#ffb74d"/>
+  <!-- marca superior -->
+  <rect x="60" y="19" width="8" height="10" rx="2" fill="#e53935"/>
+</svg>

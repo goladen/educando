@@ -562,43 +562,89 @@ const IDENTIDADES = [
     { id:2, name:'Producto de suma por diferencia', pattern:'(ax + b)(ax − b)' },
 ];
 
+// Una identidad suelta: tipo 0 (a+b)², 1 (a−b)², 2 (a+b)(a−b); g = grado de la x (1 o 2)
+function identidad(tipo, a, b, g = 1) {
+    const xs = g === 1 ? 'x' : 'x²';
+    const A = `${a === 1 ? '' : a}${xs}`;
+    const poly = Array(2 * g + 1).fill(0);
+    poly[2 * g] = a * a; poly[0] = tipo === 2 ? -b * b : b * b;
+    if (tipo !== 2) poly[g] = (tipo === 0 ? 2 : -2) * a * b;
+    const expr = tipo === 0 ? `(${A} + ${b})²` : tipo === 1 ? `(${A} − ${b})²` : `(${A} + ${b})(${A} − ${b})`;
+    const formula = tipo === 0 ? '(a + b)² = a² + 2ab + b²' : tipo === 1 ? '(a − b)² = a² − 2ab + b²' : '(a + b)(a − b) = a² − b²';
+    const sq = a === 1 ? (g === 1 ? 'x²' : '(x²)²') : `(${A})²`;
+    const sust = tipo === 2
+        ? `${sq} − ${b}² = ${polyStr(poly)}`
+        : `${sq} ${tipo === 0 ? '+' : '−'} 2·${A}·${b} + ${b}² = ${polyStr(poly)}`;
+    return { tipo, expr, poly, formula, paso: `${expr} = ${sust}` };
+}
+
+// Nivel 1: una identidad (alternando suma, diferencia y suma por diferencia).
+// Nivel 2: coeficientes mayores, (ax² ± b)², y operaciones combinadas con identidades.
+let turnoIdentidad = rInt(0, 2);
+export function genIdentidad(nivel) {
+    const tipo = turnoIdentidad; turnoIdentidad = (turnoIdentidad + 1) % 3;
+    if (nivel === 1) {
+        const id = identidad(tipo, rInt(1, 4), rInt(1, 9));
+        return { ...id, maxDeg: 2, pasos: [id.paso] };
+    }
+    const forma = rItem(['grande', 'cuadratica', 'combinada', 'combinada', 'combinadaK']);
+    if (forma === 'grande' || forma === 'cuadratica') {
+        const id = forma === 'grande' ? identidad(tipo, rInt(2, 6), rInt(2, 9)) : identidad(tipo, rInt(1, 3), rInt(1, 6), 2);
+        return { ...id, maxDeg: id.poly.length - 1, pasos: [id.paso] };
+    }
+    // Combinada: k·(identidad del turno) ± (otra identidad)
+    const k = forma === 'combinadaK' ? rItem([2, 3, -2]) : 1;
+    const otro = rItem([0, 1, 2].filter(t => t !== tipo));
+    const i1 = identidad(tipo, rInt(1, 3), rInt(1, 6)), i2 = identidad(otro, rInt(1, 3), rInt(1, 6));
+    const signo = rItem([1, -1]);
+    const p1 = i1.poly.map(v => v * k);
+    const total = signo > 0 ? addPoly(p1, i2.poly) : subPoly(p1, i2.poly);
+    if (normPoly(total).length < 2) return genIdentidad(nivel); // que no se anule casi todo
+    const kTxt = k === 1 ? '' : k === -1 ? '−' : k < 0 ? `−${-k}` : `${k}`;
+    const expr = `${kTxt}${i1.expr} ${signo > 0 ? '+' : '−'} ${i2.expr}`;
+    const pasos = [
+        i1.paso,
+        i2.paso,
+        `${k === 1 ? '' : `${kTxt}·`}(${polyStr(i1.poly)}) ${signo > 0 ? '+' : '−'} (${polyStr(i2.poly)})${signo < 0 ? '  → el − cambia el signo de todo el paréntesis' : ''}`,
+        `= ${polyStr(total)}`,
+    ];
+    return { tipo, expr, poly: normPoly(total), maxDeg: 2, pasos, formula: i1.formula, combinada: true };
+}
+
 function M6_Identidades({ onScore }) {
-    const genEj = () => {
-        const tipo = rInt(0,2);
-        const a = rInt(1,4); const b = rInt(1,9);
-        let expr, ans;
-        if(tipo===0) {
-            expr=`(${a===1?'':a}x + ${b})²`;
-            ans=[b*b, 2*a*b, a*a];
-        } else if(tipo===1) {
-            expr=`(${a===1?'':a}x − ${b})²`;
-            ans=[b*b, -2*a*b, a*a];
-        } else {
-            expr=`(${a===1?'':a}x + ${b})(${a===1?'':a}x − ${b})`;
-            ans=[-b*b, 0, a*a];
-        }
-        return { tipo, a, b, expr, ans };
-    };
-    const [ej, setEj] = useState(genEj);
-    const [resp, setResp] = useState([0,0,0]);
+    const [nivel, setNivel] = useState(1);
+    const [ej, setEj] = useState(() => genIdentidad(1));
+    const [resp, setResp] = useState([0,0,0,0,0]);
     const [result, setResult] = useState(null);
     const [score, setScore] = useState({ok:0,total:0});
 
     const comprobar = () => {
-        const ok = polyEq(normPoly(resp.slice(0,3)), normPoly(ej.ans));
-        const hint = ej.tipo===2 ? 'Recuerda: (a+b)(a−b) = a² − b²' : ej.tipo===0 ? 'Recuerda: (a+b)² = a² + 2ab + b²' : 'Recuerda: (a−b)² = a² − 2ab + b²';
-        setResult({ok, msg:ok?'¡Correcto!':'Incorrecto. '+polyStr(ej.ans), explanation: !ok ? hint : ''});
+        const ok = polyEq(normPoly(resp), normPoly(ej.poly));
+        setResult({ ok, msg: ok ? '¡Correcto!' : 'Incorrecto. ' + polyStr(ej.poly),
+            explanation: ok ? '' : `Recuerda: ${ej.formula}` });
         setScore(s=>({ok:s.ok+(ok?1:0),total:s.total+1}));
         onScore(ok?1:0,1);
     };
-    const nuevo = () => { setEj(genEj()); setResp([0,0,0]); setResult(null); };
+    const nuevo = (nv = nivel) => { setEj(genIdentidad(nv)); setResp([0,0,0,0,0]); setResult(null); };
+    const cambiarNivel = (nv) => { setNivel(nv); nuevo(nv); };
 
     return (
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {[[1,'Nivel 1 · Identidades'],[2,'Nivel 2 · Más difíciles y combinadas']].map(([nv,txt])=>(
+                    <button key={nv} onClick={()=>cambiarNivel(nv)} style={{padding:'6px 14px',borderRadius:8,border:`2px solid ${nivel===nv?'#1abc9c':'#30363d'}`,background:nivel===nv?'#0d2b26':'transparent',color:'white',cursor:'pointer',fontWeight:nivel===nv?700:400}}>
+                        {txt}
+                    </button>
+                ))}
+            </div>
             <div style={{...CARD,display:'flex',flexDirection:'column',gap:8}}>
-                <div style={{fontSize:'0.8rem',color:'#8b949e'}}>Identidad: <b style={{color:'#1abc9c'}}>{IDENTIDADES[ej.tipo].name}</b></div>
+                <div style={{fontSize:'0.8rem',color:'#8b949e'}}>
+                    {ej.combinada ? 'Operación combinada con ' : 'Identidad: '}<b style={{color:'#1abc9c'}}>{IDENTIDADES[ej.tipo].name.toLowerCase()}</b>
+                </div>
                 <div style={{fontSize:'1.5rem',fontWeight:700,color:'#f39c12',textAlign:'center',fontFamily:'Georgia,serif'}}>{ej.expr}</div>
-                <div style={{fontSize:'0.85rem',color:'#8b949e',textAlign:'center'}}>Desarrolla y escribe el resultado usando los botones</div>
+                <div style={{fontSize:'0.85rem',color:'#8b949e',textAlign:'center'}}>
+                    {ej.combinada ? 'Desarrolla cada identidad, opera y escribe el resultado' : 'Desarrolla y escribe el resultado usando los botones'}
+                </div>
             </div>
             <div style={{...CARD,background:'#0d1d1a',border:'1px solid #1abc9c22'}}>
                 <div style={{fontSize:'0.8rem',color:'#1abc9c',marginBottom:8,fontWeight:700}}>📐 Las tres identidades notables:</div>
@@ -608,10 +654,18 @@ function M6_Identidades({ onScore }) {
                     '(a+b)(a−b) = a² − b²',
                 ].map((f,i)=><div key={i} style={{fontFamily:'Georgia,serif',fontSize:'0.9rem',color:'#8b949e',padding:'2px 0'}}>{f}</div>)}
             </div>
-            <PolyInput value={resp} onChange={setResp} maxDeg={2}/>
+            <PolyInput value={resp} onChange={setResp} maxDeg={ej.maxDeg} grande={nivel === 2}/>
             {!result
                 ? <button style={BTN('#f39c12','#111')} onClick={comprobar}>Comprobar</button>
-                : <FeedbackBlock result={result} onNext={nuevo}/>
+                : <>
+                    {!result.ok && (
+                        <div style={{...CARD,background:'#1a1030',border:'1px solid #9b59b644',fontFamily:'Georgia,serif',fontSize:'0.92rem',color:'#c9d1d9',lineHeight:1.8}}>
+                            <div style={{fontSize:'0.8rem',color:'#c39bd3',fontWeight:700,fontFamily:'inherit'}}>Resolución</div>
+                            {ej.pasos.map((p,i)=><div key={i}>{p}</div>)}
+                        </div>
+                    )}
+                    <FeedbackBlock result={result} onNext={() => nuevo()}/>
+                </>
             }
             <ScoreLine ok={score.ok} total={score.total}/>
         </div>

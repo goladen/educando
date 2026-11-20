@@ -5,12 +5,12 @@
 //   3) Corregir: copiar prompt con la clave de respuestas → adjuntar fotos/vídeo de los exámenes
 //      → pegar la respuesta → tabla por examen (bien / mal / parcial / en blanco / sin corregir), editable.
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import MathText from './MathText';
 import FotoAOmni from './FotoAOmni';
 import {
-  promptHojaAOmni, interpretarOmni, promptCorreccion, interpretarCorreccion, claveRespuestas, cuenta,
+  promptHojaAOmni, interpretarOmni, interpretarLote, promptCorreccion, interpretarCorreccion, claveRespuestas, cuenta,
   NIVELES_PAPEL, IDIOMAS_PAPEL,
 } from '../utils/omniPapel';
 import { imprimirOmni } from '../utils/pdfOmni';
@@ -20,7 +20,7 @@ const OmninteractiveApp = lazy(() => import('../OmninteractiveApp'));
 const TIPO_TXT = {
   fill: 'Huecos', choice: 'Elegir', wordbank: 'Banco de palabras', construct: 'Construir frases', match: 'Unir',
   order: 'Ordenar', truefalse: 'V / F', multichoice: 'Test', error: 'Buscar el error', short: 'Respuesta corta', open: 'Abierta',
-  expr: 'Expresión', matrix: 'Matriz',
+  expr: 'Expresión', matrix: 'Matriz', crossword: 'Crucigrama', wordsearch: 'Sopa de letras',
 };
 const ESTADO = {
   bien:          { txt: 'Bien',          icon: '✓', color: '#047857', bg: '#DCFCE7' },
@@ -75,7 +75,7 @@ export default function PapelInteractivo({ usuario, onBack, onOpenEditorOmni }) 
         ))}
       </div>
 
-      {pestana === 'crear' && <PasoCrear onOpenEditorOmni={onOpenEditorOmni} />}
+      {pestana === 'crear' && <PasoCrear usuario={usuario} onOpenEditorOmni={onOpenEditorOmni} />}
       {pestana !== 'crear' && (
         <SelectorHoja hojas={misHojas} error={errorHojas} seleccion={seleccion} onSelect={setSeleccion} />
       )}
@@ -88,7 +88,88 @@ export default function PapelInteractivo({ usuario, onBack, onOpenEditorOmni }) 
 // ─────────────────────────────────────────────────────────────
 // 1) Crear
 // ─────────────────────────────────────────────────────────────
-function PasoCrear({ onOpenEditorOmni }) {
+// Guarda un recurso Omni en «resources» con el profe como autor (mismos campos que EditorOmni)
+const codigoAcceso = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+async function guardarOmni(recurso, usuario, publicar) {
+  const { id, ...r } = recurso;
+  const ejercicios = r.ejercicios.map(ex => ({
+    ...ex,
+    items: (ex.items || []).map(it => Array.isArray(it.alts) ? { ...it, alts: it.alts.map(a => Array.isArray(a) ? a.join('|') : (a || '')) } : it),
+  }));
+  return addDoc(collection(db, 'resources'), {
+    ...r, ejercicios,
+    tipoJuego: 'OMNINTERACTIVE', tipo: 'OMNI', isFinished: !!publicar,
+    profesorUid: usuario.uid, profesorNombre: usuario.displayName || 'Anon',
+    pais: usuario.pais || '', region: usuario.region || '', poblacion: usuario.poblacion || '',
+    ciclo: r.ciclo || 'Secundaria', temas: r.tema || '',
+    playCount: 0, fechaCreacion: new Date(), accessCode: codigoAcceso(), origen: 'lote_omni',
+  });
+}
+
+// Varios recursos de golpe ({"recursos": [...]}): revisar, probar y guardar todos con el profe como autor
+function PasoLote({ lote, usuario, onOpenEditorOmni, onCancelar }) {
+  const [probar, setProbar] = useState(null);
+  const [publicar, setPublicar] = useState(true);
+  const [estado, setEstado] = useState({});       // índice → 'ok' | 'error: …'
+  const [guardando, setGuardando] = useState(false);
+  const hechos = Object.values(estado).filter(v => v === 'ok').length;
+
+  const guardarTodos = async () => {
+    if (!usuario?.uid) return;
+    setGuardando(true);
+    for (let i = 0; i < lote.length; i++) {
+      if (estado[i] === 'ok') continue;
+      try { await guardarOmni(lote[i], usuario, publicar); setEstado(e => ({ ...e, [i]: 'ok' })); }
+      catch (e) { setEstado(x => ({ ...x, [i]: 'error: ' + e.message })); }
+    }
+    setGuardando(false);
+  };
+
+  if (probar) return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'white' }}>
+      <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+        <OmninteractiveApp recursoDirecto={probar} onBack={() => setProbar(null)} />
+      </Suspense>
+    </div>
+  );
+
+  return (
+    <div style={s.card}>
+      <div style={s.ok}>✓ {lote.length} hojas interactivas en el archivo</div>
+      <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden', margin: '12px 0' }}>
+        {lote.map((r, i) => (
+          <div key={r.id} style={{ display: 'flex', gap: 8, padding: '8px 12px', borderTop: i ? '1px solid #F1F5F9' : 'none', alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
+            <b style={{ color: '#6D28D9', minWidth: 22 }}>{i + 1}</b>
+            <span style={{ flex: '1 1 200px', minWidth: 0 }}>
+              <MathText text={r.titulo} />
+              <span style={{ color: '#94A3B8', fontSize: 12 }}> · {r.ejercicios.length} ejercicios{r.ejercicios.some(e => e.tipo === 'crossword') ? ' · crucigrama' : ''}{r.ejercicios.some(e => e.tipo === 'wordsearch') ? ' · sopa de letras' : ''}</span>
+            </span>
+            {estado[i] === 'ok' ? <span style={{ color: '#15803D', fontWeight: 700 }}>✓ Guardada</span>
+              : estado[i] ? <span style={{ color: '#B91C1C', fontSize: 12 }}>{estado[i]}</span> : null}
+            <button onClick={() => setProbar(r)} style={{ ...s.btnSec, padding: '5px 10px', fontSize: 12 }}>▶ Probar</button>
+            <button onClick={() => imprimirOmni(r)} style={{ ...s.btnSec, padding: '5px 10px', fontSize: 12 }}>🖨️</button>
+            {estado[i] !== 'ok' && <button onClick={() => onOpenEditorOmni?.(r)} style={{ ...s.btnSec, padding: '5px 10px', fontSize: 12 }}>✏️ Editar y guardar</button>}
+          </div>
+        ))}
+      </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, marginBottom: 10 }}>
+        <input type="checkbox" checked={publicar} onChange={e => setPublicar(e.target.checked)} />
+        Publicar (visibles para los demás profesores en el buscador de recursos)
+      </label>
+      {!usuario?.uid && <div style={s.error}>Inicia sesión como profesor para guardarlas.</div>}
+      <div style={s.fila}>
+        <button onClick={guardarTodos} disabled={guardando || !usuario?.uid || hechos === lote.length}
+          style={{ ...s.btn, background: guardando || hechos === lote.length ? '#94A3B8' : '#6D28D9', flex: '2 1 240px' }}>
+          {guardando ? `Guardando… ${hechos}/${lote.length}` : hechos === lote.length ? `✓ ${lote.length} guardadas` : `💾 Guardar las ${lote.length - hechos} con mi nombre`}
+        </button>
+        <button onClick={onCancelar} style={{ ...s.btnSec, flex: '1 1 140px' }}>← Volver</button>
+      </div>
+      <p style={s.nota}>Se guardan como recursos tuyos (Omninteractive). Después aparecen en «2 · Ficha en papel» y en tus recursos, donde puedes editarlas.</p>
+    </div>
+  );
+}
+
+function PasoCrear({ usuario, onOpenEditorOmni }) {
   const [config, setConfig] = useState({ idioma: 'Español', nivel: '1 ESO', asignatura: '', extra: '' });
   const [copiado, setCopiado] = useState(false);
   const [pegada, setPegada] = useState('');
@@ -96,16 +177,27 @@ function PasoCrear({ onOpenEditorOmni }) {
   const [recurso, setRecurso] = useState(null);
   const [probando, setProbando] = useState(false);
   const [auto, setAuto] = useState(false);
+  const [lote, setLote] = useState(null);
   const set = (k) => (e) => setConfig(c => ({ ...c, [k]: e.target.value }));
 
   const copiarPrompt = async () => {
     await copiar(promptHojaAOmni(config));
     setCopiado(true); setTimeout(() => setCopiado(false), 2500);
   };
+  const leerArchivo = (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    file.text().then(t => { setPegada(t); setError(''); });
+    e.target.value = '';
+  };
   const cargar = () => {
     setError('');
-    try { setRecurso(interpretarOmni(pegada, config)); } catch (e) { setError('No se pudo leer la respuesta: ' + e.message); }
+    try {
+      const l = interpretarLote(pegada, config);
+      if (l) setLote(l); else setRecurso(interpretarOmni(pegada, config));
+    } catch (e) { setError('No se pudo leer la respuesta: ' + e.message); }
   };
+
+  if (lote) return <PasoLote lote={lote} usuario={usuario} onOpenEditorOmni={onOpenEditorOmni} onCancelar={() => { setLote(null); setPegada(''); }} />;
 
   if (probando && recurso) return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'white' }}>
@@ -173,6 +265,10 @@ function PasoCrear({ onOpenEditorOmni }) {
       <Paso n="3" t="Pega aquí la respuesta de tu IA">
         <textarea value={pegada} onChange={e => setPegada(e.target.value)} placeholder='{"titulo": "...", "ejercicios": [...]}'
           style={{ ...s.input, minHeight: 130, fontFamily: 'monospace', fontSize: 12, resize: 'vertical' }} />
+        <label style={{ ...s.link, display: 'inline-block', marginTop: 6, cursor: 'pointer' }}>
+          📂 o carga un archivo .json (admite varias hojas a la vez)
+          <input type="file" accept=".json,application/json,text/plain" onChange={leerArchivo} style={{ display: 'none' }} />
+        </label>
         {error && <div style={s.error}>{error}</div>}
         <button onClick={cargar} disabled={!pegada.trim()} style={{ ...s.btn, background: pegada.trim() ? '#6D28D9' : '#BBB', width: '100%', marginTop: 8 }}>
           Crear hoja interactiva

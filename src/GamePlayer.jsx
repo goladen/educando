@@ -126,7 +126,7 @@ const Plataformas = lazy(() => import('./Plataformas2'));
 const AparejadosGame = lazy(() => import('./AparejadosGame'));
 const ThinkHootGame = lazy(() => import('./ThinkHootGame'));
 const RuletaGame = lazy(() => import('./RuletaGame'));
-const KartingedGame = lazy(() => import('./KartingedGame'));
+const RacingGame3D = lazy(() => import('./RacingGame3D'));
 const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
 const TextWordleGame = lazy(() => import('./TextWordleGame'));
 const SopaDeLetrasGame = lazy(() => import('./SopaDeLetrasGame'));
@@ -229,7 +229,7 @@ function GamePlayerInterno({ recurso, usuario, alTerminar, autoStart = false, ho
             )}
 
             {recurso.tipoJuego === 'KARTINGED' && (
-                <KartingedGame alTerminar={alTerminar} />
+                <RacingGame3D recurso={recurso} hojaInicial={hojaInicial || 'General'} usuario={usuario} alTerminar={alTerminar} />
             )}
 
             {recurso.tipoJuego === 'IRREGULAR_VERBS' && (

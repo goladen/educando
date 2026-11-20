@@ -4,6 +4,7 @@
 // El componente acepta prop: onBack (función para volver al menú principal)
 import { validarNombre } from './utils/filtroNombres';
 import FotoARecurso from './FotoARecurso';
+import { CrosswordEx, WordsearchEx, puntuarCrucigrama, puntuarSopa } from './components/OmniPuzzles';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import MathText from './components/MathText';
@@ -29,7 +30,8 @@ const genCode = () => Math.random().toString(36).slice(2, 7).toUpperCase();
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 const nm = (s = '') =>
-  (s || '').toLowerCase().trim().replace(/\s+/g, ' ').replace(/['']/g, "'")
+  // Apóstrofos curvos (teclado del móvil/iPad) = recto; sin punto/interrogación final
+  (s || '').toLowerCase().trim().replace(/[\s.!?]+$/, '').replace(/\s+/g, ' ').replace(/[‘’ʼ´`]/g, "'")
     .replace(/wasn't|was not/g, 'wasnot').replace(/weren't|were not/g, 'werenot')
     .replace(/isn't|is not/g, 'isnot').replace(/aren't|are not/g, 'arenot')
     .replace(/don't|do not/g, 'donot').replace(/doesn't|does not/g, 'doesnot')
@@ -89,6 +91,8 @@ function useMotorMates(activo = true) {
 }
 
 function calcScore(ex, ans) {
+  if (ex.tipo === 'crossword') return puntuarCrucigrama(ex, ans);
+  if (ex.tipo === 'wordsearch') return puntuarSopa(ex, ans);
   let c = 0, t = 0;
   ex.items.forEach(item => {
     if (ex.tipo === 'choice') {
@@ -142,6 +146,8 @@ const TIPO_INFO = {
   expr:        { label: 'Expresión', color: '#1D4ED8' },
   matrix:      { label: 'Matriz', color: '#9333EA' },
   open:        { label: 'Respuesta abierta', color: '#64748B' },
+  crossword:   { label: 'Crossword', color: '#0F766E' },
+  wordsearch:  { label: 'Word search', color: '#B45309' },
 };
 
 // ─── shared sub-components ───────────────────────────────────────────────────
@@ -708,6 +714,8 @@ function ExRenderer({ ex, ans, setAns, checked }) {
     case 'expr':        return <ExprEx {...props} />;
     case 'matrix':      return <MatrixEx {...props} />;
     case 'open':        return <OpenEx {...props} />;
+    case 'crossword':   return <CrosswordEx {...props} />;
+    case 'wordsearch':  return <WordsearchEx {...props} />;
     default: return null;
   }
 }
@@ -1062,6 +1070,7 @@ function PlayScreen({ recurso, onBack }) {
                   <span style={{ padding:'2px 10px', borderRadius:20, background:`${info.color || recurso.color}20`, color:info.color || recurso.color, fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{info.label}</span>
                 </div>
                 <p style={{ margin:0, fontSize:isMobile ? 13 : 14, color:'#475569', lineHeight:1.5 }}><MathText text={ex.enunciado} /></p>
+                {ex.imagen && <img src={ex.imagen} alt="" style={{ display:'block', maxWidth:'100%', maxHeight:260, borderRadius:10, marginTop:10, objectFit:'contain' }} />}
                 {/* Timer bar */}
                 {(ex.tiempo || 0) > 0 && startTimes[ex.id] && !isChecked && (
                   <TimerBar tiempo={ex.tiempo} startTime={startTimes[ex.id]} onTimeUp={() => autoCheck(ex.id)} />

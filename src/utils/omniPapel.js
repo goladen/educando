@@ -4,9 +4,10 @@
 //   claveRespuestas(recurso)         → [{ ref, ejercicio, tipo, pregunta, solucion, autocorregible }]
 //   promptCorreccion(recurso, opc)   → prompt para corregir fotos/vídeo de exámenes en papel
 //   interpretarCorreccion(texto)     → { examenes: [{ examen, nota, items: [...] }] }
+import { generarCrucigrama, generarSopa, normPalabra } from './puzzlesPalabras';
 // La numeración «ejercicio.item» (p. ej. 2.3) es la misma en la hoja interactiva, en el PDF y en la corrección.
 
-export const TIPOS_OMNI = ['fill', 'choice', 'wordbank', 'construct', 'match', 'order', 'truefalse', 'multichoice', 'error', 'short', 'expr', 'matrix', 'open'];
+export const TIPOS_OMNI = ['fill', 'choice', 'wordbank', 'construct', 'match', 'order', 'truefalse', 'multichoice', 'error', 'short', 'expr', 'matrix', 'open', 'crossword', 'wordsearch'];
 
 export const NIVELES_PAPEL = ['Infantil', '1 Primaria', '2 Primaria', '3 Primaria', '4 Primaria', '5 Primaria', '6 Primaria', '1 ESO', '2 ESO', '3 ESO', '4 ESO', '1 Bach', '2 Bach', 'FP', 'Universidad', 'Otros'];
 export const IDIOMAS_PAPEL = ['Español', 'English', 'Français', 'Català', 'Euskera', 'Galego', 'Deutsch', 'Italiano', 'Português'];
@@ -42,6 +43,8 @@ Para cada ejercicio elige el "tipo" que mejor reproduzca cómo se responde en pa
 - "expr": la respuesta es una EXPRESIÓN MATEMÁTICA con variables (derivadas, integrales indefinidas, polinomios, simplificar, factorizar, despejar, desarrollar...). PIKT la corrige comprobando si la del alumno es matemáticamente equivalente, así que basta UNA forma correcta en "ans" (en LaTeX). Para integrales indefinidas pon "modo":"constante" (acepta cualquier «+ C»); si no, "modo":"equiv".
 - "matrix": la respuesta es una MATRIZ o un vector (suma, producto, inversa, traspuesta...). "ans" = lista de filas, cada fila una lista de celdas en texto: [["1","2"],["3","4"]]. "corchetes": "pmatrix" (paréntesis), "bmatrix" (corchetes) o "vmatrix" (determinante).
 - "open": respuesta abierta o de desarrollo que no se puede corregir automáticamente (redacciones, explicaciones, demostraciones, estudios de funciones, dibujos). "ans" = respuesta modelo o criterios de corrección; "lineas" = número de renglones aproximado que deja la ficha.
+- "crossword": crucigrama. Cada item es UNA palabra: {"ans":"SHOWER","clue":"pista"}. Si las pistas son dibujos, describe el dibujo con un emoji y pocas palabras ("🚿 in the bathroom"). PIKT dibuja la cuadrícula: no hace falta copiarla.
+- "wordsearch": sopa de letras. Cada item es una palabra escondida: {"ans":"SOFA","clue":"🛋️"} (la pista es opcional). PIKT genera la sopa.
 
 MATEMÁTICAS — cada apartado (a, b, c...) de un ejercicio es un item distinto con su propia solución. Escribe SIEMPRE en LaTeX entre $...$:
 - Fracciones con numerador y denominador claros: $\\frac{x^2-1}{x+3}$ (nunca x^2-1/x+3).
@@ -192,8 +195,36 @@ function normalizarItem(tipo, it, k) {
       return { ...base, question: str(it.question ?? it.prompt), filas, cols, celdas, corchetes };
     }
     case 'open': return { ...base, question: str(it.question ?? it.prompt), ans: str(it.ans), lineas: Math.max(1, Math.min(20, parseInt(it.lineas) || 3)) };
+    case 'crossword':
+    case 'wordsearch': {
+      const ans = normPalabra(it.ans ?? it.word ?? it.palabra);
+      if (ans.length < 2) return null;
+      const pos = tipo === 'crossword'
+        ? (Number.isInteger(it.row) && Number.isInteger(it.col) && ['across', 'down'].includes(it.dir) ? { row: it.row, col: it.col, dir: it.dir } : {})
+        : (Number.isInteger(it.row) && Number.isInteger(it.col) && Number.isInteger(it.dr) && Number.isInteger(it.dc) ? { row: it.row, col: it.col, dr: it.dr, dc: it.dc } : {});
+      return { id: it.id ?? k + 1, ans, clue: str(it.clue ?? it.pista ?? it.question ?? ''), ...pos };
+    }
     default: return null;
   }
+}
+
+// Crucigrama / sopa: usa las posiciones que traiga el JSON y, si faltan, genera la cuadrícula
+function puzzleDe(tipo, ex, items, i) {
+  if (tipo === 'crossword') {
+    const conPos = items.every(it => it.dir) && Number(ex.filas) > 0 && Number(ex.cols) > 0;
+    if (conPos) return { filas: Number(ex.filas), cols: Number(ex.cols), items };
+    const r = generarCrucigrama(items, { semilla: `${ex.id || i}-${items.map(x => x.ans).join()}` });
+    return { filas: r.filas, cols: r.cols, items: r.items };
+  }
+  if (tipo === 'wordsearch') {
+    const nivelSopa = ['facil', 'medio', 'dificil'].includes(ex.nivelSopa) ? ex.nivelSopa : 'medio';
+    const extra = { nivelSopa, mostrarPalabras: ex.mostrarPalabras !== false };
+    const grid = typeof ex.grid === 'string' && ex.grid.includes('|') ? ex.grid : '';
+    if (grid && items.every(it => Number.isInteger(it.dr))) return { ...extra, grid, items };
+    const r = generarSopa(items, { nivel: nivelSopa, semilla: `${ex.id || i}-${items.map(x => x.ans).join()}` });
+    return { ...extra, grid: r.grid, items: r.items };
+  }
+  return {};
 }
 
 export function normalizarRecursoOmni(datos, config = {}) {
@@ -207,7 +238,9 @@ export function normalizarRecursoOmni(datos, config = {}) {
       id: str(ex.id || `ex${i + 1}`), tipo,
       titulo: str(ex.titulo || `Ejercicio ${i + 1}`), enunciado: str(ex.enunciado), imagen: ex.imagen || null,
       ...(tipo === 'wordbank' ? { wordbank: arr(ex.wordbank).map(str).filter(Boolean) } : {}),
+      ...(ex.tiempo ? { tiempo: Number(ex.tiempo) || 0 } : {}),
       items,
+      ...puzzleDe(tipo, ex, items, i),   // crucigrama / sopa: añade la cuadrícula y sustituye items (con posiciones)
     };
   }).filter(Boolean);
   // ids únicos
@@ -217,10 +250,20 @@ export function normalizarRecursoOmni(datos, config = {}) {
   return {
     titulo: str(d.titulo || 'Ficha interactiva'), nivel, asignatura: str(d.asignatura || config.asignatura || ''),
     tema: str(d.tema || ''), descripcion: str(d.descripcion || ''), tags: arr(d.tags).map(str).slice(0, 8),
-    ciclo: cicloDeNivel(nivel), color: '#6D28D9',
-    ordenFijo: true, origenPapel: true,
+    ciclo: cicloDeNivel(nivel), color: /^#[0-9a-f]{6}$/i.test(d.color || '') ? d.color : '#6D28D9',
+    ordenFijo: d.ordenFijo !== false, origenPapel: true,
     ejercicios,
   };
+}
+
+// Varios recursos a la vez: {"recursos": [ {titulo, ejercicios…}, … ]} → lista normalizada (null si no es un lote)
+export function interpretarLote(texto, config) {
+  let d;
+  try { d = extraerJSON(texto); } catch { return null; }
+  if (!d || !Array.isArray(d.recursos)) return null;
+  const lista = d.recursos.map((r, i) => ({ ...normalizarRecursoOmni(r, config), id: `auto_${Date.now()}_${i}` })).filter(r => r.ejercicios.length);
+  if (!lista.length) throw new Error('El lote no tiene ningún recurso con ejercicios válidos.');
+  return lista;
 }
 
 export function interpretarOmni(texto, config) {
@@ -264,6 +307,8 @@ export function claveRespuestas(recurso) {
         case 'matrix': pregunta = it.question;
           solucion = filasMatriz(it).map(f => `[${f.join('  ')}]`).join(' '); break;
         case 'open': pregunta = it.question; solucion = it.ans || '(respuesta abierta)'; auto = false; break;
+        case 'crossword': pregunta = `${it.dir === 'down' ? '↓' : '→'} ${it.clue || ''}`; solucion = it.ans; break;
+        case 'wordsearch': pregunta = `Sopa de letras: ${it.clue || it.ans}`; solucion = it.ans; break;
         default: break;
       }
       filas.push({ ref, ejercicio: ex.titulo, tipo: ex.tipo, lbl: it.lbl, pregunta: str(pregunta).trim(), solucion: str(solucion).trim(), autocorregible: auto });

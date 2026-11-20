@@ -2,6 +2,7 @@
 //   imprimirOmni(recurso, { soluciones, numeroExamen })
 // HTML + KaTeX para que las fórmulas salgan igual que en la hoja interactiva.
 import katex from 'katex';
+import { numerarCrucigrama, solucionCrucigrama, medidasCrucigrama, filasSopa, celdasSopa } from './puzzlesPalabras';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -94,6 +95,31 @@ function cuerpoEjercicio(ex, sols) {
     case 'open':
       return items.map(it => `<div class="item">${lbl(it)}<div style="flex:1">${tx(it.question)}
         ${sols ? `<div class="sol caja-sol">${tx(it.ans || '(respuesta abierta)')}</div>` : Array.from({ length: it.lineas || 3 }, () => '<div class="linea"></div>').join('')}</div></div>`).join('');
+    case 'crossword': {
+      const { filas, cols } = ex.filas && ex.cols ? ex : medidasCrucigrama(items);
+      const sol = solucionCrucigrama(items), { numeros, conNum } = numerarCrucigrama(items);
+      let t = '<table class="cruci">';
+      for (let r = 0; r < filas; r++) {
+        t += '<tr>';
+        for (let c = 0; c < cols; c++) {
+          const k = `${r},${c}`, l = sol.get(k);
+          t += l ? `<td class="c">${numeros.has(k) ? `<span class="n">${numeros.get(k)}</span>` : ''}${sols ? `<b class="sol">${l}</b>` : ''}</td>` : '<td></td>';
+        }
+        t += '</tr>';
+      }
+      t += '</table>';
+      const lista = (d, titulo) => { const xs = conNum.filter(it => it.dir === d).sort((a, b) => a.num - b.num);
+        return xs.length ? `<div class="pistas"><b>${titulo}</b>${xs.map(it => `<div><b>${it.num}.</b> ${tx(it.clue || '')} <span class="pista">(${String(it.ans || '').length})</span>${sols ? ` <span class="sol">${esc(it.ans)}</span>` : ''}</div>`).join('')}</div>` : ''; };
+      return `<div class="puzzle">${t}<div>${lista('across', 'Across →')}${lista('down', 'Down ↓')}</div></div>`;
+    }
+    case 'wordsearch': {
+      const fs = filasSopa(ex.grid);
+      const marcadas = new Set(sols ? items.flatMap(it => celdasSopa(it).map(([r, c]) => `${r},${c}`)) : []);
+      const t = `<table class="sopa">${fs.map((f, r) => `<tr>${[...f].map((l, c) => `<td class="${marcadas.has(`${r},${c}`) ? 'marca' : ''}">${l}</td>`).join('')}</tr>`).join('')}</table>`;
+      const mostrar = ex.mostrarPalabras !== false;
+      const lista = items.map(it => `<div>${it.clue ? tx(it.clue) + ' ' : ''}${mostrar || sols ? `<b>${esc(it.ans)}</b>` : '<span class="hueco" style="min-width:90px"></span>'}</div>`).join('');
+      return `<div class="puzzle">${t}<div class="pistas">${lista}</div></div>`;
+    }
     default: return '';
   }
 }
@@ -151,6 +177,15 @@ export function htmlOmni(recurso, { soluciones = false, numeroExamen = true } = 
   .mat-vmatrix { border-left: 2px solid #222; border-right: 2px solid #222; }
   .mat-eq { margin-left: 4px; }
   .caja-sol { border: 1px dashed #15803d; border-radius: 6px; padding: 4px 8px; margin-top: 4px; font-weight: 500; }
+  .puzzle { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .cruci { border-collapse: separate; border-spacing: 0; }
+  .cruci td { width: 26px; height: 26px; padding: 0; }
+  .cruci td.c { border: 1.3px solid #222; position: relative; text-align: center; vertical-align: middle; font-size: 12pt; }
+  .cruci .n { position: absolute; top: 0; left: 2px; font-size: 6.5pt; line-height: 1; color: #333; }
+  .pistas { flex: 1; min-width: 200px; font-size: 11pt; display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+  .sopa { border-collapse: collapse; border: 1.5px solid #444; font-family: Consolas, monospace; }
+  .sopa td { width: 24px; height: 24px; text-align: center; font-size: 12pt; font-weight: 600; padding: 0; }
+  .sopa td.marca { background: #fde68a; color: #92400e; }
   footer { margin-top: 18px; font-size: 8.5pt; color: #888; text-align: center; }
   @media print { .noprint { display: none; } }
   .noprint { position: fixed; top: 10px; right: 10px; }

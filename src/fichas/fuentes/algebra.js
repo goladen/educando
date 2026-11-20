@@ -6,6 +6,7 @@
 import { R, pick, N, P, frac, termino, polinomio, mcm } from '../fuenteTexto';
 import { TIPOS_FACTORIZAR, VisualPolinomio } from './factorizarPol.jsx';
 import { TIPOS_ECU_AVANZADAS, VisualEcuacion } from './ecuacionesAvanzadas.jsx';
+import { genParentesisDenominadores, genDenominadoresLargas } from './ecuacionesFracciones';
 
 const noCero = (a, b) => { let v; do { v = R(a, b); } while (v === 0); return v; };
 // «ax + b» (b puede ser 0 o negativo)
@@ -57,18 +58,26 @@ export const ECUACIONES = {
         },
         denominadores: {
             label: 'Con denominadores', titulo: 'Resuelve las siguientes ecuaciones con denominadores.', cols: 2, alto: 130,
+            // Fracciones en vertical (m: FRAC). Nivel 3: más largas (genDenominadoresLargas)
             gen: (nv) => {
                 if (nv === 1) {
-                    const a = pick([2, 3, 4, 5]), x = a * R(-4, 6), b = R(-6, 9), c = x / a + b;
-                    return { e: `x/${a} ${b < 0 ? '−' : '+'} ${Math.abs(b)} = ${N(c)}`, s: `x = ${N(x)}`, r: solX(x),
-                        pasos: [`x/${a} = ${N(c - b)}`, `x = ${N(c - b)} · ${a}`] };
+                    const a = pick([2, 3, 4, 5]), x = a * R(-4, 6), b = R(-6, 9) || 2, c = x / a + b;
+                    const resto = `${b < 0 ? '−' : '+'} ${Math.abs(b)} = ${N(c)}`;
+                    return { e: `x/${a} ${resto}`, m: `FRAC(x,${a}) ${resto}`, s: `x = ${N(x)}`, r: solX(x),
+                        pasos: [{ m: `FRAC(x,${a}) = ${N(c - b)}` }, `x = ${N(c - b)} · ${a} = ${N(x)}`] };
                 }
+                if (nv === 3) return genDenominadoresLargas();
                 const a = pick([2, 3, 4, 6]), b = pick([2, 3, 4, 5, 6].filter(v => v !== a));
                 const m = mcm(a, b), x = m * R(-3, 4) || m;
                 const c = x / a + x / b;
-                return { e: `x/${a} + x/${b} = ${N(c)}`, s: `x = ${N(x)}`, r: solX(x),
-                    pasos: [`m.c.m.(${a}, ${b}) = ${m}`, `${m / a}x + ${m / b}x = ${N(c * m)}`, `${(m / a) + (m / b)}x = ${N(c * m)}`, `x = ${N(c * m)} : ${(m / a) + (m / b)}`] };
+                return { e: `x/${a} + x/${b} = ${N(c)}`, m: `FRAC(x,${a}) + FRAC(x,${b}) = ${N(c)}`, s: `x = ${N(x)}`, r: solX(x),
+                    pasos: [`m.c.m.(${a}, ${b}) = ${m}`, `Multiplicamos por ${m}:  ${m / a}x + ${m / b}x = ${N(c * m)}`, `${(m / a) + (m / b)}x = ${N(c * m)}`, `x = ${N(c * m)} : ${(m / a) + (m / b)} = ${N(x)}`] };
             },
+        },
+        parentesisDenominadores: {
+            label: 'Paréntesis y denominadores', titulo: 'Resuelve las siguientes ecuaciones con paréntesis y denominadores.', cols: 2, alto: 190,
+            // nivel 1: dos fracciones con números delante del paréntesis · 2: x en los dos miembros · 3: fracciones en los dos miembros
+            gen: (nv) => genParentesisDenominadores(nv),
         },
         segundoGrado: {
             label: '2.º grado', titulo: 'Resuelve las siguientes ecuaciones de segundo grado.', cols: 2, alto: 130,
@@ -193,6 +202,7 @@ const mulC = (p, q) => { const r = Array(p.length + q.length - 1).fill(0); p.for
 const pol = (c) => `${polinomio(c)}`;
 const resPol = (c) => [{ tipo: 'texto', v: [polinomio(c)], placeholder: 'p. ej. 3x^2 − 2x + 1' }];
 
+let turnoIdentidad = Math.floor(Math.random() * 3); // fichas: alterna (a+b)², (a−b)², (a+b)(a−b)
 export const POLINOMIOS = {
     id: 'polinomios', nombre: 'Polinomios', emoji: '🔣', color: '#8e44ad', etapas: ['eso'],
     desc: 'Valor numérico, operaciones, identidades notables, factor común y factorización (con gráfica)',
@@ -229,21 +239,37 @@ export const POLINOMIOS = {
         },
         identidades: {
             label: 'Identidades notables', titulo: 'Desarrolla las siguientes identidades notables.', cols: 2, alto: 70,
+            // Alterna suma, diferencia y suma por diferencia. Nivel 1: a = 1 · 2: a hasta 5 · 3: combinadas (k·identidad ± identidad)
             gen: (nv) => {
-                const a = nv === 1 ? 1 : R(1, 3), b = R(1, 9), t = R(0, 2);
-                const ax = `${a === 1 ? '' : a}x`;
-                if (t === 0) return { e: `(${ax} + ${b})² =`, s: pol([a * a, 2 * a * b, b * b]), r: resPol([a * a, 2 * a * b, b * b]), pasos: ['(a + b)² = a² + 2ab + b²'] };
-                if (t === 1) return { e: `(${ax} − ${b})² =`, s: pol([a * a, -2 * a * b, b * b]), r: resPol([a * a, -2 * a * b, b * b]), pasos: ['(a − b)² = a² − 2ab + b²'] };
-                return { e: `(${ax} + ${b})(${ax} − ${b}) =`, s: pol([a * a, 0, -b * b]), r: resPol([a * a, 0, -b * b]), pasos: ['(a + b)(a − b) = a² − b²'] };
+                const t = turnoIdentidad; turnoIdentidad = (turnoIdentidad + 1) % 3;
+                const ident = (tt, a, b) => {
+                    const ax = `${a === 1 ? '' : a}x`;
+                    if (tt === 0) return { e: `(${ax} + ${b})²`, p: [a * a, 2 * a * b, b * b], f: '(a + b)² = a² + 2ab + b²' };
+                    if (tt === 1) return { e: `(${ax} − ${b})²`, p: [a * a, -2 * a * b, b * b], f: '(a − b)² = a² − 2ab + b²' };
+                    return { e: `(${ax} + ${b})(${ax} − ${b})`, p: [a * a, 0, -b * b], f: '(a + b)(a − b) = a² − b²' };
+                };
+                if (nv < 3) {
+                    const i = ident(t, nv === 1 ? 1 : R(2, 5), R(1, 9));
+                    return { e: `${i.e} =`, s: pol(i.p), r: resPol(i.p), pasos: [i.f, `${i.e} = ${pol(i.p)}`] };
+                }
+                const otro = pick([0, 1, 2].filter(x => x !== t)), k = pick([1, 1, 2, 3]), sg = pick([1, -1]);
+                const i1 = ident(t, R(1, 3), R(1, 6)), i2 = ident(otro, R(1, 3), R(1, 6));
+                const tot = i1.p.map((v, j) => k * v + sg * i2.p[j]);
+                if (!tot[0] && !tot[1]) return null;
+                const e = `${k === 1 ? '' : k}${i1.e} ${sg > 0 ? '+' : '−'} ${i2.e}`;
+                return { e: `${e} =`, s: pol(tot), r: resPol(tot),
+                    pasos: [`${i1.e} = ${pol(i1.p)}`, `${i2.e} = ${pol(i2.p)}`, `${k === 1 ? '' : k + '·'}(${pol(i1.p)}) ${sg > 0 ? '+' : '−'} (${pol(i2.p)}) = ${pol(tot)}`] };
             },
         },
         factorComun: {
             label: 'Factor común', titulo: 'Saca factor común.', cols: 2, alto: 70,
+            // Número y potencia de x a la vez; casi siempre 3 términos
             gen: () => {
-                const k = R(2, 6), g = R(1, 2), q = [R(1, 5), noCero(-7, 7)];
+                const k = R(2, 6), g = R(1, 3);
+                const q = Math.random() < 0.75 ? [R(1, 5), noCero(-7, 7), noCero(-7, 7)] : [R(1, 5), noCero(-7, 7)];
                 if (mcdArr(q) !== 1) return null;
                 const mono = [k, ...Array(g).fill(0)], r = mulC(mono, q);
-                const factor = `${k}${g === 1 ? 'x' : 'x²'}`;
+                const factor = `${k}${g === 1 ? 'x' : g === 2 ? 'x²' : 'x³'}`;
                 return { e: `${pol(r)} =`, s: `${factor}(${pol(q)})`, r: [{ tipo: 'texto', v: [`${factor}(${pol(q)})`] }], pasos: [`El factor común es ${factor}`] };
             },
         },

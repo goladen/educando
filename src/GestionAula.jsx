@@ -769,7 +769,8 @@ const RIOS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-export function PizarraApp({ initialModo = 'general' } = {}) {
+// onUsarImagen (opcional): muestra un botón que entrega la hoja actual como PNG (p. ej. el logo de una situación de aprendizaje)
+export function PizarraApp({ initialModo = 'general', onUsarImagen = null, textoUsarImagen = 'Usar este dibujo' } = {}) {
     const canvasRef      = useRef(null);
     const contenedorRef  = useRef(null);
     const fileInputRef   = useRef(null);
@@ -2895,6 +2896,13 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                         </div>
                         <input ref={fileInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={onFileSelected} />
                     </>}
+                    {onUsarImagen && (
+                        <button onClick={() => { const c = canvasRef.current; if (c) onUsarImagen(c.toDataURL('image/png')); }}
+                            title={textoUsarImagen}
+                            style={{ padding:'5px 10px', background:'#f59e0b', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.8rem', fontWeight:'bold' }}>
+                            ✅ {textoUsarImagen}
+                        </button>
+                    )}
                     <button onClick={descargarPagina} title="PNG hoja actual"
                         style={{ padding:'5px', background:'#2ecc71', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
                         <Camera size={15}/>

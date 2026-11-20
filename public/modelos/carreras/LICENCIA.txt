@@ -1,0 +1,2 @@
+Modelos del «Racing Kit» de Kenney (www.kenney.nl), licencia CC0 (dominio público).
+Convertidos de FBX a GLB para el juego Racing 3D de PiKT (src/carreras/).

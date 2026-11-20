@@ -55,8 +55,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { HOJA_FQ:'🧪 Hoja de Física y Química', LENGUA:'📖 Lengua', PATIO:'🛝 Patio de Juegos', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
-const TIPO_ICON   = { HOJA_FQ:'🧪', LENGUA:'📖', PATIO:'🛝', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
+const TIPO_LABEL  = { HOJA_FQ:'🧪 Hoja de Física y Química', LENGUA:'📖 Lengua', PATIO:'🛝 Patio de Juegos', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', RACING3D:'🏁 Racing 3D', CONDUCCION:'🛞 Simulador de conducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
+const TIPO_ICON   = { HOJA_FQ:'🧪', LENGUA:'📖', PATIO:'🛝', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', RACING3D:'🏁', CONDUCCION:'🛞', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE', 'QUIZ_MANDOS', 'MATES_MANDOS', 'PISTA_ROBOTS', 'ARCADE_MANDOS', 'PLATAFORMAS_MANDOS', 'PIKATRON_MANDOS', 'BUNKER_MANDOS', 'BURBUJAS_MANDOS', 'AHORCADO_MANDOS', 'SIXSEVEN_MANDOS', 'MONEYBOARD_MANDOS', 'TRIVIAL_MANDOS']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -667,6 +667,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'EMPRESA_SOLAR') return (
+                                    <EmpresaSolarCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'MUSIC_GAMES') return (
                                     <MusicGamesCard
                                         key={inf.id} inf={inf}
@@ -753,6 +765,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                 );
                                 if (tipo === 'CUERPO_HUMANO') return (
                                     <CuerpoHumanoCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
+                                if (tipo === 'CONDUCCION') return (
+                                    <ConduccionCard
                                         key={inf.id} inf={inf}
                                         onBorrar={()=>borrar(inf.id)}
                                         borrando={borrando===inf.id}
@@ -1870,6 +1894,64 @@ const CuerpoHumanoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, s
 };
 
 // Ovni Abducción: individual o duelo en pantalla dividida (1-2 jugadores por informe).
+// Simulador de conducción: test teórico (fallos) o conducción (infracciones por gravedad)
+const ConduccionCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const test = /Test/.test(inf.modalidad || '');
+    const chip = (txt, color = '#7f8c8d', bg = '#f3f4f6') => <span style={{ padding:'2px 8px', borderRadius:20, background:bg, fontSize:'0.72rem', color, fontWeight:600 }}>{txt}</span>;
+    const COLOR = { eliminatoria:'#e74c3c', deficiente:'#e67e22', leve:'#b7950b' };
+    const detalle = test ? (j.fallosLista || []) : (j.faltasLista || []);
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'flex-start', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>}
+                <span style={{ fontSize:'1.4rem' }}>🚗</span>
+                <div style={{ flex:1, minWidth:180 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Simulador de conducción <span style={{ marginLeft:6, fontWeight:400, color:'#7f8c8d', fontSize:'0.78rem' }}>{inf.modalidad}</span></div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                    <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
+                        {j.apto === true && chip('✅ APTO', '#27ae60', '#e8f5e9')}
+                        {j.apto === false && chip('❌ NO APTO', '#e74c3c', '#fdecea')}
+                        {test && chip(`✓ ${j.aciertos ?? 0}/${j.intentos ?? 0}`, '#27ae60', '#e8f5e9')}
+                        {test && chip(`✗ ${(j.intentos ?? 0) - (j.aciertos ?? 0)} fallos`, '#e74c3c', '#fdecea')}
+                        {!test && chip(`Eliminatorias: ${j.eliminatorias ?? 0}`, COLOR.eliminatoria, '#fdecea')}
+                        {!test && chip(`Deficientes: ${j.deficientes ?? 0}`, COLOR.deficiente, '#fff3e0')}
+                        {!test && chip(`Leves: ${j.leves ?? 0}`, COLOR.leve, '#fffde7')}
+                        {!test && j.recorrido != null && chip(`${j.recorrido} m · ${Math.round((j.tiempo || 0) / 60)} min`)}
+                        {!test && j.completado === false && inf.modalidad === 'Examen práctico' && chip('Ruta sin terminar')}
+                    </div>
+                </div>
+                {detalle.length > 0 && !modoSeleccion && <button onClick={e=>{e.stopPropagation();setAbierto(a=>!a);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', color:'#7f8c8d' }}>{abierto ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</button>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            {abierto && (
+                <div style={{ borderTop:'1px solid #eee', padding:'10px 15px', fontSize:'0.8rem', display:'flex', flexDirection:'column', gap:5 }}>
+                    {test ? detalle.map((f, i) => (
+                        <div key={i}><b>{f.pregunta}</b>{f.senal ? <span style={{ color:'#95a5a6' }}> (señal {f.senal})</span> : null}<br/><span style={{ color:'#e74c3c' }}>✗ {f.respuesta || 'sin responder'}</span> · <span style={{ color:'#27ae60' }}>✓ {f.correcta}</span></div>
+                    )) : detalle.map((f, i) => (
+                        <div key={i} style={{ borderLeft:`4px solid ${COLOR[f.gravedad] || '#ccc'}`, paddingLeft:8 }}>{f.texto}{f.extra ? <span style={{ color:'#95a5a6' }}> · {f.extra}</span> : null} <span style={{ color:'#95a5a6' }}>· {f.gravedad} · min {Math.floor((f.t || 0) / 60)}</span></div>
+                    ))}
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const OvniCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const [abierto, setAbierto] = useState(false);
@@ -2787,6 +2869,81 @@ const ContabilidadSuperCard = ({ inf, onBorrar, borrando, borradoOk, modoSelecci
                             <div key={i}>{icono(a.estado)} <b>{i+1}.</b> {a.titulo} <span style={{ color:'#aaa' }}>({a.intentos} int.{a.pistas ? `, ${a.pistas} pista${a.pistas>1?'s':''}` : ''})</span></div>
                         ))}
                     </div>
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// Situación de aprendizaje «Mi empresa de placas solares» (situaciones/empresaSolar): logo, fases y resumen de la propuesta
+const EmpresaSolarCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const r = j.resumen || {};
+    const pct = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos/j.intentos)*100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const fmtN = (v, d = 0) => (v ?? 0).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion?onSeleccionar:()=>setAbierto(a=>!a)} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:'pointer' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                {j.logo ? <img src={j.logo} alt="" style={{ width:38, height:38, objectFit:'contain', borderRadius:8, border:`2px solid ${j.color || '#d97706'}`, background:'white' }}/> : <span style={{ fontSize:'1.4rem' }}>☀️</span>}
+                <div style={{ flex:1, minWidth:160 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Empresa solar{j.empresa ? ` · ${j.empresa}` : ''}</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                        {j.pedido && <span style={{ marginLeft:5 }}>· pedido {j.pedido}</span>}
+                    </div>
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                <span title="Cálculos correctos sin ver la solución" style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.78rem', color:'#27ae60' }}>✓ {j.aciertos??0}/{j.intentos??0}</span>
+                {r.total != null && <span title="Precio final de la propuesta" style={{ padding:'2px 8px', borderRadius:20, background: r.total <= (r.presupuestoMax ?? Infinity) ? '#fff7ed' : '#fdecea', fontWeight:700, fontSize:'0.78rem', color: r.total <= (r.presupuestoMax ?? Infinity) ? '#b45309' : '#e74c3c' }}>{fmtN(r.total, 0)} €</span>}
+                {abierto ? <ChevronUp size={16} color="#95a5a6"/> : <ChevronDown size={16} color="#95a5a6"/>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            {abierto && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'10px 15px', fontSize:'0.82rem', color:'#2c3e50' }}>
+                    <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'flex-start' }}>
+                        {j.logo && <img src={j.logo} alt="Logo" style={{ width:110, height:110, objectFit:'contain', borderRadius:10, border:`2px solid ${j.color || '#d97706'}`, background:'white' }}/>}
+                        <div style={{ flex:1, minWidth:220 }}>
+                            {j.eslogan && <div style={{ fontStyle:'italic', marginBottom:4 }}>«{j.eslogan}»</div>}
+                            {j.idea && <div style={{ color:'#7f8c8d', marginBottom:6 }}>💭 {j.idea}</div>}
+                            <div style={{ color:'#7f8c8d' }}>Cliente: <b>{j.cliente || '—'}</b> ({j.ciudad || '—'})</div>
+                            <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginTop:6, color:'#7f8c8d' }}>
+                                <span>Paneles: <b>{r.paneles ?? '—'}</b> × {r.panel || '—'}</span>
+                                <span>Potencia: <b>{fmtN(r.kWp, 2)} kWp</b></span>
+                                <span>Inversor: <b>{r.inversorKw != null ? `${fmtN(r.inversorKw, 1)} kW` : '—'}</b>{r.inversorKw != null && (r.inversorOk ? ' ✅' : ' ❌')}</span>
+                                <span>Batería: <b>{r.bateria ? `${r.bateria} kWh` : 'No'}</b></span>
+                                <span>Producción: <b>{fmtN(r.produccion)} kWh</b> / consumo {fmtN(r.consumo)} kWh</span>
+                                <span>Beneficio: <b>{r.margen ?? '—'} %</b></span>
+                                <span>Precio: <b>{r.total != null ? `${fmtN(r.total, 2)} €` : 'sin calcular'}</b> (máx. {fmtN(r.presupuestoMax)} €)</span>
+                                <span>Ahorro/año: <b>{fmtN(r.ahorro, 2)} €</b></span>
+                                <span>Amortización: <b>{r.amortizacion != null ? `${fmtN(r.amortizacion, 1)} años` : '—'}</b></span>
+                                {r.kwhAhorrados > 0 && <span>Eficiencia: <b>−{fmtN(r.kwhAhorrados)} kWh</b></span>}
+                            </div>
+                        </div>
+                    </div>
+                    {(j.fases || []).length > 0 && (
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10 }}>
+                            {j.fases.map(f => {
+                                const completa = f.total > 0 && f.hechas === f.total;
+                                return <span key={f.n} title={f.titulo} style={{ padding:'1px 8px', borderRadius:20, background: completa ? '#e8f5e9' : f.hechas > 0 ? '#fff4e5' : '#f3f4f6', color: completa ? '#27ae60' : f.hechas > 0 ? '#e67e22' : '#aaa', fontWeight:700 }}>{f.n}. {f.titulo}: {f.ok}/{f.total}</span>;
+                            })}
+                        </div>
+                    )}
+                    {j.revelados > 0 && <div style={{ color:'#95a5a6', marginTop:6 }}>Soluciones vistas: {j.revelados}</div>}
                 </div>
             )}
             {confirmar && (

@@ -175,7 +175,8 @@ function ModalEnviarProfe({ datos, onClose }) {
         codigoProfesor: code,
         jugadores: [{ nombre: nombre.trim(), curso: curso.trim(),
           aciertos: datos.aciertos, intentos: 10,
-          porcentaje: Math.round((datos.aciertos / 10) * 100) }],
+          porcentaje: Math.round((datos.aciertos / 10) * 100),
+          ...(datos.repaso?.length ? { repaso: datos.repaso } : {}) }],
       });
       guardarRegistroLocal('ATOMOS_TEST', {
         titulo: 'Test de Átomos', aciertos: datos.aciertos, intentos: 10,
@@ -725,7 +726,12 @@ function SimuladorAtomos() {
       )}
 
       {/* Modal envío profesor (encima de todo) */}
-      {showModal && <ModalEnviarProfe datos={{ aciertos: score }} onClose={()=>setShowModal(false)} />}
+      {showModal && <ModalEnviarProfe datos={{ aciertos: score, repaso: answers.map((a, i) => quiz[i] ? ({
+        enunciado: quiz[i].q, ok: !!a.correct,
+        dada: a.chosen != null ? String(quiz[i].opts[a.chosen] ?? '') : '',
+        correcta: String(quiz[i].opts[quiz[i].ans] ?? ''),
+        ...(a.correct ? {} : { explicacion: quiz[i].exp || '' }),
+      }) : null).filter(Boolean) }} onClose={()=>setShowModal(false)} />}
     </>
   );
 }

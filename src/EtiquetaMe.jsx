@@ -504,7 +504,9 @@ function ModalEnviarProfeBase({ datos, onClose }) {
                 tipo: 'ETIQUETAS', modalidad: 'Individual', fecha: new Date(),
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, total: datos.total, nota: datos.nota }],
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, total: datos.total, nota: datos.nota,
+                    intentos: datos.total, porcentaje: Math.round(datos.nota || 0),
+                    ...(datos.repaso?.length ? { repaso: datos.repaso } : {}) }],
             });
             guardarRegistroLocal('ETIQUETAS', {
                 titulo: datos.recursoTitulo, aciertos: datos.aciertos, intentos: datos.total,
@@ -932,7 +934,8 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                     </div>
                     {mostrarEnvio && (
                         <ModalEnviarProfe
-                            datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, hoja: hoja?.nombreHoja, aciertos: evaluacion.aciertos, total: evaluacion.total, nota: evaluacion.nota }}
+                            datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, hoja: hoja?.nombreHoja, aciertos: evaluacion.aciertos, total: evaluacion.total, nota: evaluacion.nota,
+                                repaso: markers.map((m, i) => ({ enunciado: `Punto ${i + 1}`, ok: !!evaluacion.resultados?.[m.id], dada: String(respuestas[m.id] || '').slice(0, 80), correcta: String(m.text || '') })) }}
                             onClose={() => setMostrarEnvio(false)}
                         />
                     )}

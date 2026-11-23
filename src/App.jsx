@@ -14,6 +14,7 @@ const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
 import { SolarSystemViewer, APPS } from './components/LandingGames3';
 const ImperiosGame = lazy(() => import('./components/ImperiosGame'));
 const Orientacion = lazy(() => import('./orientacion/Orientacion'));
+const CorrectorExamenes = lazy(() => import('./corrector/CorrectorExamenes.jsx'));
 const DinamicasAula = lazy(() => import('./dinamicasAula/DinamicasAula'));
 const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
 const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
@@ -32,6 +33,7 @@ const MoneyBoard = lazy(() => import('./MoneyBoard'));
 const EnigmicLogic = lazy(() => import('./EnigmicLogic'));
 const SixSeven = lazy(() => import('./SixSeven'));
 const QuizMandos = lazy(() => import('./mandos/QuizMandos.jsx'));
+const EscanerMovil = lazy(() => import('./tarjetas/EscanerMovil.jsx'));
 const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const OvniAbduccion = lazy(() => import('./OvniAbduccion'));
 const RacingGame3D = lazy(() => import('./RacingGame3D'));
@@ -89,7 +91,7 @@ const RUTAS_RESERVADAS = new Set([
   'irregular_verbs','sistema_solar',
   'retos','conectapuntos','sudoku',
   'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','invasores','manos','avatar','orientacion','dinamicas',
+  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','invasores','manos','avatar','orientacion','dinamicas','corrector',
   'comunidades','comunidad','competicion','banco','pdf','imprimir',
   'fisica',
   'math_world','primaria','feria','patio',
@@ -132,6 +134,8 @@ function App() {
     // ESTADO PARA EL TOKEN DE DRIVE
     const [googleToken, setGoogleToken] = useState(null);
     const [deepLinkGame, setDeepLinkGame] = useState(null);
+    // ?escaner=CODIGO → el móvil del profe como cámara de las tarjetas de PiLive (sin sesión)
+    const [escanerTarjetas, setEscanerTarjetas] = useState(() => { try { const v = new URLSearchParams(window.location.search).get('escaner'); return v === null ? null : v; } catch { return null; } });
     const [mitadDual] = useState(() => { try { return new URLSearchParams(window.location.search).get('dual'); } catch { return null; } });
     const [reinicioMitad, setReinicioMitad] = useState(0);
     const [rutaPublica, setRutaPublica] = useState(null);
@@ -209,7 +213,7 @@ function App() {
           }
         } catch (_) {}
       }
-      if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
+      if (slug === 'corrector' || slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
@@ -407,6 +411,7 @@ function App() {
         </>
     );
 
+    if (escanerTarjetas !== null) return <Suspense fallback={null}><EscanerMovil codigoInicial={escanerTarjetas} onExit={() => { setEscanerTarjetas(null); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (rutaPublica === 'escalada') return <ClimbingHub onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'whoknows') return <WhoKnows onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'karting_track') return <KartingTrack />;
@@ -419,6 +424,7 @@ function App() {
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'manos') return <><QuizManos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'dinamicas') return <><DinamicasAula onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'corrector') return <><CorrectorExamenes onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'orientacion') return <><Orientacion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'avatar') return <><AvatarCuerpo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

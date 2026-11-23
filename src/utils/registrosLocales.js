@@ -79,6 +79,7 @@ export const JUEGOS_REGISTRO_META = {
     QUIZ_MANOS:          { nombre: 'Quiz con los dedos',  emoji: '✋', color: '#7c3aed' },
     AVATAR_CUERPO:       { nombre: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2' },
     ORIENTACION:         { nombre: 'Orientación',          emoji: '🚩', color: '#c026d3' },
+    CORRECTOR:           { nombre: 'Corrector de exámenes', emoji: '📝', color: '#0f766e' },
     MBOT_RETOS:          { nombre: 'Retos del mBot2',     emoji: '🚗', color: '#0284c7' },
     EMPRESA_SOLAR:       { nombre: 'Mi empresa solar',    emoji: '☀️', color: '#d97706' },
 };

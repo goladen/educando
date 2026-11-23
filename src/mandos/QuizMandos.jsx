@@ -153,14 +153,15 @@ const guardarLS = (clave, valor) => {
 
 // soloMates: herramienta «Mates con mandos» de Math World (el mismo quiz, solo con sus ejercicios)
 // matesIniciales: { temas, tipos, nivel, titulo } → arranca con esos ejercicios (p. ej. desde Cambio de unidades)
-export default function QuizMandos({ onExit, soloMates = false, matesIniciales = null }) {
+// recursoInicial: se abre con ese recurso ya elegido (p. ej. desde PiLive → «Con mandos micro:bit»)
+export default function QuizMandos({ onExit, soloMates = false, matesIniciales = null, recursoInicial = null }) {
   const [fase, setFase] = useState('config'); // config | lobby | pregunta | resultado | final
-  const [tipo, setTipo] = useState(soloMates ? 'mates' : 'tablas');
+  const [tipo, setTipo] = useState(soloMates ? 'mates' : recursoInicial ? 'recurso' : 'tablas');
   const generarMates = useRef(null);
   const [numPreguntas, setNumPreguntas] = useState(8);
   const [tiempo, setTiempo] = useState(soloMates ? 30 : 20);
   const [textoPropias, setTextoPropias] = useState(() => leerLS(LS_PROPIAS, EJEMPLO_PROPIAS));
-  const [recurso, setRecurso] = useState(null);
+  const [recurso, setRecurso] = useState(recursoInicial);
   const [hojaSel, setHojaSel] = useState(-1); // -1 = todas las hojas
   const [ordenRecurso, setOrdenRecurso] = useState(false); // true = en el orden del recurso
   const [respuesta, setRespuesta] = useState('letras'); // 'letras' (A-D) | 'numero'
@@ -352,7 +353,7 @@ export default function QuizMandos({ onExit, soloMates = false, matesIniciales =
         <button onClick={onExit} style={st.backBtn}>
           ← Volver
         </button>
-        <h2 style={st.title}>{matesIniciales?.titulo || (soloMates ? '🧮 Mates con mandos' : '🏆 Quiz con mandos')}</h2>
+        <h2 style={st.title}>{matesIniciales?.titulo || (soloMates ? '🧮 Mates con mandos' : recursoInicial ? `🎮 PiLive con mandos · ${recursoInicial.titulo || ''}` : '🏆 Quiz con mandos')}</h2>
         <ChipAntena />
         {(fase === 'pregunta' || fase === 'resultado') && (
           <span style={st.contador}>

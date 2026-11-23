@@ -51,7 +51,8 @@ function ModalEnviarProfe({ onClose, score, config, reto = null }) {
         codigoProfesor: code,
         config: { nivel: config?.level, numVerbos: config?.numVerbs, modo: config?.columnsMode },
         jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: score.points, intentos: score.maxPoints,
-          porcentaje: Math.round(score.points / Math.max(1, score.maxPoints) * 100), ...(reto ? { reto } : {}) }],
+          porcentaje: Math.round(score.points / Math.max(1, score.maxPoints) * 100), ...(reto ? { reto } : {}),
+          ...(score.repaso?.length ? { repaso: score.repaso.slice(0, 80) } : {}) }],
       });
       guardarRegistroLocal('IRREGULAR_VERBS', {
         titulo: 'Test de Verbos Irregulares', aciertos: score.points, intentos: score.maxPoints,
@@ -232,6 +233,7 @@ export default function IrregularVerbsTest({ initialConfig = null }) {
     let points = 0;
     let maxPoints = 0;
     const activeCols = getActiveColumns(config.columnsMode);
+    const repaso = []; // casillas falladas (lo que el alumno ve tachado en rojo)
 
     testData.forEach((row) => {
       activeCols.forEach(col => {
@@ -240,12 +242,15 @@ export default function IrregularVerbsTest({ initialConfig = null }) {
           const userAns = userAnswers[`${row.id}-${col}`];
           if (isCorrect(userAns, row.verbData[col])) {
             points++;
+          } else {
+            const pista = row.verbData.baseForm || row.verbData[row.givenCol] || '';
+            repaso.push({ enunciado: `${pista} · ${columnLabels[col] || col}`, ok: false, dada: String(userAns || '').trim().slice(0, 60), correcta: String(row.verbData[col] || '') });
           }
         }
       });
     });
 
-    setScore({ points, maxPoints });
+    setScore({ points, maxPoints, repaso });
     setStep('results');
   };
 

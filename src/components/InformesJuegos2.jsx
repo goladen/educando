@@ -55,9 +55,9 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { HOJA_FQ:'🧪 Hoja de Física y Química', LENGUA:'📖 Lengua', PATIO:'🛝 Patio de Juegos', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', RACING3D:'🏁 Racing 3D', AVIONES:'✈️ Pilota el avión', CONDUCCION:'🛞 Simulador de conducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
-const TIPO_ICON   = { HOJA_FQ:'🧪', LENGUA:'📖', PATIO:'🛝', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', RACING3D:'🏁', AVIONES:'✈️', CONDUCCION:'🛞', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
-const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE', 'QUIZ_MANDOS', 'MATES_MANDOS', 'PISTA_ROBOTS', 'ARCADE_MANDOS', 'PLATAFORMAS_MANDOS', 'PIKATRON_MANDOS', 'BUNKER_MANDOS', 'BURBUJAS_MANDOS', 'AHORCADO_MANDOS', 'SIXSEVEN_MANDOS', 'MONEYBOARD_MANDOS', 'TRIVIAL_MANDOS']);
+const TIPO_LABEL  = { HOJA_FQ:'🧪 Hoja de Física y Química', LENGUA:'📖 Lengua', PATIO:'🛝 Patio de Juegos', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', PILIVE_TARJETAS:'🃏 PiLive con tarjetas', CORRECTOR:'📝 Corrector de exámenes', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', OVNI:'🛸 Ovni Abducción', RACING3D:'🏁 Racing 3D', AVIONES:'✈️ Pilota el avión', CONDUCCION:'🛞 Simulador de conducción', INVASORES:'👾 Invasión Pi', CUERPO_HUMANO:'🦴 Cuerpo humano 3D', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico', QUIZ_MANDOS:'🏆 Quiz con mandos', MATES_MANDOS:'🧮 Mates con mandos', PISTA_ROBOTS:'🤖 Pista de robots', FUTBOL_MANDOS:'⚽ Fútbol 3D con mandos', INVASORES_MANDOS:'👾 Invasión Pi con mandos', CALAMAR_MANDOS:'🦑 Luz roja · Luz verde con mandos', ESCAPE_MANDOS:'🎃 Escape room con mandos', CUERDA_MANDOS:'🪢 Tirón de cuerda con mandos', ARCADE_MANDOS:'🕹️ Arkade con mandos', PLATAFORMAS_MANDOS:'🏃 Pikatron 2 con mandos', PIKATRON_MANDOS:'⚡ Pikatron con mandos', BUNKER_MANDOS:'🎯 Bunker con mandos', BURBUJAS_MANDOS:'🔵 Burbujas con mandos', AHORCADO_MANDOS:'🪢 Ahorcado con mandos', SIXSEVEN_MANDOS:'6️⃣7️⃣ Six Seven con mandos', MONEYBOARD_MANDOS:'💰 Money Board con mandos', TRIVIAL_MANDOS:'🎲 Trivial con mandos' };
+const TIPO_ICON   = { HOJA_FQ:'🧪', LENGUA:'📖', PATIO:'🛝', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', PILIVE_TARJETAS:'🃏', CORRECTOR:'📝', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', OVNI:'🛸', RACING3D:'🏁', AVIONES:'✈️', CONDUCCION:'🛞', INVASORES:'👾', CUERPO_HUMANO:'🦴', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' , QUIZ_MANDOS:'🏆', MATES_MANDOS:'🧮', PISTA_ROBOTS:'🤖', FUTBOL_MANDOS:'⚽', INVASORES_MANDOS:'👾', CALAMAR_MANDOS:'🦑', ESCAPE_MANDOS:'🎃', CUERDA_MANDOS:'🪢', ARCADE_MANDOS:'🕹️', PLATAFORMAS_MANDOS:'🏃', PIKATRON_MANDOS:'⚡', BUNKER_MANDOS:'🎯', BURBUJAS_MANDOS:'🔵', AHORCADO_MANDOS:'🪢', SIXSEVEN_MANDOS:'6️⃣', MONEYBOARD_MANDOS:'💰', TRIVIAL_MANDOS:'🎲' };
+const TIPO_LIVE = new Set(['THINKHOOT', 'PILIVE_TARJETAS', 'MATHLIVE', 'OLYMPICLIVE', 'QUIZ_MANDOS', 'MATES_MANDOS', 'PISTA_ROBOTS', 'ARCADE_MANDOS', 'PLATAFORMAS_MANDOS', 'PIKATRON_MANDOS', 'BUNKER_MANDOS', 'BURBUJAS_MANDOS', 'AHORCADO_MANDOS', 'SIXSEVEN_MANDOS', 'MONEYBOARD_MANDOS', 'TRIVIAL_MANDOS']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
 
@@ -964,6 +964,91 @@ const EmptyCard = ({ msg }) => (
 const pctColor2 = (p) => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
 const pctBg2    = (p) => p >= 80 ? '#e8f5e9' : p >= 50 ? '#fff8e1' : '#fdecea';
 
+// ─── Detalle genérico de cada jugador ─────────────────────────────────────────
+// Lo que el alumno vio en su resumen final:
+//   j.desglose: [{ nombre, aciertos, total }]   (p. ej. «Comprensión 3/4 · Huecos 5/8»)
+//   j.detalles: [{ titulo, pct }]               (Omninteractive / VideoQuizz)
+//   j.repaso / j.preguntas: [{ enunciado|pregunta|nombre, ok|correcto, dada, correcta }]
+const normalizarRepaso = (lista) => (Array.isArray(lista) ? lista : [])
+    .filter(it => it && typeof it === 'object')
+    .map(it => ({
+        texto: String(it.enunciado ?? it.pregunta ?? it.nombre ?? it.texto ?? ''),
+        ok: !!(it.ok ?? it.correcto ?? it.correct),
+        dada: it.dada != null ? String(it.dada) : '',
+        correcta: it.correcta != null ? String(it.correcta) : '',
+        nota: it.explicacion ? String(it.explicacion) : '',
+    }))
+    .filter(it => it.texto);
+
+const DetalleRespuestasJugadores = ({ jugadores = [] }) => {
+    const [verAciertos, setVerAciertos] = useState(false);
+    const datos = jugadores.map(j => ({
+        nombre: j.nombre,
+        desglose: [
+            ...(Array.isArray(j.desglose) ? j.desglose : []).map(d => ({ nombre: d.nombre, txt: `${d.aciertos ?? 0}/${d.total ?? 0}`, pct: d.total ? Math.round((d.aciertos || 0) / d.total * 100) : null })),
+            ...(Array.isArray(j.detalles) ? j.detalles : []).filter(d => d && d.titulo != null && d.pct != null).map(d => ({ nombre: d.titulo, txt: `${d.pct}%`, pct: d.pct })),
+        ],
+        repaso: normalizarRepaso(j.repaso || j.preguntas),
+    })).filter(d => d.desglose.length || d.repaso.length);
+    if (!datos.length) return null;
+    const varios = jugadores.length > 1;
+    const hayAciertos = datos.some(d => d.repaso.some(r => r.ok));
+    return (
+        <div style={{ marginTop:12, display:'flex', flexDirection:'column', gap:10 }}>
+            {datos.map((d, k) => {
+                const fallos = d.repaso.filter(r => !r.ok);
+                const aciertos = d.repaso.filter(r => r.ok);
+                return (
+                    <div key={k} style={{ padding:'10px 12px', background:'#f8f9fa', borderRadius:10, border:'1px solid #ecf0f1' }}>
+                        {varios && <div style={{ fontWeight:700, fontSize:'0.82rem', color:'#2c3e50', marginBottom:6 }}>{d.nombre}</div>}
+                        {d.desglose.length > 0 && (
+                            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: d.repaso.length ? 10 : 0 }}>
+                                {d.desglose.map((x, i) => (
+                                    <span key={i} style={{ padding:'3px 9px', borderRadius:20, background: x.pct != null ? pctBg2(x.pct) : '#eef2f7', color: x.pct != null ? pctColor2(x.pct) : '#34495e', fontWeight:700, fontSize:'0.76rem' }}>
+                                        {x.nombre}: {x.txt}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        {d.repaso.length > 0 && (
+                            <>
+                                <div style={{ fontSize:'0.72rem', color:'#e74c3c', fontWeight:700, letterSpacing:.5, marginBottom:6 }}>
+                                    {fallos.length ? `✗ EN QUÉ HA FALLADO (${fallos.length})` : '✓ SIN FALLOS'}
+                                </div>
+                                {fallos.map((r, i) => (
+                                    <div key={i} style={{ background:'#fdecea', borderRadius:7, padding:'5px 9px', marginBottom:4, fontSize:'0.8rem', color:'#2c3e50' }}>
+                                        <b>{r.texto}</b>
+                                        {(r.dada || r.correcta) && (
+                                            <div style={{ fontSize:'0.76rem', marginTop:1 }}>
+                                                {r.dada ? <>Respondió <s style={{ color:'#c0392b' }}>{r.dada}</s></> : <span style={{ color:'#7f8c8d' }}>Sin respuesta</span>}
+                                                {r.correcta && <> · correcta: <b style={{ color:'#27ae60' }}>{r.correcta}</b></>}
+                                            </div>
+                                        )}
+                                        {r.nota && <div style={{ fontSize:'0.74rem', color:'#7f8c8d', marginTop:1 }}>{r.nota}</div>}
+                                    </div>
+                                ))}
+                                {aciertos.length > 0 && verAciertos && (
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                                        {aciertos.map((r, i) => (
+                                            <span key={i} style={{ background:'#eefaf0', borderRadius:6, padding:'2px 7px', fontSize:'0.76rem', color:'#2c3e50' }}>✓ {r.texto}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                );
+            })}
+            {hayAciertos && (
+                <button onClick={e => { e.stopPropagation(); setVerAciertos(v => !v); }}
+                    style={{ alignSelf:'flex-start', padding:'4px 10px', borderRadius:8, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', fontWeight:600, fontSize:'0.75rem' }}>
+                    {verAciertos ? 'Ocultar aciertos' : 'Ver también los aciertos'}
+                </button>
+            )}
+        </div>
+    );
+};
+
 const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, canDelete, onAgregarAGrupo, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const jugs   = inf.jugadores || [];
@@ -1183,6 +1268,8 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             </tr>
                         </tfoot>
                     </table>
+                    {/* Desglose por apartados y repaso de respuestas (genérico, cualquier juego) */}
+                    <DetalleRespuestasJugadores jugadores={jugs} />
                     {/* Desglose de módulos para ALGEBRA */}
                     {tipo === 'ALGEBRA' && jugs.some(j => j.modulos?.length > 0) && (
                         <div style={{ marginTop:12, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, border:'1px solid #ecf0f1' }}>

@@ -431,6 +431,9 @@ function Carrera({ config, preguntas, onFin, onSalir, mandos }) {
     const btnT = { width: 74, height: 74, borderRadius: 18, border: '2px solid rgba(255,255,255,0.25)', background: 'rgba(8,10,25,0.6)', color: 'white', fontSize: '1.8rem', touchAction: 'none', userSelect: 'none' };
     const vertical = (est?.division ?? (tam.w >= tam.h ? 'vertical' : 'horizontal')) === 'vertical';
     const ests = est?.jugadores || [];
+    // con los botones táctiles de 1 jugador: ¿cabe el velocímetro abajo en el centro, entre ◀ ▶ y los pedales?
+    const tBoton = Math.max(54, Math.min(84, Math.floor((tam.w - 64) / 4.4)));
+    const huecoCentro = tam.w - 4 * tBoton - 36 > 110;
     // tamaño de cada zona (px) para dimensionar joystick y freno
     const zonaW = n === 1 ? tam.w : n === 2 ? (vertical ? tam.w / 2 : tam.w) : tam.w / 2;
     const zonaH = n === 1 ? tam.h : n === 2 ? (vertical ? tam.h : tam.h / 2) : tam.h / 2;
@@ -489,7 +492,7 @@ function Carrera({ config, preguntas, onFin, onSalir, mandos }) {
                             {est.clasif.map((c, i) => <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: c.esJugador ? 900 : 500, color: c.esJugador ? '#ffd600' : 'white' }}><span style={{ width: 16 }}>{i + 1}.</span><span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color }} />{c.nombre}</div>)}
                         </div>
                     )}
-                    <div style={{ position: 'absolute', right: 14, bottom: tactil ? 110 : 16, zIndex: 5, ...caja, textAlign: 'right', pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', ...(tactil && huecoCentro ? { left: '50%', transform: 'translateX(-50%)', bottom: 12, textAlign: 'center' } : { right: 14, bottom: tactil ? 150 : 16, textAlign: 'right' }), zIndex: 5, ...caja, pointerEvents: 'none' }}>
                         <div style={{ fontSize: '2.4rem', fontWeight: 900, lineHeight: 1, color: est?.turbo ? '#40c4ff' : 'white' }}>{est?.kmh ?? 0}</div>
                         <div style={{ fontSize: '0.75rem', color: '#aaa' }}>km/h {est?.atras ? '· R' : ''}</div>
                         {est?.derrape && <div style={{ color: '#ffd600', fontWeight: 900 }}>💨 DERRAPE {est.tDerrape >= 1 ? '✨' : ''}</div>}
@@ -501,7 +504,7 @@ function Carrera({ config, preguntas, onFin, onSalir, mandos }) {
             )}
             {/* Botones y minimapa: arriba en el centro (a 3-4 jugadores, en el cruce de las 4 zonas) */}
             <div style={{ position: 'absolute', ...(n >= 3 ? { top: '50%', left: '50%', transform: 'translate(-50%,-50%)' } : varios ? { top: 10, left: '50%', transform: 'translateX(-50%)' } : { top: 10, right: 10 }), display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, zIndex: 25 }}>
-                <canvas ref={mmRef} width={180} height={180} style={{ width: n >= 3 ? 'min(120px,16vmin)' : varios ? 'min(140px,22vw)' : 'min(180px,30vw)', height: n >= 3 ? 'min(120px,16vmin)' : varios ? 'min(140px,22vw)' : 'min(180px,30vw)', borderRadius: 14, border: '2px solid rgba(255,255,255,0.2)', pointerEvents: 'none', display: n >= 3 ? 'none' : 'block' }} />
+                <canvas ref={mmRef} width={180} height={180} style={{ width: n >= 3 ? 'min(120px,16vmin)' : varios ? 'min(140px,22vw)' : 'min(180px,30vw,28vh)', height: n >= 3 ? 'min(120px,16vmin)' : varios ? 'min(140px,22vw)' : 'min(180px,30vw,28vh)', borderRadius: 14, border: '2px solid rgba(255,255,255,0.2)', pointerEvents: 'none', display: n >= 3 ? 'none' : 'block' }} />
                 <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => { m()?.pausar(true); onSalir(); }} style={{ ...caja, border: 'none', cursor: 'pointer', fontWeight: 700, padding: '5px 10px' }}>✕</button>
                     <button onClick={() => m()?.alternarCamara()} style={{ ...caja, border: 'none', cursor: 'pointer', padding: '5px 10px' }}>🎥</button>
@@ -518,16 +521,22 @@ function Carrera({ config, preguntas, onFin, onSalir, mandos }) {
             )}
             {aviso && <div style={{ position: 'absolute', top: '32%', left: 0, right: 0, textAlign: 'center', zIndex: 9, fontSize: 'clamp(2rem,7vw,4rem)', fontWeight: 900, color: '#ffd600', textShadow: '0 4px 20px rgba(0,0,0,0.8)', pointerEvents: 'none' }}>{aviso}</div>}
             {/* Controles táctiles: 1 jugador = botones; a varios = joystick flotante + freno en cada zona */}
-            {tactil && !varios && (
-                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 12, display: 'flex', justifyContent: 'space-between', zIndex: 5, touchAction: 'none' }}>
-                    <div style={{ display: 'flex', gap: 10 }}><button {...dir(-1)} style={btnT}>◀</button><button {...dir(1)} style={btnT}>▶</button></div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                        <button {...pedal('atras')} style={{ ...btnT, fontSize: '1.2rem' }}>⬇</button>
-                        <button {...pedal('freno')} style={{ ...btnT, fontSize: '0.8rem', fontWeight: 800, background: 'rgba(183,28,28,0.7)' }}>FRENO</button>
-                        <button {...pedal('acel')} style={{ ...btnT, height: 96, fontSize: '1.4rem', background: 'rgba(27,94,32,0.75)' }}>⬆</button>
+            {tactil && !varios && (() => {
+                const t = Math.max(54, Math.min(84, Math.floor((tam.w - 64) / 4.4))); // tamaño según el ancho de la pantalla
+                const b = { ...btnT, width: t, height: t, borderRadius: 18, background: 'rgba(8,10,25,0.38)', border: '2px solid rgba(255,255,255,0.35)', backdropFilter: 'blur(2px)' };
+                return (
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 5, touchAction: 'none', pointerEvents: 'none' }}>
+                        <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto' }}><button {...dir(-1)} style={b}>◀</button><button {...dir(1)} style={b}>▶</button></div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', pointerEvents: 'auto' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <button {...pedal('freno')} style={{ ...b, height: Math.round(t * 0.8), fontSize: '0.75rem', fontWeight: 800, background: 'rgba(183,28,28,0.55)' }}>FRENO</button>
+                                <button {...pedal('atras')} style={{ ...b, height: Math.round(t * 0.62), fontSize: '1rem' }}>⬇</button>
+                            </div>
+                            <button {...pedal('acel')} style={{ ...b, height: Math.round(t * 1.5), fontSize: '1.5rem', background: 'rgba(27,94,32,0.6)' }}>⬆</button>
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
             {tactil && varios && Array.from({ length: n }, (_, j) => {
                 const col = ests[j]?.color || COLORES_J[j];
                 const izq = ladoJoy(j) === 'izq';
@@ -741,7 +750,10 @@ function PantallaHoja({ recurso, onElegir, onSalir }) {
  *  · recurso / hojaInicial: entra directamente con ese recurso (p. ej. desde GamePlayer).
  *  · modoOlimpico, hojaOlimpica, onOlimpicoFinish(puntos): contrato de Control de Aula / OlympicLive.
  */
-export default function RacingGame3D({ usuario, alTerminar, onExit, recurso: recursoProp = null, hojaInicial = 'General', modoOlimpico = false, hojaOlimpica = 'General', onOlimpicoFinish = null }) {
+export default function RacingGame3D(props) {
+    return <div style={{ position: 'fixed', inset: 0, zIndex: 9990, overflowY: 'auto', background: '#0a0a1a' }}><RacingGame3DInterno {...props} /></div>;
+}
+function RacingGame3DInterno({ usuario, alTerminar, onExit, recurso: recursoProp = null, hojaInicial = 'General', modoOlimpico = false, hojaOlimpica = 'General', onOlimpicoFinish = null }) {
     const varias = (recursoProp?.hojas?.length || 0) > 1;
     const [fase, setFase] = useState(recursoProp ? (varias && !modoOlimpico && hojaInicial === 'General' ? 'HOJA' : 'CONFIG') : 'PREVIO');
     const [recurso, setRecurso] = useState(recursoProp);

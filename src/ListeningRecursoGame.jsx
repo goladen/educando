@@ -268,7 +268,16 @@ function JugarListening({ recurso, onBack, usuario = null }) {
             </div>
             {mostrarEnvio && (
                 <ModalEnviarProfe
-                    datos={{ aciertos, total, porcentaje: pct, tema: recurso.titulo, modo: `${modo}${preguntas.length ? ' + preguntas' : ''}`, modalidad: 'Recurso del profesor' }}
+                    datos={{ aciertos, total, porcentaje: pct, tema: recurso.titulo, modo: `${modo}${preguntas.length ? ' + preguntas' : ''}`, modalidad: 'Recurso del profesor',
+                        // Mismo desglose y fallos que ve el alumno en su resumen
+                        desglose: [
+                            ...(preguntas.length > 0 ? [{ nombre: '❓ Comprensión', aciertos: aciertosPreg, total: preguntas.length }] : []),
+                            ...(hayHuecos ? [{ nombre: '🕳️ Huecos', aciertos: aciertosHuecos, total: item.gaps.length }] : []),
+                        ],
+                        repaso: [
+                            ...preguntas.map((p, i) => ({ enunciado: String(p.enunciado || `Pregunta ${i + 1}`).slice(0, 200), ok: respPreg[i] === p.correcta, dada: respPreg[i] != null ? String(p.opciones?.[respPreg[i]] ?? '') : '', correcta: String(p.opciones?.[p.correcta] ?? '') })),
+                            ...item.gaps.map(g => ({ enunciado: `Hueco ${g.gap_number}`, ok: cleanText(respHuecos[g.gap_number]) === cleanText(g.answer), dada: String(respHuecos[g.gap_number] || '').slice(0, 60), correcta: String(g.answer || '') })),
+                        ] }}
                     onClose={() => setMostrarEnvio(false)} />
             )}
         </div>

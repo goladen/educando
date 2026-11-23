@@ -20,6 +20,7 @@ const DocumentosPersonalizados = lazy(() => import('../components/DocumentosPers
 const ExploradorINE = lazy(() => import('../estadistica/ExploradorINE'));
 const VisorCuerpo = lazy(() => import('../anatomia/VisorCuerpo'));
 const BancoProblemasFisica = lazy(() => import('../ecuaciones/BancoProblemasFisica'));
+const ImprimirTarjetas = lazy(() => import('../tarjetas/ImprimirTarjetas.jsx'));
 
 const MORADO = '#6D28D9';
 
@@ -103,6 +104,14 @@ const ITEMS = [
         desc: 'Situación de aprendizaje «Mi empresa de placas solares»: cada alumno o equipo imprime la propuesta para su cliente con el logo, el diseño del tejado, la producción mes a mes, el presupuesto y la amortización.',
         donde: 'Situaciones de Aprendizaje → Mi empresa de placas solares → fase 9 «Propuesta al cliente» → «🖨️ Imprimir / PDF».', etapas: ['ESO', 'Bachillerato'], materias: 'Matemáticas, Tecnología, Economía', accion: { ir: 'empresasolar' },
         claves: 'placas paneles solares fotovoltaica energia presupuesto empresa emprendimiento amortizacion logo' },
+    { id: 'corrector', bloque: 'AULA', emoji: '📝', nombre: 'Hoja de respuestas para corregir con el móvil', estetica: 'Hoja de círculos A-E', color: '#0f766e',
+        desc: 'Hasta 50 preguntas: los alumnos rellenan su nº de lista y los círculos, y el Corrector saca la nota al enfocar cada hoja con la cámara. También el examen con las preguntas de un recurso, hojas con el nombre de cada alumno y la clave.',
+        donde: 'Corrector de exámenes → «1 · Preparar» → «🖨️ Imprimir».', etapas: ['Primaria', 'ESO', 'Bachillerato'], materias: 'Todas', accion: { ir: 'corrector' },
+        claves: 'examen test corregir corrector hoja de respuestas plantilla circulos zipgrade camara movil nota evaluacion tipo test' },
+    { id: 'tarjetas', bloque: 'AULA', emoji: '🃏', nombre: 'Tarjetas de respuesta (sin móviles)', estetica: 'Tarjetas con código', color: '#0f766e',
+        desc: 'Una tarjeta por alumno con un código y las letras A-D. En PiLive, los alumnos la levantan con su respuesta arriba y la cámara del ordenador las lee todas a la vez.',
+        donde: 'Se abre aquí mismo (también en PiLive → «🃏 Con tarjetas»).', etapas: ['Infantil', 'Primaria', 'ESO', 'Bachillerato'], materias: 'Todas', accion: { vista: 'TARJETAS' },
+        claves: 'plickers tarjetas respuesta camara codigo qr aruco votar test sin moviles pilive' },
     { id: 'gestion', bloque: 'AULA', emoji: '🏫', nombre: 'Gestión de Aula', estetica: 'Documentos de clase', color: '#e67e22',
         desc: 'Plano de clase, grupos, listas y horarios listos para imprimir.',
         donde: 'Abre la herramienta (p. ej. Plano de clase) → «🖨 Imprimir».', etapas: ['Primaria', 'ESO', 'Bachillerato'], materias: 'Tutoría', accion: { ir: 'gestion' },
@@ -227,6 +236,7 @@ export default function CentroPdf({ onExit, onIr }) {
                         <VisorCuerpo onExit={volverVista} />
                     </div>
                 )}
+                {vista === 'TARJETAS' && <ImprimirTarjetas onClose={volverVista} />}
                 {vista === 'BANCO_FISICA' && (
                     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f8fafc', overflowY: 'auto' }}>
                         <BancoProblemasFisica onVolver={volverVista} />

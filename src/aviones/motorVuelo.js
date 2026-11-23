@@ -35,7 +35,8 @@ export function altura(x, z) {
     const llano = 1 - suave(0, 420, Math.max(0, Math.hypot(Math.max(Math.abs(x) - 70, 0), Math.max(Math.abs(z) - 760, 0))));
     return lerp(h, MESETA, llano);
 }
-const enPista = (x, z) => Math.abs(x - PISTA.x) < PISTA.ancho / 2 + 3 && z < PISTA.z0 + 40 && z > PISTA.z1 - 40;
+// con margen: la hierba llana de los lados de la pista también vale para tomar tierra
+const enPista = (x, z) => Math.abs(x - PISTA.x) < PISTA.ancho / 2 + 22 && z < PISTA.z0 + 40 && z > PISTA.z1 - 40;
 
 // ─── Avión de bajo polígono (morro hacia −z) ────────────────────────────────
 function crearAvion(color) {
@@ -166,10 +167,10 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
     hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 2; hangar.position.set(80, MESETA, -40); escena.add(hangar);
     // luces de aproximación
     const matLuzPista = new THREE.MeshBasicMaterial({ color: 0xfff59d });
-    const luzPista = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 6, 4), matLuzPista, 120);
+    const luzPista = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 6, 4), matLuzPista, 140);
     { let k = 0; const m = new THREE.Matrix4();
       for (let z = PISTA.z1; z <= PISTA.z0 && k < 100; z += 25) { for (const s of [-1, 1]) { m.makeTranslation(PISTA.x + s * (PISTA.ancho / 2 + 1.5), MESETA + 0.4, z); luzPista.setMatrixAt(k++, m); } }
-      for (let d = 30; d <= 200 && k < 120; d += 20) { m.makeTranslation(PISTA.x, MESETA + 0.6, PISTA.z1 - d); luzPista.setMatrixAt(k++, m); }
+      for (let d = 30; d <= 200 && k < 138; d += 20) { m.makeTranslation(PISTA.x, MESETA + 0.6, PISTA.z1 - d); luzPista.setMatrixAt(k++, m); m.makeTranslation(PISTA.x, MESETA + 0.6, PISTA.z0 + d); luzPista.setMatrixAt(k++, m); }
       luzPista.count = k; }
     escena.add(luzPista);
 
@@ -228,13 +229,15 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         [300, 140, -2200], [-300, 130, -2400] /* vuelta al norte */,
     ];
     // tras el último punto el avión da la vuelta hacia el sur para la aproximación final
-    const curva = new THREE.CatmullRomCurve3(ctrl.map(([x, y, z]) => new THREE.Vector3(x, y, z)), false, 'centripetal');
+    // a un 82 % del tamaño original: más lejos de la sierra del borde del mapa (había choques al girar tras los aros del noroeste)
+    const curva = new THREE.CatmullRomCurve3(ctrl.map(([x, y, z]) => new THREE.Vector3(x * 0.82, y, z * 0.82)), false, 'centripetal');
     const preguntas = (op.preguntas || []).filter(p => p && Array.isArray(p.opciones) && p.opciones.length >= 2).slice(0, 40);
     const nPreg = Math.min(op.nPreguntas, preguntas.length);
     const entre = clamp(op.arosEntre, 1, 4);
     const totalPuntos = nPreg > 0 ? nPreg * (entre + 1) : 10;
     const puertas = []; // { tipo:'aro'|'pregunta'|'final', c:Vector3, n:Vector3(dirección), der:Vector3, radio, pregunta?, grupo }
-    const alturaSegura = (x, z) => { let m = -1e9; for (const [dx, dz] of [[0, 0], [60, 0], [-60, 0], [0, 60], [0, -60], [90, 90], [-90, -90], [90, -90], [-90, 90]]) m = Math.max(m, altura(x + dx, z + dz)); return Math.max(m, 0) + 75; };
+    // altura segura de un aro: por encima de todo el terreno en el radio de giro (al girar tras el aro el avión se pasa unos cientos de metros)
+    const alturaSegura = (x, z) => { let m = altura(x, z); for (const r of [120, 260, 400, 520]) for (let k = 0; k < 12; k++) { const an = k * Math.PI / 6; m = Math.max(m, altura(x + Math.cos(an) * r, z + Math.sin(an) * r)); } return Math.max(m, 0) + 75; };
     for (let k = 0; k < totalPuntos; k++) {
         const u = (k + 1) / (totalPuntos + 1);
         const c = curva.getPointAt(u), t = curva.getTangentAt(u);
@@ -243,9 +246,29 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         const esPreg = nPreg > 0 && (k + 1) % (entre + 1) === 0;
         puertas.push({ tipo: esPreg ? 'pregunta' : 'aro', c, n, der: new THREE.Vector3(-n.z, 0, n.x), radio: esPreg ? 13 : 16, pregunta: esPreg ? preguntas[puertas.filter(p => p.tipo === 'pregunta').length] : null, k });
     }
+    // Tramos seguros: el avión va casi en línea recta de un aro al siguiente, así que entre dos aros
+    // seguidos no puede quedar una montaña (con pocos aros, muy separados, pasaba y había choques).
+    for (let vuelta = 0; vuelta < 3; vuelta++) {
+        for (let k = 0; k < puertas.length; k++) {
+            const a = k === 0 ? new THREE.Vector3(PISTA.x, MESETA + 40, PISTA.z1) : puertas[k - 1].c, b = puertas[k].c;
+            let maxT = 0;
+            for (let t = 0.04; t < 1; t += 0.04) maxT = Math.max(maxT, altura(lerp(a.x, b.x, t), lerp(a.z, b.z, t)));
+            const minimo = maxT + 70;
+            if (b.y < minimo) b.y = minimo;
+            if (k > 0 && a.y < minimo) a.y = minimo;
+        }
+    }
     // aproximación final: el circuito acaba al norte → se aterriza hacia el sur (+z), entrando por el umbral norte
-    puertas.push({ tipo: 'final', c: new THREE.Vector3(PISTA.x, MESETA + 70, PISTA.z1 - 900), n: new THREE.Vector3(0, 0, 1), der: new THREE.Vector3(-1, 0, 0), radio: 26, k: puertas.length });
-    puertas.push({ tipo: 'final', c: new THREE.Vector3(PISTA.x, MESETA + 32, PISTA.z1 - 380), n: new THREE.Vector3(0, 0, 1), der: new THREE.Vector3(-1, 0, 0), radio: 22, k: puertas.length });
+    // Aproximación: se puede aterrizar por cualquiera de las dos cabeceras (la que quede más cerca al acabar
+    // el circuito). Los aros azules de cada lado son solo una guía para alinearse: no hay que pasar por ellos.
+    const guiasAprox = [];
+    for (const lado of [-1, 1]) { // −1 = cabecera norte (se aterriza hacia el sur), 1 = cabecera sur
+        const umbral = lado < 0 ? PISTA.z1 : PISTA.z0;
+        [[900, 60, 26], [420, 30, 22]].forEach(([d, h, r]) => {
+            const z = umbral + lado * d;
+            guiasAprox.push({ c: new THREE.Vector3(PISTA.x, Math.max(MESETA + h, altura(PISTA.x, z) + 40), z), radio: r });
+        });
+    }
     const SEP = 34; // separación entre los 4 aros de una puerta de pregunta
     const matAro = new THREE.MeshStandardMaterial({ color: 0xffc400, emissive: 0xff9800, emissiveIntensity: 0.6, roughness: 0.4 });
     const matAroHecho = new THREE.MeshStandardMaterial({ color: 0x69f0ae, emissive: 0x00c853, emissiveIntensity: 0.5, transparent: true, opacity: 0.35 });
@@ -273,6 +296,9 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         }
         escena.add(grupo); pu.grupo = grupo;
     });
+    guiasAprox.forEach(g => {
+        const m = new THREE.Mesh(geoAro, matFinal); m.scale.setScalar(g.radio); m.position.copy(g.c); escena.add(m);
+    });
     // flecha 3D que señala el siguiente objetivo (delante del avión)
     const flecha = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2.6, 4), new THREE.MeshBasicMaterial({ color: 0xffd600, transparent: true, opacity: 0.9, depthTest: false }));
     flecha.renderOrder = 10; escena.add(flecha);
@@ -288,7 +314,7 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
             sig: 0, aros: 0, arosFallados: 0, aciertos: 0, fallos: 0, penal: 0, puntos: 0, choques: 0, turbo: 0, inmune: 0,
             preguntas: [], ultimoSeguro: null, fase: 'despegue', aterrizaje: null, terminado: false, tiempoFin: null,
             camara: new THREE.PerspectiveCamera(62, 1, 0.5, 9000), vista: 'exterior', camPos: new THREE.Vector3(), camIni: false,
-            tactil: { cabeceo: 0, alabeo: 0, motor: null, freno: 0 }, prevLado: null, preguntaAvisada: -1, choqueT: 0, perdida: false,
+            tactil: { cabeceo: 0, alabeo: 0, motor: null, freno: 0 }, mando: { cabeceo: 0, alabeo: 0, motor: 0, freno: 0 }, prevLado: null, preguntaAvisada: -1, choqueT: 0, perdida: false,
         };
     });
 
@@ -299,7 +325,7 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
     const onKeyDown = (ev) => {
         const t = (ev.target?.tagName || '').toLowerCase(); if (t === 'input' || t === 'textarea') return;
         const k = ev.key.toLowerCase();
-        if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'pageup', 'pagedown'].includes(k)) ev.preventDefault();
+        if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'pageup', 'pagedown', 'enter', '+', '-'].includes(k)) ev.preventDefault();
         teclas.add(k);
         if (k === 'c' && !ev.repeat) alternarCamara();
         despertarAudio();
@@ -317,10 +343,11 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         } else if (p.i === 0) {
             cab = T('w') - T('s'); ala = T('d') - T('a'); mot = T('q') - T('e'); freno = T(' ');
         } else {
-            cab = T('arrowup') - T('arrowdown'); ala = T('arrowright') - T('arrowleft'); mot = T('pageup') - T('pagedown'); freno = T('enter');
+            cab = T('arrowup') - T('arrowdown'); ala = T('arrowright') - T('arrowleft'); mot = Math.max(T('pageup'), T('+')) - Math.max(T('pagedown'), T('-')); freno = T('enter');
         }
         if (op.invertir) cab = -cab;
-        cab += p.tactil.cabeceo; ala += p.tactil.alabeo; freno = Math.max(freno, p.tactil.freno);
+        cab += p.tactil.cabeceo + p.mando.cabeceo; ala += p.tactil.alabeo + p.mando.alabeo; freno = Math.max(freno, p.tactil.freno, p.mando.freno);
+        mot += p.mando.motor; // A / B del micro:bit: subir o bajar la potencia mientras se mantienen
         const mandos = (navigator.getGamepads ? [...navigator.getGamepads()] : []).filter(g => g && g.connected);
         mandos.forEach((gp, i) => {
             if (nPil > 1 && i !== p.i) return;
@@ -330,12 +357,12 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
             mot += (gp.buttons[7]?.value || 0) - (gp.buttons[6]?.value || 0);
             freno = Math.max(freno, gp.buttons[1]?.pressed ? 1 : 0);
         });
-        p.motor = p.fase === 'rodando' ? 0 : p.tactil.motor != null ? p.tactil.motor : clamp(p.motor + mot * 0.6 * dt, 0, 1);
+        p.motor = p.fase === 'rodando' ? 0 : (p.tactil.motor != null && !p.mando.motor) ? p.tactil.motor : clamp(p.motor + mot * 0.6 * dt, 0, 1);
         return { cab: clamp(cab, -1, 1), ala: clamp(ala, -1, 1), freno };
     }
 
     // ── Estado de la partida ──
-    let tiempo = 0, tiempoVuelo = 0, terminada = false, pausado = false;
+    let tiempo = 0, tiempoVuelo = 0, terminada = false, pausado = false, cierreEn = null;
     const avisar = (p, texto) => cb.onAviso?.({ jugador: p.i, texto });
     const fwd = (p) => new THREE.Vector3(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
 
@@ -421,6 +448,14 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         cb.onChoque?.({ jugador: p.i, motivo });
     }
     function reaparecer(p) {
+        // aterrizando: en la línea de aproximación de su cabecera, mirando a la pista y despacio
+        if (p.fase === 'aterrizar' || p.sig >= puertas.length) {
+            const lado = p.ladoAprox ?? -1, umbral = lado < 0 ? PISTA.z1 : PISTA.z0, z = umbral + lado * 1000;
+            Object.assign(p, { x: PISTA.x, y: Math.max(MESETA + 70, altura(PISTA.x, z) + 50), z, yaw: lado < 0 ? Math.PI : 0, pitch: -0.04, banco: 0, v: 45, motor: 0.3, suelo: false, inmune: 2.5, camIni: false });
+            if (p.fase === 'vuelo') p.fase = 'aterrizar';
+            p.avion.visible = true;
+            return;
+        }
         // vuelve en el aire, antes del siguiente objetivo y mirando hacia él
         const pu = puertas[Math.min(p.sig, puertas.length - 1)];
         const prev = p.sig > 0 ? puertas[p.sig - 1].c : new THREE.Vector3(PISTA.x, MESETA + 60, PISTA.z1 - 200);
@@ -468,7 +503,7 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         }
         p.ultimoSeguro = pu.c.clone();
         p.sig++;
-        if (p.sig >= puertas.length && p.fase === 'vuelo') { p.fase = 'aterrizar'; p.tAterrizar = 120; avisar(p, '🛬 ¡Ahora aterriza en la pista! Baja la potencia y desciende suave'); }
+        if (p.sig >= puertas.length && p.fase === 'vuelo') { p.fase = 'aterrizar'; p.tAterrizar = 120; p.ladoAprox = p.z < 0 ? -1 : 1; avisar(p, '🛬 ¡Ahora aterriza en la pista! Baja la potencia y desciende suave'); }
     }
 
     // ── Efectos: fuegos artificiales (acierto) ──
@@ -531,6 +566,7 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         p.terminado = true; p.tiempoFin = tiempoVuelo;
         avisar(p, '🏁 ¡Vuelo completado!');
         if (pilotos.every(q => q.terminado)) terminar();
+        else if (cierreEn == null) { cierreEn = 90; pilotos.forEach(q => { if (!q.terminado) avisar(q, `⏱️ ${p.nombre} ha terminado: tienes 90 s`); }); }
     }
     function resumenDe(p) {
         const total = (p.tiempoFin ?? tiempoVuelo) + p.penal;
@@ -559,10 +595,8 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
             cam.position.set(p.x, p.y, p.z).addScaledVector(f, 1.2); cam.position.y += 1.05;
             cam.rotation.set(p.pitch, p.yaw, -p.banco * 0.9, 'YXZ');
             cam.fov = 70; cam.updateProjectionMatrix();
-            p.avion.visible = false;
             return;
         }
-        if (p.choqueT <= 0) p.avion.visible = true;
         const atras = p.suelo ? 20 : 24, arriba = p.suelo ? 6 : 7;
         tmp.set(p.x, p.y, p.z).addScaledVector(new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw)), -atras).add(new THREE.Vector3(0, arriba - Math.sin(p.pitch) * 8, 0));
         if (!p.camIni) { p.camPos.copy(tmp); p.camIni = true; }
@@ -634,7 +668,12 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
 
     // ── Estado para la interfaz ──
     function objetivoDe(p) {
-        if (p.fase === 'aterrizar' || p.fase === 'rodando') return new THREE.Vector3(PISTA.x, MESETA, p.fase === 'rodando' ? PISTA.z0 : PISTA.z1 + 80);
+        if (p.fase === 'rodando') return new THREE.Vector3(PISTA.x, MESETA, p.ladoAprox < 0 ? PISTA.z0 : PISTA.z1);
+        if (p.fase === 'aterrizar') {
+            const lado = p.ladoAprox ?? (p.z < 0 ? -1 : 1), umbral = lado < 0 ? PISTA.z1 : PISTA.z0;
+            const fuera = lado < 0 ? p.z < umbral - 450 : p.z > umbral + 450; // aún lejos: a la línea de aproximación
+            return fuera ? new THREE.Vector3(PISTA.x, MESETA + 45, umbral + lado * 450) : new THREE.Vector3(PISTA.x, MESETA, umbral - lado * 150);
+        }
         const pu = puertas[p.sig]; return pu ? pu.c : null;
     }
     function estadoPiloto(p) {
@@ -655,9 +694,9 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
             perdida: p.perdida && !p.suelo, suelo: p.suelo, fase: p.fase, turbo: p.turbo > 0, choque: p.choqueT > 0,
             rumbo, elev, dist: dist != null ? Math.round(dist) : null,
             hechas: p.sig, totalPuertas: puertas.length, aciertos: p.aciertos, fallos: p.fallos, aros: p.aros, puntos: p.puntos,
-            tiempo: formato(tiempoVuelo + p.penal), penal: p.penal, pregunta: preg, terminado: p.terminado, aterrizaje: p.aterrizaje,
+            tiempo: formato((p.tiempoFin ?? tiempoVuelo) + p.penal), penal: p.penal, cierre: cierreEn != null && !p.terminado ? Math.ceil(cierreEn) : null, pregunta: preg, terminado: p.terminado, aterrizaje: p.aterrizaje,
             tAterrizar: p.fase === 'aterrizar' ? Math.max(0, Math.ceil(p.tAterrizar)) : null,
-            alineado: p.fase === 'aterrizar' ? { lat: Math.round(p.x - PISTA.x), distPista: Math.round(PISTA.z1 - p.z), alturaPista: Math.round(p.y - MESETA) } : null,
+            alineado: p.fase === 'aterrizar' ? { lat: Math.round((p.x - PISTA.x) * ((p.ladoAprox ?? -1) < 0 ? -1 : 1)), distPista: Math.round((p.ladoAprox ?? -1) < 0 ? PISTA.z1 - p.z : p.z - PISTA.z0), alturaPista: Math.round(p.y - MESETA) } : null,
             vista: p.vista,
         };
     }
@@ -668,6 +707,10 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
     function simular(dt) {
         tiempo += dt;
         if (!terminada) tiempoVuelo += dt;
+        if (cierreEn != null && !terminada) {
+            cierreEn -= dt;
+            if (cierreEn <= 0) pilotos.forEach(q => { if (!q.terminado) { if (q.fase !== 'rodando') q.aterrizaje = 'sin terminar'; terminarPiloto(q); } });
+        }
         pilotos.forEach(p => {
             const antes = new THREE.Vector3(p.x, p.y, p.z);
             if (p.fase === 'aterrizar' && !p.terminado) {
@@ -707,6 +750,7 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
         renderer.setScissorTest(nPil > 1);
         pilotos.forEach((p, i) => {
             actualizarCamara(p, dt);
+            pilotos.forEach(q => { q.avion.visible = q.choqueT <= 0 && !(q === p && p.vista === 'cabina'); });
             const [x, y, w, h] = rects[i];
             if (p.camara.aspect !== w / h) { p.camara.aspect = w / h; p.camara.updateProjectionMatrix(); }
             sol.target.position.set(p.x, Math.max(altura(p.x, p.z), 0), p.z); sol.position.copy(sol.target.position).add(OFFSET_SOL);
@@ -738,7 +782,9 @@ export function crearVuelo(contenedor, opciones = {}, cb = {}) {
     // ═══════════════ API ═══════════════
     return {
         /** Entrada táctil: { cabeceo, alabeo } de −1 a 1, motor 0-1 (null = teclado), freno 0/1. */
-        setEntradaTactil(o, i = 0) { Object.assign(pilotos[i].tactil, o); },
+        setEntradaTactil(o, i = 0) { if (pilotos[i]) Object.assign(pilotos[i].tactil, o); },
+        /** Mandos micro:bit: { cabeceo, alabeo } de −1 a 1, motor = −1 / 0 / 1 (bajar / nada / subir la potencia), freno 0/1. */
+        setEntradaMando(o, i = 0) { if (pilotos[i]) Object.assign(pilotos[i].mando, o); },
         alternarCamara, rendirse, despertarAudio,
         pausar(b) { pausado = !!b; reloj.getDelta(); },
         setSonido(on) { audio.on = !!on; if (!on && audio.g) audio.g.gain.value = 0; else despertarAudio(); },

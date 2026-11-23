@@ -946,6 +946,13 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive, onAbrirINE }) {
           intentos:   total,
           fallos:     total - aciertos,
           porcentaje: pct,
+          // Lo mismo que ve el alumno en su resumen final
+          repaso: respuestas.slice(0, 60).map(r => ({
+            enunciado: r.preguntaTipo === 'capital' ? `Capital de ${r.paisNombre}` : String(r.pais || ''),
+            ok: !!r.correcto,
+            dada: r.dada != null ? String(r.dada).slice(0, 80) : '',
+            correcta: r.correcto ? '' : String(r.pais || ''),
+          })),
         }],
       });
       alert('✅ Resultado enviado al profesor.');

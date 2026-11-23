@@ -19,7 +19,8 @@ const esVirtual = (id) => Number(id) > 900;
 const limpio = (v) => JSON.parse(JSON.stringify(v ?? null));
 
 /** Botón «📤 Guardar resultados» + ventana. Pásale `estilo` para que encaje con el juego. */
-export default function GuardarResultadosMandos({ tipo, juego, jugadores, recursoTitulo = '', hoja = '', config = null, estilo, texto = '📤 Guardar resultados (código del profesor)' }) {
+// modalidad / claveNombres: otros juegos de clase (p. ej. PiLive con tarjetas) reutilizan la ventana con su propio almacén de nombres.
+export default function GuardarResultadosMandos({ tipo, juego, jugadores, recursoTitulo = '', hoja = '', config = null, estilo, texto = '📤 Guardar resultados (código del profesor)', modalidad = 'Mandos micro:bit', claveNombres = LS_NOMBRES }) {
   const [abierto, setAbierto] = useState(false);
   const [guardado, setGuardado] = useState(false);
   const hay = (jugadores || []).length > 0;
@@ -35,7 +36,7 @@ export default function GuardarResultadosMandos({ tipo, juego, jugadores, recurs
       </button>
       {abierto && (
         <Ventana
-          tipo={tipo} juego={juego} jugadores={jugadores} recursoTitulo={recursoTitulo} hoja={hoja} config={config}
+          tipo={tipo} juego={juego} jugadores={jugadores} recursoTitulo={recursoTitulo} hoja={hoja} config={config} modalidad={modalidad} claveNombres={claveNombres}
           onGuardado={() => setGuardado(true)} yaGuardado={guardado} onClose={() => setAbierto(false)}
         />
       )}
@@ -43,7 +44,7 @@ export default function GuardarResultadosMandos({ tipo, juego, jugadores, recurs
   );
 }
 
-function Ventana({ tipo, juego, jugadores, recursoTitulo, hoja, config, onGuardado, yaGuardado, onClose }) {
+function Ventana({ tipo, juego, jugadores, recursoTitulo, hoja, config, modalidad, claveNombres, onGuardado, yaGuardado, onClose }) {
   const [codigo, setCodigo] = useState(() => leer(LS_CODIGO, ''));
   const [curso, setCurso] = useState('');
   const [nombres, setNombres] = useState(() => Object.fromEntries(jugadores.map((j) => [j.id, j.nombre || ''])));
@@ -89,7 +90,7 @@ function Ventana({ tipo, juego, jugadores, recursoTitulo, hoja, config, onGuarda
       await addDoc(collection(db, 'informes_juegos'), {
         tipo,
         juego: juego || '',
-        modalidad: 'Mandos micro:bit',
+        modalidad,
         fecha: new Date(),
         codigoProfesor: code,
         ...(recursoTitulo ? { recursoTitulo: String(recursoTitulo).slice(0, 120) } : {}),
@@ -100,9 +101,9 @@ function Ventana({ tipo, juego, jugadores, recursoTitulo, hoja, config, onGuarda
       });
       escribir(LS_CODIGO, code);
       // Los nombres corregidos se recuerdan para todos los juegos de mandos
-      const guardados = leer(LS_NOMBRES, {}) || {};
+      const guardados = leer(claveNombres, {}) || {};
       elegidos.forEach((j) => { const n = String(nombres[j.id]).trim(); if (n && !esVirtual(j.id)) guardados[j.id] = n; });
-      escribir(LS_NOMBRES, guardados);
+      escribir(claveNombres, guardados);
       setEstado({ enviando: false, error: '', hecho: true });
       onGuardado?.();
     } catch (e) {

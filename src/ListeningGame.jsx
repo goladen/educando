@@ -97,7 +97,9 @@ export function ModalEnviarProfe({ datos, onClose }) {
                 : [{ nombre: nombre.trim(), curso: curso.trim(),
                      aciertos: datos.aciertos, total: datos.total,
                      porcentaje: datos.porcentaje, tema: datos.tema, modo: datos.modo,
-                     ...(datos.reto ? { reto: datos.reto } : {}) }];
+                     ...(datos.reto ? { reto: datos.reto } : {}),
+                     ...(datos.repaso?.length ? { repaso: datos.repaso } : {}),
+                     ...(datos.desglose?.length ? { desglose: datos.desglose } : {}) }];
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'LISTENING', modalidad: datos.modalidad || 'Individual',
                 tema: datos.tema || '', fecha: new Date(),
@@ -833,7 +835,8 @@ function JuegoIndividual({ item, modo, idioma, onBack, reto = null }) {
             )}
             {mostrarEnvio && !esRetoCompeticion && (
                 <ModalEnviarProfe
-                    datos={{ aciertos, total: gaps.length, porcentaje: pct, tema: item.titulo, modo, modalidad: 'Individual', reto: reto ? (reto.titulo || 'Reto') : null }}
+                    datos={{ aciertos, total: gaps.length, porcentaje: pct, tema: item.titulo, modo, modalidad: 'Individual', reto: reto ? (reto.titulo || 'Reto') : null,
+                        repaso: gaps.map(g => { const ok = cleanText(respuestas[g.gap_number]) === cleanText(g.answer); return { enunciado: 'Hueco ' + g.gap_number, ok, dada: String(respuestas[g.gap_number] || '').slice(0, 60), correcta: String(g.answer || '') }; }) }}
                     onClose={() => setMostrarEnvio(false)}
                 />
             )}

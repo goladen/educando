@@ -154,6 +154,13 @@ export const GAMES = [
     nivel: 'Secundaria y Bachillerato', materia: 'Educación vial, Tutoría y Tecnología',
   },
   {
+    slug: 'corrector', emoji: '📝', color: '#0f766e',
+    h1: 'Corrector de exámenes tipo test con el móvil',
+    title: 'Corrector de exámenes tipo test con la cámara del móvil, gratis | PiKT',
+    desc: 'Imprime la hoja de respuestas (hasta 50 preguntas A-E), los alumnos rellenan los círculos y la cámara del móvil saca la nota al momento. Sin IA, sin subir fotos y sin límite de hojas. Clave a mano, escaneada o desde tus preguntas.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
+  },
+  {
     slug: 'invasores', emoji: '👾', color: '#22d3ee',
     h1: 'Invasión Pi: arcade retro de preguntas',
     title: 'Invasión Pi: arcade retro de mates y preguntas para 1-4 jugadores | PiKT',

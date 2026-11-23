@@ -592,7 +592,8 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           nivel: (modoJuego === 'musculos' || modoJuego === 'huesos') ? nivel : null,
           modoRespuesta: modo,
         },
-        jugadores: [{ nombre: mNombre.trim(), curso: mCurso.trim(), aciertos, intentos: total, fallos: total - aciertos, porcentaje: pct }],
+        jugadores: [{ nombre: mNombre.trim(), curso: mCurso.trim(), aciertos, intentos: total, fallos: total - aciertos, porcentaje: pct,
+          repaso: respuestas.slice(0, 60).map(r => ({ enunciado: String(r.nombre || '') + (r.tipo ? ' (' + (TIPOS_PREGUNTA.find(t => t.id === r.tipo)?.label || r.tipo) + ')' : ''), ok: !!r.correcto, dada: r.dada != null ? String(r.dada).slice(0, 80) : '', correcta: r.correcto ? '' : String(r.correcta ?? r.nombre ?? '').slice(0, 80) })) }],
       });
       alert('✅ Resultado enviado al profesor.');
       setModalEnviar(false); setMNombre(''); setMCurso(''); setMCodigo('');
@@ -1732,7 +1733,7 @@ function AnatomiaQuiz({ onBack }) {
     playSound(ok ? 'CORRECT' : 'WRONG');
     setElegida(opcion);
     setFase('feedback');
-    setRespuestas(prev => [...prev, { correcto: ok, nombre: preg.item.nombre, tipo: preg.tipo }]);
+    setRespuestas(prev => [...prev, { correcto: ok, nombre: preg.item.nombre, tipo: preg.tipo, dada: opcion, correcta: preg.correcta }]);
   };
 
   const siguiente = () => {
@@ -1755,7 +1756,8 @@ function AnatomiaQuiz({ onBack }) {
         tipo: 'BIOLOGIA', modalidad: 'Individual', fecha: new Date(),
         codigoProfesor: cod,
         config: { modoJuego: 'anatomia_imagenes', filtroCategoria: filtroCat, tipos: tiposActivos },
-        jugadores: [{ nombre: mNombre.trim(), curso: mCurso.trim(), aciertos, intentos: total, fallos: total - aciertos, porcentaje: pct }],
+        jugadores: [{ nombre: mNombre.trim(), curso: mCurso.trim(), aciertos, intentos: total, fallos: total - aciertos, porcentaje: pct,
+          repaso: respuestas.slice(0, 60).map(r => ({ enunciado: String(r.nombre || '') + (r.tipo ? ' (' + (TIPOS_PREGUNTA.find(t => t.id === r.tipo)?.label || r.tipo) + ')' : ''), ok: !!r.correcto, dada: r.dada != null ? String(r.dada).slice(0, 80) : '', correcta: r.correcto ? '' : String(r.correcta ?? r.nombre ?? '').slice(0, 80) })) }],
       });
       alert('✅ Resultado enviado al profesor.');
       setModalEnviar(false); setMNombre(''); setMCurso(''); setMCodigo('');

@@ -25,6 +25,7 @@ const RacingGame3D = lazy(() => import('../RacingGame3D'));
 const AvionesGame3D = lazy(() => import('../AvionesGame3D'));
 const ThinkHootGame = lazy(() => import('../ThinkHootGame'));
 const PiLiveSolo = lazy(() => import('../PiLiveSolo'));
+const QuizTarjetas = lazy(() => import('../tarjetas/QuizTarjetas.jsx'));
 const RuletaGame = lazy(() => import('../RuletaGame'));
 const MathLive = lazy(() => import('../MathLive'));
 const OlympicLive = lazy(() => import('../OlympicLive'));
@@ -117,6 +118,7 @@ const PizarraApp = lazy(() => import('../GestionAula').then(m => ({ default: m.P
 const QuizManos = lazy(() => import('../manos/QuizManos.jsx'));
 const AvatarCuerpo = lazy(() => import('../cuerpo/AvatarCuerpo.jsx'));
 const Orientacion = lazy(() => import('../orientacion/Orientacion.jsx'));
+const CorrectorExamenes = lazy(() => import('../corrector/CorrectorExamenes.jsx'));
 const DinamicasAula = lazy(() => import('../dinamicasAula/DinamicasAula.jsx'));
 const SemaforoAlumno = lazy(() => import('../dinamicasAula/SemaforoLive.jsx'));
 const AlgebraApp = lazy(() => import('../Algebra'));
@@ -1426,6 +1428,14 @@ export const GAME_INFO = {
         materias: ['Educación Física', 'Geografía', 'Matemáticas'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    CORRECTOR: {
+        descripcion: 'Corrige exámenes tipo test con la cámara del móvil, sin IA y sin subir fotos. Imprime la hoja de respuestas (hasta 50 preguntas, A-B, A-C, A-D o A-E; vale una fotocopia para toda la clase o una hoja por alumno con su nombre), los alumnos rellenan su nº de lista y los círculos, y al enfocar cada hoja sale la nota al momento con los aciertos en verde y los fallos en rojo. La clave se pone a mano, escaneando tu hoja rellenada o sacándola de un recurso (y entonces imprime también el examen con las preguntas). Detecta respuestas en blanco y dobles marcas, permite restar por fallo y da el % de aciertos de cada pregunta.',
+        tipoPreguntas: 'Preguntas tipo test de 2 a 5 opciones (A-E), escritas por el profesor o sacadas de un recurso de opción múltiple.',
+        biblioteca: 'Opcional: las preguntas y la clave pueden salir de tus recursos o de los públicos.',
+        multiplayer: 'Toda la clase: el profesor escanea las hojas. Resultados en tabla, CSV para Excel y guardado en Informes con el código del profesor.',
+        materias: ['Todas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato', 'FP'],
+    },
     AVATAR_CUERPO: {
         descripcion: 'Avatares 3D que copian en tiempo real los movimientos del cuerpo que ve la webcam (brazos, codos, piernas, tronco y cabeza), como un espejo. Modos: «Espejo» (libre, 1 o 2 personas), «Imita la postura» (colocarse como una silueta), «Imita a tu compañero» (por turnos, el líder hace una postura y el otro la copia) y «Coreografía» (seguir pasos al ritmo de la música, tipo Just Dance: ¡PERFECTO!, ¡GENIAL!, BIEN o FALLO y rachas). Lateralidad, esquema corporal, expresión corporal y Educación Física. El reconocimiento del cuerpo (MediaPipe) se hace en el propio navegador: no se envía ninguna imagen.',
         tipoPreguntas: 'Sin preguntas: posturas corporales (brazos en cruz, letra Y, mano derecha/izquierda arriba, robot… y, con el cuerpo entero, estrella, rodilla arriba y sentadilla) y coreografías generadas al azar (tranquila o movida).',
@@ -1781,7 +1791,7 @@ const MATERIA_SLUGS = {
 };
 
 const MATH_ONLY_IDS = new Set(['MATHLIVE', 'SIXSEVEN']);
-const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ', 'FUNCIONES_EJECUTIVAS'];
+const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ', 'FUNCIONES_EJECUTIVAS', 'CORRECTOR'];
 // Herramientas con IA, siempre disponibles en todas las materias (separadas de la gestión de aula)
 const IA_IDS = ['MINIAPP_CREATOR'];
 
@@ -1789,6 +1799,7 @@ const EXTRA_TOOLS = {
     OMNINTERACTIVE:     { id: 'OMNINTERACTIVE',     name: 'Omninteractive',   emoji: '📚', color: '#6D28D9' },
     VIDEOQUIZZ:         { id: 'VIDEOQUIZZ',         name: 'VideoQuizz',       emoji: '🎬', color: '#DC2626' },
     FUNCIONES_EJECUTIVAS:{ id: 'FUNCIONES_EJECUTIVAS',name: 'Func. Ejecutivas',emoji: '🧠', color: '#FF5722' },
+    CORRECTOR:          { id: 'CORRECTOR',          name: 'Corrector de exámenes', emoji: '📝', color: '#0f766e', shareable: true },
     SOLAR_SYSTEM:       { id: 'SOLAR_SYSTEM',       name: 'Sistema Solar',    emoji: '🪐', color: '#3B82F6' },
     MUSICA:             { id: 'MUSICA',             name: 'Música',           emoji: '🎵', color: '#8b5cf6' },
     GEOGRAFIA:          { id: 'GEOGRAFIA',          name: 'Geografía',        emoji: '🌍', color: '#0d9488' },
@@ -2244,6 +2255,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'AVIONES' });
             } else if (path === 'ovni') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
+            } else if (path === 'corrector') {
+                setCorrectorApp(true);
             } else if (path === 'invasores') {
                 setJuegoActivo({ tipoJuego: 'INVASORES' });
             } else if (path === 'vanila') {
@@ -2353,6 +2366,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [quizManosApp,        setQuizManosApp]        = useState(false);
     const [avatarCuerpoApp,     setAvatarCuerpoApp]     = useState(false);
     const [orientacionApp,      setOrientacionApp]      = useState(false);
+    const [correctorApp,        setCorrectorApp]        = useState(false);
     const [dinamicasApp,        setDinamicasApp]        = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
@@ -2402,6 +2416,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     useEffect(() => { if (!quizManosApp) refrescarRegistros(); }, [quizManosApp]);
     useEffect(() => { if (!avatarCuerpoApp) refrescarRegistros(); }, [avatarCuerpoApp]);
     useEffect(() => { if (!orientacionApp) refrescarRegistros(); }, [orientacionApp]);
+    useEffect(() => { if (!correctorApp) refrescarRegistros(); }, [correctorApp]);
     useEffect(() => { if (!dinamicasApp) refrescarRegistros(); }, [dinamicasApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
@@ -2917,6 +2932,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             QUIZ_MANOS:         () => setQuizManosApp(true),
             AVATAR_CUERPO:      () => setAvatarCuerpoApp(true),
             ORIENTACION:        () => { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); },
+            CORRECTOR:          () => { setCorrectorApp(true); window.history.pushState({}, '', '/corrector'); },
             DINAMICAS_AULA:     () => { setDinamicasApp(true); window.history.pushState({}, '', '/dinamicas'); },
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
@@ -3119,6 +3135,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 if (destino === 'puzzle') setJuegoActivo({ tipoJuego: 'PUZZLE_IMAGENES' });
                 else if (destino === 'gestion') setGestionAula(true);
                 else if (destino === 'orientacion') { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); }
+                else if (destino === 'corrector') { setCorrectorApp(true); window.history.pushState({}, '', '/corrector'); }
                 else if (destino === 'quienesquien') { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }
                 else if (destino === 'dinamicas') { setDinamicasApp(true); window.history.pushState({}, '', '/dinamicas'); }
                 else if (destino === 'comunidades') { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }
@@ -3147,6 +3164,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     if (quizManosApp) return <Suspense fallback={null}><QuizManos onExit={() => { setQuizManosApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (dinamicasApp) return <Suspense fallback={null}><DinamicasAula onExit={() => { setDinamicasApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (orientacionApp) return <Suspense fallback={null}><Orientacion onExit={() => { setOrientacionApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
+    if (correctorApp) return <Suspense fallback={null}><CorrectorExamenes onExit={() => { setCorrectorApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (avatarCuerpoApp) return <Suspense fallback={null}><AvatarCuerpo onExit={() => { setAvatarCuerpoApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (pizarraApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}>
@@ -3547,6 +3565,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <><TextWordleGame recursoInicial={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo.juegoLibre ? null : juegoActivo} /></>;
         if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <><SopaDeLetrasGame recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo.juegoLibre ? null : juegoActivo} /></>;
         if (juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <><Ahorcado recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo.juegoLibre ? null : juegoActivo} /></>;
+        if (juegoActivo.modoEspecial === 'PILIVE_MANDOS') return <Suspense fallback={null}><QuizMandos recursoInicial={juegoActivo} onExit={() => setJuegoActivo(null)} /></Suspense>;
+        if (juegoActivo.modoEspecial === 'PILIVE_TARJETAS') return <Suspense fallback={null}><QuizTarjetas recurso={juegoActivo} onExit={() => setJuegoActivo(null)} /></Suspense>;
         if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <><ConAvisoEncaje recurso={juegoActivo} juego="PILIVE_SOLO" onCancelar={() => setJuegoActivo(null)}>{(rc) => <PiLiveSolo recurso={rc} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />}</ConAvisoEncaje><FichaFlotante recurso={juegoActivo} /></>;
 
         return <><GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
@@ -4025,6 +4045,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     recurso={eligiendoModoPiLive}
                     onPresentar={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); lanzarComoGestor(r); }}
                     onJugarSolo={() => { setConfigSoloPiLive(eligiendoModoPiLive); setEligiendoModoPiLive(null); }}
+                    onTarjetas={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_TARJETAS' }); }}
+                    onMandos={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_MANDOS' }); }}
                     onClose={() => setEligiendoModoPiLive(null)}
                 />
             )}
@@ -4605,6 +4627,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'AVATAR_CUERPO',       label: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2', action: () => { setAvatarCuerpoApp(true); window.history.pushState({}, '', '/avatar'); }, shareable: true, shareUrl: `${window.location.origin}/avatar` },
                     { id: 'LENGUA_SIGNOS',   label: 'Lengua Signos',   emoji: '🤟',  color: '#2563EB', action: () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }), shareable: true },
                     { id: 'ORIENTACION',         label: 'Orientación',          emoji: '🚩', color: '#c026d3', action: () => { setOrientacionApp(true); window.history.pushState({}, '', '/orientacion'); }, shareable: true, shareUrl: `${window.location.origin}/orientacion` },
+                    // ── Evaluación
+                    { id: 'CORRECTOR',           label: 'Corrector de exámenes', emoji: '📝', color: '#0f766e', action: () => { setCorrectorApp(true); window.history.pushState({}, '', '/corrector'); }, shareable: true, shareUrl: `${window.location.origin}/corrector` },
                     // ── Desarrollo y programación didáctica
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                     { id: 'SITUACIONES_APRENDIZAJE', label: 'Situaciones de Aprendizaje', emoji: '🌱', color: '#15803d', action: () => setSituacionesAprendizaje(true), shareable: true, shareUrl: `${basePublica()}?juego=situaciones_aprendizaje` },
@@ -4736,7 +4760,7 @@ function InfoRow({ icon, label, text }) {
 }
 
 // MODAL: elegir entre presentar en vivo o jugar en solitario (PiLive)
-function ModalEligeModoPiLive({ recurso, onPresentar, onJugarSolo, onClose }) {
+function ModalEligeModoPiLive({ recurso, onPresentar, onJugarSolo, onTarjetas, onMandos, onClose }) {
     return (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '420px', width: '90%' }}>
@@ -4745,6 +4769,8 @@ function ModalEligeModoPiLive({ recurso, onPresentar, onJugarSolo, onClose }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <button onClick={onPresentar} style={{ padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', cursor: 'pointer', fontWeight: 'bold' }}>🖥️ Presentar en vivo</button>
                     <button onClick={onJugarSolo} style={{ padding: '15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', cursor: 'pointer', fontWeight: 'bold' }}>🙋 Jugar yo solo</button>
+                    {onTarjetas && <button onClick={onTarjetas} title='Los alumnos levantan una tarjeta impresa y la cámara la lee' style={{ padding: '12px 15px', background: '#0f766e', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', cursor: 'pointer', fontWeight: 'bold', lineHeight: 1.3 }}>🃏 Con tarjetas (sin móviles)<br /><span style={{ fontSize: '0.78rem', fontWeight: 600, opacity: 0.9 }}>Tarjetas impresas + la cámara del ordenador</span></button>}
+                    {onMandos && <button onClick={onMandos} title='Cada alumno responde A-D con un mando micro:bit (antena por USB)' style={{ padding: '12px 15px', background: '#1e3a8a', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', cursor: 'pointer', fontWeight: 'bold', lineHeight: 1.3 }}>🎮 Con mandos micro:bit<br /><span style={{ fontSize: '0.78rem', fontWeight: 600, opacity: 0.9 }}>Responden con la placa; la antena va por USB</span></button>}
                     <button onClick={onClose} style={{ marginTop: '6px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
                 </div>
             </div>
@@ -5260,6 +5286,8 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
         if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <><SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
         if (appData.id === 'AHORCADO' || juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <><Ahorcado recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
         if (appData.id === 'ETIQUETAS' || juegoActivo.tipoJuego === 'ETIQUETAS')     return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PILIVE_MANDOS') return <Suspense fallback={null}><QuizMandos recursoInicial={juegoActivo} onExit={() => setJuegoActivo(null)} /></Suspense>;
+        if (juegoActivo.modoEspecial === 'PILIVE_TARJETAS') return <Suspense fallback={null}><QuizTarjetas recurso={juegoActivo} onExit={() => setJuegoActivo(null)} /></Suspense>;
         if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <><ConAvisoEncaje recurso={juegoActivo} juego="PILIVE_SOLO" onCancelar={() => setJuegoActivo(null)}>{(rc) => <PiLiveSolo recurso={rc} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />}</ConAvisoEncaje><FichaFlotante recurso={juegoActivo} /></>;
         return <><GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} /><FichaFlotante recurso={juegoActivo} /></>;
     }
@@ -5278,6 +5306,8 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                         else lanzarComoGestor(r);
                     }}
                     onJugarSolo={() => { setConfigSoloPiLive(eligiendoModoPiLive); setEligiendoModoPiLive(null); }}
+                    onTarjetas={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_TARJETAS' }); }}
+                    onMandos={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_MANDOS' }); }}
                     onClose={() => setEligiendoModoPiLive(null)}
                 />
             )}

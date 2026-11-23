@@ -34,6 +34,7 @@ const EnigmicLogic = lazy(() => import('./EnigmicLogic'));
 const SixSeven = lazy(() => import('./SixSeven'));
 const QuizMandos = lazy(() => import('./mandos/QuizMandos.jsx'));
 const EscanerMovil = lazy(() => import('./tarjetas/EscanerMovil.jsx'));
+const CorrectorMovil = lazy(() => import('./corrector/CorrectorMovil.jsx'));
 const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const OvniAbduccion = lazy(() => import('./OvniAbduccion'));
 const RacingGame3D = lazy(() => import('./RacingGame3D'));
@@ -136,6 +137,8 @@ function App() {
     const [deepLinkGame, setDeepLinkGame] = useState(null);
     // ?escaner=CODIGO → el móvil del profe como cámara de las tarjetas de PiLive (sin sesión)
     const [escanerTarjetas, setEscanerTarjetas] = useState(() => { try { const v = new URLSearchParams(window.location.search).get('escaner'); return v === null ? null : v; } catch { return null; } });
+    // ?corregir=CODIGO → el móvil del profe como cámara del Corrector de exámenes (sin sesión)
+    const [correctorMovil, setCorrectorMovil] = useState(() => { try { return new URLSearchParams(window.location.search).get('corregir'); } catch { return null; } });
     const [mitadDual] = useState(() => { try { return new URLSearchParams(window.location.search).get('dual'); } catch { return null; } });
     const [reinicioMitad, setReinicioMitad] = useState(0);
     const [rutaPublica, setRutaPublica] = useState(null);
@@ -411,6 +414,7 @@ function App() {
         </>
     );
 
+    if (correctorMovil !== null) return <Suspense fallback={null}><CorrectorMovil codigoInicial={correctorMovil} onExit={() => { setCorrectorMovil(null); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (escanerTarjetas !== null) return <Suspense fallback={null}><EscanerMovil codigoInicial={escanerTarjetas} onExit={() => { setEscanerTarjetas(null); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (rutaPublica === 'escalada') return <ClimbingHub onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'whoknows') return <WhoKnows onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;

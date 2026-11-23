@@ -59,12 +59,13 @@ export async function generarPdf({ desde, hasta, porFolio, nombres, conNombres, 
     const c = m / 6;
     const bits = bitsTarjeta(n);
 
-    // Línea de corte
-    pdf.setDrawColor(200);
-    pdf.setLineWidth(0.2);
+    // Tarjeta CUADRADA (se recorta por la línea): igual en las cuatro posiciones,
+    // así girarla para B o D no se siente «de lado» y el código queda en el centro.
+    const sx = x0 + (cw - lado) / 2 + 2, sy = y0 + (ch - lado) / 2 + 2, sl = lado - 4;
+    pdf.setDrawColor(190);
+    pdf.setLineWidth(0.25);
     pdf.setLineDashPattern([2, 2], 0);
-    if (k % cols) pdf.line(x0, y0 + 4, x0, y0 + ch - 4);
-    if (Math.floor(k / cols)) pdf.line(x0 + 4, y0, x0 + cw - 4, y0);
+    pdf.rect(sx, sy, sl, sl, 'S');
     pdf.setLineDashPattern([], 0);
 
     pdf.setFillColor(0, 0, 0);
@@ -95,11 +96,11 @@ export async function generarPdf({ desde, hasta, porFolio, nombres, conNombres, 
     pdf.setFontSize(Math.max(9, lado * 0.05));
     pdf.setTextColor(71, 85, 105);
     const nombre = conNombres ? String(nombres[n] || '').trim() : '';
-    pdf.text(`${n}${nombre ? ` · ${nombre.slice(0, 30)}` : ''}`, x0 + 6, y0 + 9);
+    pdf.text(`${n}${nombre ? ` · ${nombre.slice(0, 30)}` : ''}`, sx + 4, sy + 7);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(7);
     pdf.setTextColor(148, 163, 184);
-    pdf.text('PiKT · pikt.es', x0 + cw - 6, y0 + ch - 5, { align: 'right' });
+    pdf.text('PiKT · pikt.es', sx + sl - 4, sy + sl - 3, { align: 'right' });
   });
   if (devolver) return pdf;
   pdf.save(`tarjetas-pikt-${desde}-${hasta}.pdf`);
@@ -146,7 +147,7 @@ export default function ImprimirTarjetas({ onClose, numInicial }) {
         <p style={st.ayuda}>
           Cada alumno tiene <b>su</b> tarjeta (siempre la misma: el número dice quién es). Para responder la levanta con la
           letra elegida <b>arriba</b>. Se imprimen una vez y sirven para todo el curso; si las plastificas, mejor.
-          Imprime en blanco y negro, <b>sin ajustar a página</b> y sin doblarlas.
+          Imprime en blanco y negro y <b>recórtalas por la línea discontinua</b>: son cuadradas, así se sujetan igual en las cuatro posiciones. Que no se doblen y que los dedos no tapen el cuadro negro (cogedlas por el borde, junto a la letra de abajo).
         </p>
 
         <div style={st.previa}>

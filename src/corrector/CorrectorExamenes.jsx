@@ -7,7 +7,10 @@
 // Todo se guarda en este dispositivo (localStorage) para no perder lo corregido.
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CamaraTarjetas from '../tarjetas/CamaraTarjetas.jsx';
-import { leerHoja, puntuar, aGris, LETRAS, MAX_PREGUNTAS, MARCAS, R, posBurbuja, posId } from './omr.js';
+import { leerHoja, puntuar, aGris, LETRAS, MAX_PREGUNTAS, MARCAS } from './omr.js';
+import { pintarLectura } from './dibujo.js';
+import useSesionMovil from './useSesionMovil.js';
+import { urlCorrectorMovil } from './escanerCorrector.js';
 import { descargarPdfCorrector } from './hojaPdf.js';
 import { hojasTarjetas } from '../tarjetas/preguntasTarjetas.js';
 import { barajar } from '../utils/normalizarPreguntas';
@@ -18,6 +21,7 @@ import { guardarRegistroLocal } from '../utils/registrosLocales';
 import GuardarResultadosMandos from '../mandos/GuardarResultadosMandos.jsx';
 
 const SelectorRecursoMandos = lazy(() => import('../mandos/SelectorRecursoMandos.jsx'));
+const SubirArchivos = lazy(() => import('./SubirArchivos.jsx'));
 
 const LS = 'pikt_corrector_v1';
 const LS_NOMBRES = 'pikt_tarjetas_nombres'; // nº de lista = nº de tarjeta de PiLive: mismos nombres
@@ -69,6 +73,14 @@ export default function CorrectorExamenes({ onExit }) {
     setPestana(p);
   };
 
+  const guardarHoja = useCallback((r) => setResultados((prev) => ({ ...prev, [r.lista]: { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas || [], hora: Date.now(), reescaneada: !!prev[r.lista] } })), []);
+  const ponerClave = useCallback((resp) => {
+    setCfg((c) => ({ ...c, clave: [...resp, ...Array(MAX_PREGUNTAS).fill('')].slice(0, MAX_PREGUNTAS) }));
+    setModoEscaneo('alumnos');
+    setAviso('🔑 Clave leída: revísala en «Preparar» si quieres.');
+  }, []);
+  const movil = useSesionMovil({ cfg, clave, modo: modoEscaneo, onHoja: guardarHoja, onClave: ponerClave });
+
   const nuevaCorreccion = () => {
     if (filas.length && !window.confirm('¿Borrar las hojas corregidas y empezar otra corrección? (La clave se mantiene.)')) return;
     setResultados({});
@@ -95,8 +107,7 @@ export default function CorrectorExamenes({ onExit }) {
         )}
         {pestana === 'corregir' && (
           <Corregir cfg={cfg} clave={clave} modo={modoEscaneo} setModo={setModoEscaneo} nombre={nombre} resultados={resultados}
-            onClave={(resp) => { set({ clave: [...resp, ...Array(MAX_PREGUNTAS).fill('')].slice(0, MAX_PREGUNTAS) }); setModoEscaneo('alumnos'); setAviso('🔑 Clave leída: revísala en «Preparar» si quieres.'); }}
-            onHoja={(r) => setResultados((prev) => ({ ...prev, [r.lista]: { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas, hora: Date.now(), reescaneada: !!prev[r.lista] } }))}
+            onClave={ponerClave} onHoja={guardarHoja} movil={movil}
             onVerResultados={() => irA('resultados')} />
         )}
         {pestana === 'resultados' && (
@@ -287,7 +298,12 @@ const MOTIVOS = {
   fuera: () => 'Una parte de la hoja se sale de la imagen.',
 };
 
-function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHoja, onVerResultados }) {
+const LS_FUENTE = 'pikt_corrector_fuente';
+function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHoja, onVerResultados, movil }) {
+  // De dónde salen las hojas: cámara de este dispositivo, móvil conectado o archivos
+  const [fuente, setFuente] = useState(() => leerLS(LS_FUENTE, 'camara'));
+  useEffect(() => guardarLS(LS_FUENTE, fuente), [fuente]);
+  useEffect(() => { if (fuente === 'movil') movil.crear(); }, [fuente]); // eslint-disable-line react-hooks/exhaustive-deps
   const [estado, setEstado] = useState({ tipo: 'info', texto: 'Enfoca una hoja con la cámara.' });
   const [ultima, setUltima] = useState(null); // última hoja aceptada (para el cartel)
   const lecturaRef = useRef(null); // { r, t, puntos }
@@ -345,36 +361,11 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
     ponerEstado('ok', '');
   }, [cfg.nPreguntas, cfg.nOpciones, cfg.penalizacion, clave, modo, onClave, onHoja]);
 
-  // Círculos de colores sobre la hoja: verde bien, rojo mal (y la buena en verde), naranja en blanco
+  // Círculos de colores sobre la hoja (ver dibujo.js)
   const pintarExtra = useCallback((ctx, ex) => {
     const L = lecturaRef.current;
     if (!L || Date.now() - L.t > 700) return;
-    const { r } = L;
-    const radio = (x, y) => { const a = r.H(x, y), b = r.H(x + R, y); return Math.hypot(b.x - a.x, b.y - a.y); };
-    const circulo = (x, y, color, grueso, relleno) => {
-      const p = r.H(x, y);
-      ctx.beginPath();
-      ctx.arc(ex(p.x), p.y, radio(x, y) * 1.25, 0, Math.PI * 2);
-      if (relleno) { ctx.fillStyle = relleno; ctx.fill(); }
-      ctx.lineWidth = grueso;
-      ctx.strokeStyle = color;
-      ctx.stroke();
-    };
-    const g = Math.max(2, radio(105, 150) * 0.35);
-    for (let q = 0; q < cfg.nPreguntas; q++) {
-      const dada = r.respuestas[q];
-      const buena = modo === 'clave' ? '' : clave[q];
-      if (dada && dada !== '*') {
-        const p = posBurbuja(q, LETRAS.indexOf(dada));
-        const color = modo === 'clave' || !buena ? '#38bdf8' : dada === buena ? COLOR.bien : COLOR.mal;
-        circulo(p.x, p.y, color, g, color + '55');
-      }
-      if (dada === '*') for (let o = 0; o < cfg.nOpciones; o++) { const p = posBurbuja(q, o); circulo(p.x, p.y, COLOR.doble, g / 2); }
-      if (buena && dada !== buena) { const p = posBurbuja(q, LETRAS.indexOf(buena)); circulo(p.x, p.y, dada ? COLOR.bien : COLOR.blanco, g / 1.5); }
-    }
-    if (modo !== 'clave' && r.lista) {
-      [Math.floor(r.lista / 10), r.lista % 10].forEach((d, c) => { const p = posId(c, d); circulo(p.x, p.y, '#2563eb', g, '#2563eb55'); });
-    }
+    pintarLectura(ctx, L.r, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, clave: modo === 'clave' ? null : clave, ex });
   }, [cfg.nPreguntas, cfg.nOpciones, clave, modo]);
 
   const enCartel = ultima && estado.tipo === 'ok';
@@ -389,8 +380,20 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
         </div>
         <button style={st.btnSec} onClick={onVerResultados}>📊 {nHojas} {nHojas === 1 ? 'hoja corregida' : 'hojas corregidas'} →</button>
       </div>
+      <div style={st.fuentes}>
+        {[['camara', '📷 Esta cámara'], ['movil', '📱 Móvil conectado'], ['archivos', '🖼️ Fotos o vídeo']].map(([k, t]) => (
+          <button key={k} style={st.fuente(fuente === k)} onClick={() => setFuente(k)}>{t}</button>
+        ))}
+      </div>
       {modo === 'clave' && <div style={st.explica}>Enfoca <b>tu</b> hoja con las respuestas correctas rellenadas. Se apuntará como clave ({cfg.nPreguntas} preguntas).</div>}
 
+      {fuente === 'movil' && <PanelMovil movil={movil} nombre={nombre} />}
+      {fuente === 'archivos' && (
+        <Suspense fallback={<p>Cargando…</p>}>
+          <SubirArchivos cfg={cfg} clave={clave} modo={modo} onHoja={onHoja} onClave={onClave} nombre={nombre} />
+        </Suspense>
+      )}
+      {fuente === 'camara' && <>
       <div style={{ position: 'relative' }}>
         <CamaraTarjetas activo maxTarjeta={64} onDetecciones={null} etiqueta={() => ({ texto: '', color: '#38bdf8' })}
           onFotograma={onFotograma} pintarExtra={pintarExtra} alto="62vh" compacta
@@ -412,6 +415,52 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
         <li>Verde = bien · rojo = mal (con la buena marcada) · naranja = en blanco · morado = doble marca.</li>
         <li>Si vuelves a escanear una hoja, se queda la última lectura.</li>
       </ul>
+      </>}
+    </div>
+  );
+}
+
+/** QR y estado del móvil conectado (la sesión vive en useSesionMovil). */
+function PanelMovil({ movil, nombre }) {
+  const { codigo, creando, error, conectado, recibidas, crear } = movil;
+  const url = codigo ? urlCorrectorMovil(codigo) : '';
+  const qr = url ? 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url) + '&bgcolor=ffffff&color=0f172a&margin=8' : '';
+  return (
+    <div style={{ ...st.panel, display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'flex-start' }}>
+      <div style={{ textAlign: 'center', minWidth: 240, flex: '0 0 auto' }}>
+        {creando && <p>Creando la sesión…</p>}
+        {error && <><p style={{ color: '#dc2626', fontWeight: 700 }}>{error}</p><button style={st.btnPrim} onClick={crear}>Reintentar</button></>}
+        {codigo && <>
+          <img src={qr} alt={'QR ' + codigo} width={220} height={220} style={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+          <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: 5 }}>{codigo}</div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>{window.location.host}/?corregir={codigo}</div>
+          <div style={{ marginTop: 6, fontWeight: 800, color: conectado ? '#15803d' : '#b45309' }}>{conectado ? '✅ Móvil conectado' : '⏳ Esperando al móvil…'}</div>
+        </>}
+      </div>
+      <div style={{ flex: 1, minWidth: 240 }}>
+        <h3 style={st.h3}>📱 El móvil como cámara</h3>
+        <ol style={{ ...st.ayuda, paddingLeft: 18, margin: 0 }}>
+          <li>Escanea el QR con el móvil (o abre la dirección de debajo).</li>
+          <li>Enfoca las hojas una a una: el móvil manda el nº de lista y las respuestas, este ordenador pone la nota y se la devuelve.</li>
+          <li>La tabla se va llenando en «3 · Resultados» aunque cambies de pestaña.</li>
+        </ol>
+        <p style={st.ayuda}>Por internet solo viajan números y letras: ni fotos, ni la clave, ni los nombres.</p>
+        {recibidas.length > 0 && <>
+          <h4 style={{ margin: '12px 0 6px' }}>Últimas hojas recibidas</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {recibidas.map((h) => (
+              <div key={h.id} style={st.recibida}>
+                {h.clave ? <b>🔑 Clave recibida</b> : <>
+                  <b style={{ width: 54 }}>Nº {h.lista}</b>
+                  <span style={{ flex: 1 }}>{nombre(h.lista)}</span>
+                  <span>✅ {h.aciertos} ❌ {h.fallos} ⚪ {h.blancos}{h.dudosas?.length ? ' ⚠' : ''}</span>
+                  <b style={{ width: 40, textAlign: 'right', color: h.nota >= 5 ? '#16a34a' : '#dc2626' }}>{String(h.nota).replace('.', ',')}</b>
+                </>}
+              </div>
+            ))}
+          </div>
+        </>}
+      </div>
     </div>
   );
 }
@@ -562,5 +611,8 @@ const st = {
   inputTabla: { width: '100%', minWidth: 120, border: 'none', borderBottom: '1px solid #e2e8f0', padding: '4px 2px', fontSize: 14, background: 'transparent', fontFamily: 'inherit' },
   mini: { padding: '4px 8px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontSize: 12, marginRight: 4 },
   chip: { color: '#fff', fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 99 },
+  fuentes: { display: 'flex', gap: 6, flexWrap: 'wrap', background: '#e2e8f0', padding: 4, borderRadius: 12 },
+  fuente: (on) => ({ flex: 1, minWidth: 120, padding: '9px 10px', borderRadius: 9, border: 'none', background: on ? '#fff' : 'transparent', boxShadow: on ? '0 1px 4px rgba(0,0,0,0.15)' : 'none', fontWeight: 800, color: on ? '#0f766e' : '#475569', cursor: 'pointer', fontSize: 14 }),
+  recibida: { display: 'flex', gap: 10, alignItems: 'center', background: '#f8fafc', borderRadius: 8, padding: '6px 10px', fontSize: 14 },
   toast: { position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', color: '#fff', padding: '10px 18px', borderRadius: 12, fontWeight: 700, zIndex: 50 },
 };

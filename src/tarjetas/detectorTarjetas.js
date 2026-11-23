@@ -29,10 +29,11 @@ export function bitsTarjeta(n) {
 export function letraDeEsquinas(c) {
   const ang = (Math.atan2(c[1].y - c[0].y, c[1].x - c[0].x) * 180) / Math.PI;
   const giro = ((Math.round(-ang / 90) % 4) + 4) % 4;
-  // Distancia al múltiplo de 90° más cercano: si la tarjeta va muy inclinada (≈45°) no se fía.
+  // Distancia al múltiplo de 90° más cercano: si la tarjeta va muy inclinada (cerca de 45°,
+  // justo entre dos letras) no se fía. Hasta 38° se acepta (se sujeta torcida con frecuencia).
   const resto = (((ang % 90) + 90) % 90);
   const desvio = Math.min(resto, 90 - resto);
-  return { letra: LETRAS_TARJETA[giro], angulo: ang, dudosa: desvio > 30 };
+  return { letra: LETRAS_TARJETA[giro], angulo: ang, dudosa: desvio > 38 };
 }
 
 /**

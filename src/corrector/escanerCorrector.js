@@ -6,8 +6,8 @@
 //
 // Documento live_games/{codigo}:
 //   tipoJuego: 'CORRECTOR_ESCANER', codigo, createdAt
-//   nPreguntas, nOpciones, modo: 'alumnos' | 'clave', titulo       (ordenador)
-//   hojas: { [id]: { lista, r: 'AB-*C…', d: [dudosas], modo, t } }  (móvil)
+//   nPreguntas, nOpciones, nEscritas, letras, modo: 'alumnos' | 'clave' (ordenador)
+//   hojas: { [id]: { lista, r: 'AB-*C…', d: [dudosas], e: [casillas codificadas], modo, t } }  (móvil)
 //   notas: { [id]: { lista, nota, aciertos, fallos, blancos, ok } }  (ordenador)
 //   movil: ms del último latido
 import { db } from '../firebase';
@@ -39,10 +39,10 @@ export const actualizarCorrector = (codigo, datos) => updateDoc(ref(codigo), dat
 export const cerrarCorrector = (codigo) => deleteDoc(ref(codigo)).catch(() => {});
 
 /** Móvil: manda una hoja leída. Devuelve su id (para encontrar luego su nota). */
-export function enviarHoja(codigo, { lista, respuestas, dudosas, modo }) {
+export function enviarHoja(codigo, { lista, respuestas, dudosas, escritas = [], modo }) {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   return updateDoc(ref(codigo), {
-    [`hojas.${id}`]: { lista: lista || 0, r: respuestasATexto(respuestas), d: dudosas || [], modo, t: Date.now() },
+    [`hojas.${id}`]: { lista: lista || 0, r: respuestasATexto(respuestas), d: dudosas || [], e: escritas.map((x) => x.c), modo, t: Date.now() },
     movil: Date.now(),
   }).then(() => id);
 }

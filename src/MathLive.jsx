@@ -15,6 +15,7 @@ import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
 import { nombreSeguro } from './utils/filtroNombres';
+import { generarOperacionesMathLive } from './utils/operacionesMathLive';
 
 // --- AUDIOS (PRE-CARGADOS PARA EVITAR LAG) ---
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
@@ -49,83 +50,6 @@ const parseText = (text) => {
     p = p.replace(/\((.*?)\)\/\((.*?)\)/g, '<span class="fraction"><span class="numer">$1</span><span class="denom">$2</span></span>');
     return <span dangerouslySetInnerHTML={{ __html: p }} />;
 };
-
-
-const generarOperacionesMathLive = (config) => {
-    const questions = [];
-    const count = parseInt(config.mathCount || 0);
-    if (count <= 0) return [];
-
-    const types = config.mathTypes || ['POSITIVOS'];
-    const ops = config.mathOps || ['SUMA'];
-    const min = parseInt(config.mathMin || 1);
-    const max = parseInt(config.mathMax || 10);
-
-    const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-    const getRandomFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
-    const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
-    const simplify = (n, d) => { const common = gcd(Math.abs(n), Math.abs(d)); return { n: n / common, d: d / common }; };
-
-    for (let i = 0; i < count; i++) {
-        const type = types[i % types.length];
-        const op = ops[i % ops.length];
-        let qObj = { tipo: 'MATH', tiempo: config.mathTime || 30, puntosMax: config.mathPuntosMax || 100, puntosMin: config.mathPuntosMin || 50, subtipo: 'STANDARD' };
-        let a, b, res, operatorSymbol;
-
-        if (type === 'FRACCIONES') {
-            qObj.subtipo = 'FRACTION';
-            const n1 = getRandomInt(min, max); const d1 = getRandomInt(min, max);
-            const n2 = getRandomInt(min, max); const d2 = getRandomInt(min, max);
-            qObj.f1 = { n: n1, d: d1 }; qObj.f2 = { n: n2, d: d2 };
-            let resN, resD;
-            if (op === 'SUMA') { operatorSymbol = '+'; resN = n1 * d2 + n2 * d1; resD = d1 * d2; }
-            else if (op === 'RESTA') { operatorSymbol = '-'; resN = n1 * d2 - n2 * d1; resD = d1 * d2; }
-            else if (op === 'MULT') { operatorSymbol = '·'; resN = n1 * n2; resD = d1 * d2; }
-            else if (op === 'DIV') { operatorSymbol = ':'; resN = n1 * d2; resD = d1 * n2; }
-            const simple = simplify(resN, resD);
-            if (simple.d < 0) { simple.n = -simple.n; simple.d = -simple.d; }
-            qObj.operator = operatorSymbol; qObj.respuesta = { n: simple.n, d: simple.d }; qObj.q = "Calcula";
-        } else {
-            qObj.subtipo = 'STANDARD';
-            const isDecimal = type === 'DECIMALES';
-            const isNegative = type === 'NEGATIVOS';
-            const getVal = () => { let v = isDecimal ? parseFloat(getRandomFloat(min, max)) : getRandomInt(min, max); if (isNegative && Math.random() > 0.5) v = -v; return v; };
-            a = getVal(); b = getVal();
-            if (op === 'DIV') {
-                if (b === 0) b = 1;
-                if (!isDecimal) { const resTemp = isNegative ? (Math.random() > 0.5 ? -getRandomInt(min, max) : getRandomInt(min, max)) : getRandomInt(min, max); a = b * resTemp; }
-            }
-            if (op === 'SUMA') { operatorSymbol = '+'; res = a + b; }
-            else if (op === 'RESTA') {
-                operatorSymbol = '-';
-
-                // --- SEGURO PARA RESTAS: Si solo queremos POSITIVOS, evitamos que dé negativo ---
-                if (!isNegative && b > a) {
-                    const temp = a;
-                    a = b;
-                    b = temp;
-                }
-
-                res = a - b;
-            }
-            else if (op === 'MULT') { operatorSymbol = '·'; res = a * b; }
-            else if (op === 'DIV') { operatorSymbol = ':'; res = a / b; }
-
-            if (isDecimal || !Number.isInteger(res)) {
-                res = parseFloat(res.toFixed(1));
-                qObj.respuesta = String(res).replace('.', ',');
-            } else {
-                qObj.respuesta = String(res);
-            }
-            qObj.displayA = String(a).replace('.', ','); qObj.displayB = String(b).replace('.', ',');
-            if (b < 0) qObj.displayB = `(${qObj.displayB})`; if (a < 0 && op !== '') qObj.displayA = `${qObj.displayA}`;
-            qObj.operator = operatorSymbol; qObj.q = "Calcula";
-        }
-        questions.push(qObj);
-    }
-    return questions;
-};
-
 
 
 // ============================================================================
@@ -179,7 +103,8 @@ function MathLiveHost({ codigoSala, onExit, usuario }) {
                     generationProcessed.current = true;
                     const mathQuestions = generarOperacionesMathLive(data.config);
                     // Si el profesor ya tenía preguntas normales (ej. orden, selección) las mezclamos
-                    const standardQuestions = data.preguntas || [];
+                    // Las preguntas musicales no existen en este motor: se descartan
+                    const standardQuestions = (data.preguntas || []).filter(p => p?.tipo !== 'MUSICAL');
                     const combined = [...mathQuestions, ...standardQuestions].sort(() => Math.random() - 0.5); // Mezcla simple
 
                     await updateDoc(doc(db, "live_games", codigoSala), { preguntas: combined, mathGenerated: true });

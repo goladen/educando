@@ -29,15 +29,94 @@ export const ID = { xDecenas: 166, xUnidades: 178, y0: 40, paso: 7 };
 export const RESP = { cols: [22, 85, 148], y0: 122, pasoY: 8, filas: 17, dx: 14, pasoX: 8 };
 
 export const posId = (columna, digito) => ({ x: columna === 0 ? ID.xDecenas : ID.xUnidades, y: ID.y0 + digito * ID.paso });
-export function posBurbuja(q, o) {
-  const col = Math.floor(q / RESP.filas);
-  const fila = q % RESP.filas;
+// filas: filas por columna (17 en la hoja clásica; menos si hay respuestas escritas debajo)
+export function posBurbuja(q, o, filas = RESP.filas) {
+  const col = Math.floor(q / filas);
+  const fila = q % filas;
   return { x: RESP.cols[col] + RESP.dx + o * RESP.pasoX, y: RESP.y0 + fila * RESP.pasoY };
 }
-export const posNumero = (q) => {
-  const p = posBurbuja(q, 0);
+export const posNumero = (q, filas = RESP.filas) => {
+  const p = posBurbuja(q, 0, filas);
   return { x: p.x - 5.5, y: p.y };
 };
+
+// ── Respuestas escritas: una letra o cifra MAYÚSCULA por casilla ──
+// Sin respuestas escritas la hoja es la clásica (17 filas por columna, igual que siempre).
+// Con ellas, los círculos ocupan solo las filas necesarias y debajo van las casillas.
+export const CAJA = { w: 8, h: 10, paso: 9, filaY: 13, margen: 0.5 };
+export const MAX_LETRAS = 16;
+export const filasTest = ({ nPreguntas = 0, nEscritas = 0 }) => (nEscritas > 0 ? Math.max(1, Math.ceil(nPreguntas / 3)) : RESP.filas);
+
+/** Dónde van las respuestas escritas: { titulo (y del rótulo), items: [{ k, num, x, y, cajas:[{cx, cy}] }], capacidad }. */
+export function plantillaEscritas({ nPreguntas = 0, nEscritas = 0, letras = 8 }) {
+  const n = Math.max(1, Math.min(MAX_LETRAS, letras));
+  const titulo = nPreguntas > 0 ? RESP.y0 + filasTest({ nPreguntas, nEscritas: 1 }) * RESP.pasoY + 4 : RESP.y0 - 9;
+  const y0 = titulo + 10;
+  const cols = n <= 8 ? [22, 108] : [22];
+  const ultima = 271 - CAJA.h / 2; // centro más bajo posible (encima de los marcadores de abajo)
+  const filas = y0 > ultima ? 0 : Math.floor((ultima - y0) / CAJA.filaY) + 1;
+  const capacidad = filas * cols.length;
+  const items = [];
+  for (let k = 0; k < Math.min(nEscritas, capacidad); k++) {
+    const col = Math.floor(k / filas), fila = k % filas;
+    const x = cols[col], y = y0 + fila * CAJA.filaY;
+    items.push({ k, num: nPreguntas + k + 1, x, y, cajas: Array.from({ length: n }, (_, j) => ({ cx: x + 9 + j * CAJA.paso + CAJA.w / 2, cy: y })) });
+  }
+  return { titulo, items, capacidad, letras: n };
+}
+
+/**
+ * Recorta cada casilla (por la homografía) y devuelve su «tinta» 0-1 en una rejilla
+ * fija de GW×GH, o null si está vacía. Se descartan motas y restos del borde impreso.
+ */
+export const GW = 41, GH = 55;
+export function leerCajas(gris, H, items) {
+  const iw = CAJA.w - 2 * CAJA.margen, ih = CAJA.h - 2 * CAJA.margen;
+  return items.map((it) => it.cajas.map(({ cx, cy }) => {
+    const v = new Float32Array(GW * GH);
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+      const p = H(cx - iw / 2 + (gx + 0.5) * iw / GW, cy - ih / 2 + (gy + 0.5) * ih / GH);
+      const m = muestra(gris, p.x, p.y);
+      if (m === null) return null;
+      v[gy * GW + gx] = m;
+    }
+    const orden = Float32Array.from(v).sort();
+    const papel = Math.max(40, orden[Math.floor(orden.length * 0.85)]);
+    // Tinta normalizada entre el papel y el trazo más oscuro de la casilla: conserva los bordes
+    // suaves del trazo (como en los datos de entrenamiento) en vez de saturarlo todo a negro.
+    const oscuro = orden[Math.floor(orden.length * 0.005)]; // ~11 px: un punto o una coma también cuentan
+    if (papel - oscuro < Math.max(25, papel * 0.15)) return null; // sin contraste: casilla vacía
+    const tinta = new Float32Array(GW * GH);
+    for (let i = 0; i < tinta.length; i++) tinta[i] = Math.max(0, Math.min(1, ((papel - v[i]) / (papel - oscuro) - 0.12) / 0.8));
+    limpiarTinta(tinta);
+    let masa = 0;
+    for (const t of tinta) masa += t;
+    return masa < 12 ? null : tinta; // poca tinta = vacía (una coma o un punto ya cuentan)
+  }));
+}
+
+// Quita componentes pequeñas (motas) y rayas pegadas al borde (restos del recuadro impreso)
+function limpiarTinta(t) {
+  const vis = new Uint8Array(t.length), pila = [];
+  for (let i0 = 0; i0 < t.length; i0++) {
+    if (vis[i0] || t[i0] <= 0.3) continue;
+    const comp = [];
+    let x0 = GW, x1 = 0, y0 = GH, y1 = 0;
+    vis[i0] = 1; pila.push(i0);
+    while (pila.length) {
+      const i = pila.pop(); comp.push(i);
+      const x = i % GW, y = (i / GW) | 0;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      for (const j of [x > 0 ? i - 1 : -1, x < GW - 1 ? i + 1 : -1, y > 0 ? i - GW : -1, y < GH - 1 ? i + GW : -1]) {
+        if (j >= 0 && !vis[j] && t[j] > 0.3) { vis[j] = 1; pila.push(j); }
+      }
+    }
+    const pegada = x0 <= 1 || y0 <= 1 || x1 >= GW - 2 || y1 >= GH - 2;
+    const delgada = x1 - x0 <= 3 || y1 - y0 <= 3;
+    if (comp.length < 8 || (pegada && delgada)) for (const i of comp) t[i] = 0;
+  }
+  for (let i = 0; i < t.length; i++) if (t[i] <= 0.3 && !vis[i]) t[i] = t[i] < 0.15 ? 0 : t[i];
+}
 
 // ───────────────────────── Homografía ─────────────────────────
 
@@ -175,7 +254,8 @@ function decidir(niveles, umbral, vacio) {
  * → { ok:false, motivo } o
  *   { ok:true, lista (n.º de lista o null), respuestas: ['A'|''|'*'…], dudosas: [q…], H }
  */
-export function leerHoja(imagen, detecciones, { nPreguntas, nOpciones }, gris = null) {
+export function leerHoja(imagen, detecciones, { nPreguntas, nOpciones, nEscritas = 0 }, gris = null) {
+  const filas = filasTest({ nPreguntas, nEscritas });
   const { parejas, vistas } = parejasDeMarcas(detecciones);
   if (vistas.length < 3) return { ok: false, motivo: 'marcas', vistas };
   const H = homografia(parejas);
@@ -187,7 +267,7 @@ export function leerHoja(imagen, detecciones, { nPreguntas, nOpciones }, gris = 
   if (Math.hypot(b.x - a.x, b.y - a.y) < 9) return { ok: false, motivo: 'lejos', vistas };
 
   const nivelesId = [0, 1].map((c) => Array.from({ length: 10 }, (_, d) => { const p = posId(c, d); return oscuridad(g, H, p.x, p.y); }));
-  const niveles = Array.from({ length: nPreguntas }, (_, q) => Array.from({ length: nOpciones }, (_, o) => { const p = posBurbuja(q, o); return oscuridad(g, H, p.x, p.y); }));
+  const niveles = Array.from({ length: nPreguntas }, (_, q) => Array.from({ length: nOpciones }, (_, o) => { const p = posBurbuja(q, o, filas); return oscuridad(g, H, p.x, p.y); }));
   if ([...nivelesId.flat(), ...niveles.flat()].some((v) => v === null)) return { ok: false, motivo: 'fuera', vistas };
 
   // Nivel de un círculo vacío = mediana de todos (la mayoría están vacíos)
@@ -204,23 +284,34 @@ export function leerHoja(imagen, detecciones, { nPreguntas, nOpciones }, gris = 
   const [dec, uni] = nivelesId.map((col) => decidir(col, umbral, vacio).marca);
   // Sin decenas = 0 (alumnos del 1 al 9 que solo rellenan las unidades)
   const lista = uni >= 0 && dec !== -2 ? (dec > 0 ? dec : 0) * 10 + uni : null;
-  return { ok: true, lista: lista || null, respuestas, dudosas, H, umbral, vistas };
+  return { ok: true, lista: lista || null, respuestas, dudosas, H, umbral, vistas, filas, gris: g };
 }
 
-/** Nota de una hoja: aciertos, fallos, blancos, dobles y nota sobre 10 (con penalización por fallo). */
-export function puntuar(respuestas, clave, { penalizacion = 0 } = {}) {
-  let aciertos = 0, fallos = 0, blancos = 0, dobles = 0;
+/**
+ * Nota de una hoja: aciertos, fallos, blancos, dobles y nota sobre 10 (con penalización por fallo).
+ * escritas: estados de las respuestas escritas ([{ estado }]): cuentan como preguntas; sus fallos
+ * no restan (no se pueden acertar al azar) y las «dudosas» no suman hasta que el profe las revise.
+ */
+export function puntuar(respuestas, clave, { penalizacion = 0, escritas = [] } = {}) {
+  let aciertos = 0, fallos = 0, blancos = 0, dobles = 0, falloTest = 0, pendientes = 0;
   const detalle = clave.map((c, q) => {
     const r = respuestas[q] || '';
     if (!c) return 'anulada'; // pregunta sin clave: no cuenta
     if (r === '') { blancos++; return 'blanco'; }
-    if (r === '*') { dobles++; fallos++; return 'doble'; }
+    if (r === '*') { dobles++; fallos++; falloTest++; return 'doble'; }
     if (r === c) { aciertos++; return 'bien'; }
-    fallos++;
+    fallos++; falloTest++;
     return 'mal';
   });
-  const validas = clave.filter(Boolean).length;
-  const puntos = Math.max(0, aciertos - fallos * penalizacion);
+  for (const e of escritas) {
+    if (e.estado === 'anulada') continue;
+    if (e.estado === 'bien') aciertos++;
+    else if (e.estado === 'mal') fallos++;
+    else if (e.estado === 'blanco') blancos++;
+    else pendientes++;
+  }
+  const validas = clave.filter(Boolean).length + escritas.filter((e) => e.estado !== 'anulada').length;
+  const puntos = Math.max(0, aciertos - falloTest * penalizacion);
   const nota = validas ? Math.round((puntos / validas) * 100) / 10 : 0;
-  return { aciertos, fallos, blancos, dobles, validas, nota, detalle };
+  return { aciertos, fallos, blancos, dobles, pendientes, validas, nota, detalle };
 }

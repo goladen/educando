@@ -163,8 +163,10 @@ function GamePlayerInterno({ recurso, usuario, alTerminar, autoStart = false, ho
     if (modoInicial === 'LINEA_TIEMPO' || (!modoInicial && recurso.tipoJuego === 'LINEA_TIEMPO')) return <LineaTiempoGame recurso={recurso} onExit={alTerminar} />;
     if (recurso.tipoJuego === 'LISTENING_RECURSO') return <Suspense fallback={null}><ListeningRecursoGame recurso={recurso} usuario={usuario} onExit={alTerminar} /></Suspense>;
 
-    // Botón de Salir al Inicio (Cierra el juego actual)
-    const BotonCasa = () => (
+    // Botón de Salir al Inicio (Cierra el juego actual). En una mitad de la pantalla dual no sale:
+    // allí la barra de arriba ya tiene «↻ Reiniciar» y el botón tapaba el marcador del juego.
+    const enMitadDual = (() => { try { return new URLSearchParams(window.location.search).has('dual'); } catch { return false; } })();
+    const BotonCasa = () => enMitadDual ? null : (
         <button
             onClick={alTerminar}
             style={{

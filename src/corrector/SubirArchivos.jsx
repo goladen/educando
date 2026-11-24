@@ -5,7 +5,8 @@
 //           seguidas, y por cada nº de lista se queda la lectura que más se repite.
 import React, { useMemo, useRef, useState } from 'react';
 import { crearDetector } from '../tarjetas/detectorTarjetas.js';
-import { leerHoja, puntuar, MARCAS } from './omr.js';
+import { leerHoja, MARCAS } from './omr.js';
+import { hayEscritas, leerEscritas, textosLeidos } from './escritas.js';
 import { pintarLectura } from './dibujo.js';
 
 const IDS = new Set(MARCAS.map((m) => m.tarjeta));
@@ -43,33 +44,41 @@ const esperar = (el, ev) => new Promise((ok, mal) => {
 
 const MOTIVO = { marcas: 'No se ven al menos 3 de las 4 esquinas negras', lejos: 'La hoja sale muy pequeña', fuera: 'Parte de la hoja se sale de la foto' };
 
-export default function SubirArchivos({ cfg, clave, modo, onHoja, onClave, nombre }) {
+export default function SubirArchivos({ cfg, clave, modo, onHoja, onClave, nombre, prepararHoja, notaHoja }) {
   const [items, setItems] = useState([]); // { id, archivo, estado, texto, mini, lista, nota }
   const [progreso, setProgreso] = useState(null); // { texto, pct }
   const det = useMemo(() => crearDetector({ maxTarjeta: 64 }), []);
   const cancelar = useRef(false);
   const inputRef = useRef(null);
-  const opcDibujo = { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, clave: modo === 'clave' ? null : clave };
+  const opcDibujo = { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, nEscritas: cfg.nEscritas || 0, letras: cfg.letras || 8, clave: modo === 'clave' ? null : clave };
 
   const añadir = (it) => setItems((prev) => [...prev, { id: Math.random().toString(36).slice(2), ...it }]);
 
   const leer = (img) => {
     const dets = det.detectar(img).filter((d) => IDS.has(d.tarjeta));
-    return leerHoja(img, dets, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones });
+    return leerHoja(img, dets, cfg);
   };
 
-  // Guarda una lectura buena como hoja (o como clave) y la añade al informe
-  const aceptar = (r, archivo, mini, extra = '') => {
+  // Guarda una lectura buena como hoja (o como clave) y la añade al informe. lienzo: imagen para la miniatura.
+  const aceptar = async (r, archivo, lienzo, extra = '') => {
     if (modo === 'clave') {
-      onClave(r.respuestas.map((x) => (x === '*' ? '' : x)));
-      añadir({ archivo, estado: 'ok', texto: `🔑 Clave leída${extra}`, mini });
+      const resp = r.respuestas.map((x) => (x === '*' ? '' : x));
+      let textos = null;
+      if (hayEscritas(cfg)) { try { textos = textosLeidos(await leerEscritas(r, cfg, () => false)); } catch { /* sin lector: solo el test */ } }
+      onClave(resp, textos);
+      añadir({ archivo, estado: 'ok', texto: '🔑 Clave leída' + (textos ? ' (también las escritas: revísalas en «Preparar»)' : '') + extra, mini: miniatura(lienzo, r, opcDibujo) });
       cancelar.current = true; // solo cuenta la primera hoja
       return;
     }
-    if (!r.lista) { añadir({ archivo, estado: 'error', texto: 'No se lee el nº de lista', mini }); return; }
-    const p = puntuar(r.respuestas, clave, { penalizacion: cfg.penalizacion });
-    onHoja(r);
-    añadir({ archivo, estado: 'ok', lista: r.lista, nota: p.nota, texto: `✅ ${p.aciertos} · ❌ ${p.fallos} · ⚪ ${p.blancos}${r.dudosas.length ? ` · ⚠ revisar ${r.dudosas.map((q) => q + 1).join(', ')}` : ''}${extra}`, mini });
+    if (!r.lista) { añadir({ archivo, estado: 'error', texto: 'No se lee el nº de lista', mini: miniatura(lienzo, r, opcDibujo) }); return; }
+    let h;
+    try { h = await prepararHoja(r); } catch { añadir({ archivo, estado: 'error', texto: 'No se pudo cargar el lector de letras (¿sin internet?)', mini: miniatura(lienzo, r, opcDibujo) }); return; }
+    const p = notaHoja(h);
+    onHoja(h);
+    const texto = '✅ ' + p.aciertos + ' · ❌ ' + p.fallos + ' · ⚪ ' + p.blancos
+      + (p.pendientes ? ' · 🔍 ' + p.pendientes + ' por revisar' : '')
+      + (r.dudosas.length ? ' · ⚠ revisar ' + r.dudosas.map((q) => q + 1).join(', ') : '') + extra;
+    añadir({ archivo, estado: 'ok', lista: r.lista, nota: p.nota, texto, mini: miniatura(lienzo, r, { ...opcDibujo, escritas: p.escritasEst }) });
   };
 
   const foto = async (f) => {
@@ -82,7 +91,7 @@ export default function SubirArchivos({ cfg, clave, modo, onHoja, onClave, nombr
     bmp.close?.();
     const r = leer(img);
     if (!r.ok) { añadir({ archivo: f.name, estado: 'error', texto: MOTIVO[r.motivo] || 'No se lee la hoja', mini: miniatura(c, null, opcDibujo) }); return; }
-    aceptar(r, f.name, miniatura(c, r, opcDibujo));
+    await aceptar(r, f.name, c);
   };
 
   const video = async (f) => {
@@ -116,7 +125,7 @@ export default function SubirArchivos({ cfg, clave, modo, onHoja, onClave, nombr
       for (const m of porLista.values()) {
         const mejor = [...m.values()].sort((a, b) => b.n - a.n)[0];
         const otras = m.size - 1;
-        aceptar(mejor.r, f.name, miniatura(mejor.c, mejor.r, opcDibujo), otras ? ` · ${otras} lectura(s) distinta(s): ¿hoja movida? Revísala` : '');
+        await aceptar(mejor.r, f.name, mejor.c, otras ? ` · ${otras} lectura(s) distinta(s): ¿hoja movida? Revísala` : '');
       }
     } catch (e) {
       añadir({ archivo: f.name, estado: 'error', texto: e?.message || 'No se puede leer el vídeo' });

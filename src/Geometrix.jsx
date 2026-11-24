@@ -13,7 +13,7 @@ import SalaGeometria3D from './SalaGeometria3D';
 const CambioUnidades = lazy(() => import('./unidades/CambioUnidades'));
 import ModalCompartirReto from './components/ModalCompartirReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
-import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import { leerRetoUrl, limpiarRetoUrl, textoEnvioCompeticion } from './utils/retoLink';
 
 // --- AUDIOS Y AVATARES (Estética MathLive) ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -1265,7 +1265,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         {/* Si el reto viene de una prueba de competición, el resultado va SOLO allí */}
                         <button onClick={() => setMostrarEnvioFin(true)}
                             style={{ ...sLocal.btnPrimary, background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>
-                            {esRetoCompeticion ? '🏆 Enviar a la competición' : '📤 Enviar al profesor'}
+                            {esRetoCompeticion ? textoEnvioCompeticion() : '📤 Enviar al profesor'}
                         </button>
                         <button onClick={handleExit} style={{ ...sLocal.btnPrimary, background: '#009688' }}>Salir al Menú</button>
                     </div>

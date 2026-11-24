@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Trophy, X } from 'lucide-react';
+import { COMP_RETO_SEMANA } from '../utils/retoLink';
+import ModalEnviarRetoSemana from '../retoSemana/ModalEnviarRetoSemana';
 
 const norm = (s) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -14,7 +16,13 @@ const norm = (s) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀
  * contraseña no se comprueba aquí (nadie puede leerlas): la validan las reglas
  * de Firestore al crear el documento en competiciones/{id}/resultados.
  */
-export default function ModalEnviarCompeticion({ compId, catId, puntos, detalle = null, nombreJuego = '', tituloReto = '', onClose }) {
+export default function ModalEnviarCompeticion(props) {
+    // Reto de la semana (&comp=semana&cat=<idReto>): ranking público propio
+    if (props.compId === COMP_RETO_SEMANA) return <ModalEnviarRetoSemana {...props} retoId={props.catId} />;
+    return <ModalEnviarCompeticionBase {...props} />;
+}
+
+function ModalEnviarCompeticionBase({ compId, catId, puntos, detalle = null, nombreJuego = '', tituloReto = '', onClose }) {
     const [participantes, setParticipantes] = useState(null);
     const [alias, setAlias]   = useState(() => { try { return localStorage.getItem('pikt_comp_alias') || ''; } catch (_) { return ''; } });
     const [clave, setClave]   = useState('');

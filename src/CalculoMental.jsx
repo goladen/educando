@@ -11,7 +11,7 @@ import DominoMatematico from './dominofracciones';
 import AscensorEnteros from './AscensorEnteros';
 import ModalCompartirReto from './components/ModalCompartirReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
-import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import { leerRetoUrl, limpiarRetoUrl, textoEnvioCompeticion } from './utils/retoLink';
 import ProblemasNumeros from './ProblemasNumeros';
 
 // Fichas imprimibles (editor + PDF + pizarra + enlace público): se cargan solo al abrirlas
@@ -1338,7 +1338,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                         {/* Si el reto viene de una prueba de competición, el resultado va SOLO allí */}
                         {esRetoCompeticion ? (
                             <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#f39c12,#e67e22)' }}>
-                                🏆 Enviar a la competición
+                                {textoEnvioCompeticion()}
                             </button>
                         ) : (
                             <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>

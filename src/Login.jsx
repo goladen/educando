@@ -69,7 +69,9 @@ export default function Login({ setGoogleToken }) {
                 setVistaActual('COMUNIDADES');
             } else {
                 // Buscamos si la ruta coincide con algún juego
-                const app = APPS.find(a => a.name.toLowerCase() === path || a.id.toLowerCase() === path);
+                // /mathlive (enlaces antiguos): MathLive ahora es parte de PiLive
+                const slug = path === 'mathlive' ? 'thinkhoot' : path;
+                const app = APPS.find(a => a.name.toLowerCase() === slug || a.id.toLowerCase() === slug);
                 if (app) setVistaActual(app.id);
                 else setVistaActual('MAIN');
             }

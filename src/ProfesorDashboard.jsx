@@ -2,7 +2,7 @@
 import CargandoChunk from './components/CargandoChunk';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy, limit, arrayRemove, deleteField } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair, Share2 } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Medal, Crosshair, Share2 } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import ModalCrearIA from './components/ModalCrearIA';
@@ -19,7 +19,6 @@ import MenuPublico from './components/MenuPublico';
 import GlobalSearch from './components/GlobalSearch';
 const TeacherTools = lazy(() => import('./components/TeacherTools'));
 const MiniAppAdmin = lazy(() => import('./components/MiniAppAdmin'));
-const EditorMathLive = lazy(() => import('./components/EditorMathLive'));
 const MathLive = lazy(() => import('./MathLive'));
 const OlympicLive = lazy(() => import('./OlympicLive'));
 const ModalPdfRecurso = lazy(() => import('./components/ModalPdfRecurso'));
@@ -79,12 +78,13 @@ import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_DEVELOPER_KEY = import.meta.env.VITE_GOOGLE_DEVELOPER_KEY;
 // ==============================================================================
+// PiLive incluye los antiguos recursos MathLive (ahora «operaciones automáticas» dentro de PiLive)
+const tiposDeJuego = (id) => id === 'THINKHOOT' ? ['THINKHOOT', 'MATHLIVE'] : [id];
+const filtroTipoJuego = (id) => id === 'THINKHOOT' ? where("tipoJuego", "in", tiposDeJuego(id)) : where("tipoJuego", "==", id);
 const TIPOS_JUEGOS = {
     PASAPALABRA: { id: 'PASAPALABRA', label: 'Pasapalabra', color: '#3F51B5', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Rosco (seg)', type: 'number', default: 150 }] },
     CAZABURBUJAS: { id: 'CAZABURBUJAS', label: 'Burbujas y Pikatron', color: '#E91E63', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 20 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosAcierto', label: 'Pts Acierto', type: 'number', default: 10 }, { key: 'puntosFallo', label: 'Pts Fallo', type: 'number', default: 2 }] },
     
-    // --- AÑADE ESTA LÍNEA ---
-    MATHLIVE: { id: 'MATHLIVE', label: 'MathLive', color: '#009688', camposConfig: [] },
     // --
     // --- AÑADE ESTA LÍNEA PARA SOLUCIONAR EL ERROR ---
 
@@ -143,7 +143,6 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
     const [mostrandoCrearIA, setMostrandoCrearIA] = useState(false);
     const [mostrandoEditorManual, setMostrandoEditorManual] = useState(false);
     const [mostrandoEditorPro, setMostrandoEditorPro] = useState(false);
-    const [mostrandoEditorMathLive, setMostrandoEditorMathLive] = useState(false);
     const [mostrandoEditorBurbujasPikatron, setMostrandoEditorBurbujasPikatron] = useState(false);
     const [mostrandoMathWordle, setMostrandoMathWordle] = useState(false);
     const [mostrandoEditorWordle, setMostrandoEditorWordle] = useState(false);
@@ -261,12 +260,12 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
     const cargarRecursosPropios = async () => {
         setCargando(true);
         try {
-            const q = query(collection(db, "resources"), where("profesorUid", "==", usuario.uid), where("tipoJuego", "==", juegoSeleccionado));
+            const q = query(collection(db, "resources"), where("profesorUid", "==", usuario.uid), filtroTipoJuego(juegoSeleccionado));
             // Recursos que otros profes han compartido conmigo (solo array-contains: sin índice compuesto)
             const qCompartidos = query(collection(db, "resources"), where("compartidoCon", "array-contains", usuario.uid));
             const [s, sComp] = await Promise.all([getDocs(q), getDocs(qCompartidos).catch(() => null)]);
             const compartidos = (sComp?.docs || []).map(d => ({ ...d.data(), id: d.id, _compartido: true }))
-                .filter(r => r.tipoJuego === juegoSeleccionado && r.profesorUid !== usuario.uid);
+                .filter(r => tiposDeJuego(juegoSeleccionado).includes(r.tipoJuego) && r.profesorUid !== usuario.uid);
             const docs = [...s.docs.map(d => ({ ...d.data(), id: d.id })), ...compartidos].filter(r => {
                 if (modoDashboard === 'PRO') {
                     return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'LINEA_TIEMPO' || r.tipo === 'LISTENING_RECURSO' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM' || r.format === 'VTE';
@@ -289,7 +288,7 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
     const cargarBiblioteca = async () => {
         setCargando(true);
         try {
-            const q = query(collection(db, "resources"), where("tipoJuego", "==", juegoSeleccionado), where("isPrivate", "==", false), orderBy("playCount", "desc"));
+            const q = query(collection(db, "resources"), filtroTipoJuego(juegoSeleccionado), where("isPrivate", "==", false), orderBy("playCount", "desc"));
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid).filter(r => {
                 if (modoDashboard === 'PRO') {
@@ -402,7 +401,6 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
         if (modoDashboard === 'PRO' || modoDashboard === 'LIVE') {
             if (juegoSeleccionado === 'CAZABURBUJAS') return iniciarCreacionBurbujasPikatron();
             if (juegoSeleccionado === 'THINKHOOT') return iniciarCreacionPiLive();
-            if (juegoSeleccionado === 'MATHLIVE') return iniciarCreacionMathLive();
             if (juegoSeleccionado === 'WORDLE') return iniciarCreacionWordle(); // <--- AÑADIR ESTO
             if (juegoSeleccionado === 'OLYMPICLIVE') return iniciarCreacionOlympic();
             if (juegoSeleccionado === 'SINTAXIS') return iniciarCreacionSintaxis();
@@ -514,25 +512,6 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
         setMostrandoEditorBurbujasPikatron(true);
     };
 
-    // 3. CREAR MATHLIVE (YA LO TIENES, PERO LO REPASAMOS)
-    const iniciarCreacionMathLive = () => {
-        const conf = {
-            isMathLive: true,
-            mathCount: 8, mathTime: 30, mathPuntosMax: 30, mathPuntosMin: 20,
-            mathTypes: ['POSITIVOS'], mathOps: ['SUMA'], mathMin: 1, mathMax: 10,
-            aleatorio: true, numPreguntas: 4
-        };
-        const nuevoRecurso = {
-            id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
-            tipo: 'PRO',
-            tipoJuego: 'MATHLIVE', // <--- CAMBIA ESTO (Antes ponía 'THINKHOOT')
-            config: conf, hojas: [{ nombreHoja: 'Grupo 1', preguntas: [] }], isPrivate: false
-        };
-        setDatosEditor(nuevoRecurso);
-        setMostrandoEditorMathLive(true);
-    };
-
-
     // 4. CREAR OLYMPIC LIVE
     const iniciarCreacionOlympic = () => {
         const conf = {
@@ -579,11 +558,8 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
             }
 
             else if (dataFresca.tipo === 'PRO') {
-                // PRIMERO comprobamos el subtipo
-                if (dataFresca.config?.isMathLive) {
-                    setMostrandoEditorMathLive(true);
-                }
-                else if (dataFresca.tipoJuego === 'WORDLE') { // <--- AHORA SÍ ENTRA AQUÍ
+                // Los recursos con operaciones (antiguo MathLive) se editan en el editor de PiLive
+                if (dataFresca.tipoJuego === 'WORDLE') { // <--- AHORA SÍ ENTRA AQUÍ
                     setMostrandoEditorWordle(true);
                 }
                 else {
@@ -721,7 +697,6 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
             // Cerrar todos los editores
             setMostrandoEditorManual(false);
             setMostrandoEditorPro(false);
-            setMostrandoEditorMathLive(false);
             setMostrandoEditorBurbujasPikatron(false);
             setMostrandoEditorWordle(false); // <--- Cerramos el de Wordle
             setMostrandoEditorOlympic(false);
@@ -1057,7 +1032,9 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
             return;
         }
 
-        if (!pool || pool.length === 0) return alert("No hay preguntas disponibles con esa configuración.");
+        // Con operaciones automáticas (antiguo MathLive) se puede jugar sin preguntas propias
+        if ((!pool || pool.length === 0) && !r.config?.isMathLive) return alert("No hay preguntas disponibles con esa configuración.");
+        pool = pool || [];
 
         // 2. RECORTAR Y ADAPTAR FORMATO
         const pFin = pool.slice(0, limitePreguntas).map(p => {
@@ -1423,7 +1400,7 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'LINEA_TIEMPO' && j.id !== 'LISTENING_RECURSO' && j.id !== 'OMNINTERACTIVE' && j.id !== 'VIDEOQUIZZ' && j.id !== 'SOLAR_SYSTEM')
+                            .filter(j => j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'LINEA_TIEMPO' && j.id !== 'LISTENING_RECURSO' && j.id !== 'OMNINTERACTIVE' && j.id !== 'VIDEOQUIZZ' && j.id !== 'SOLAR_SYSTEM')
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}
@@ -1602,14 +1579,6 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
                                         }}>
                                         <Zap size={16} /> <span className="btn-text">Pi-Live</span>
                                     </button>
-                                    <button onClick={() => setJuegoSeleccionado('MATHLIVE')} className="header-btn"
-                                        style={{
-                                            padding: '8px 20px', borderRadius: '20px',
-                                            background: juegoSeleccionado === 'MATHLIVE' ? '#009688' : 'white',
-                                            color: juegoSeleccionado === 'MATHLIVE' ? 'white' : '#555'
-                                        }}>
-                                        <Calculator size={16} /> <span className="btn-text">MathLive</span>
-                                    </button>
                                     <button onClick={() => setJuegoSeleccionado('OLYMPICLIVE')} className="header-btn"
                                         style={{
                                             padding: '8px 20px', borderRadius: '20px',
@@ -1786,7 +1755,6 @@ function ProfesorDashboardInterno({ usuario, googleToken, abrirEnlaceJuego = fal
 
             {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario} />}
 
-            {mostrandoEditorMathLive && <EditorMathLive datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorMathLive(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario}/>}
             {mostrandoEditorBurbujasPikatron && (
                 <EditorProBurbujasPikatron
                     datos={datosEditor}

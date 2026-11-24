@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  Juego en pantalla dual (Pasapalabra, Burbujas/Test y Pikatron) para el monitor interactivo:
+//  Juego en pantalla dual (Pasapalabra, Burbujas/Test, Pikatron y Plataformas) para el monitor interactivo:
 //  el mismo recurso abierto DOS veces, una en cada mitad, cada una con su propia configuración
 //  (hoja, modo, juego) y su propia partida.
 //
@@ -25,6 +25,21 @@ export const esMitadDual = () => {
     try { return new URLSearchParams(window.location.search).has('dual'); } catch { return false; }
 };
 
+/** Lado de esta mitad (0 izquierda, 1 derecha) o null si no es una mitad dual. */
+export const ladoMitadDual = () => {
+    try {
+        const v = new URLSearchParams(window.location.search).get('dual');
+        return v === null ? null : (v === '1' ? 1 : 0);
+    } catch { return null; }
+};
+
+// Un solo teclado para dos jugadores en los juegos de acción (Pikatron, Plataformas):
+// W A S D → mitad izquierda (llegan como flechas) · flechas → mitad derecha.
+// El juego avisa con window.__piktModoAccion = true mientras se está jugando.
+const TECLAS_IZQ = { KeyW: 'ArrowUp', KeyA: 'ArrowLeft', KeyS: 'ArrowDown', KeyD: 'ArrowRight' };
+const TECLAS_DER = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const JUEGOS_ACCION = new Set(['PIKATRON', 'PLATAFORMAS']);
+
 /** Recurso que la ventana principal deja a sus dos mitades (copia: otro «realm»). */
 export function recursoDeVentanaDual() {
     try {
@@ -37,7 +52,7 @@ export function recursoDeVentanaDual() {
 // Juegos que se pueden elegir en cada mitad según el tipo de recurso (valor de m= en la URL)
 function juegosDe(recurso) {
     if (recurso?.tipoJuego === 'PASAPALABRA') return [{ id: 'PASAPALABRA', label: '🔤 Pasapalabra' }];
-    return [{ id: 'BURBUJAS', label: '🫧 Burbujas / Test' }, { id: 'PIKATRON', label: '🚀 Pikatron' }];
+    return [{ id: 'BURBUJAS', label: '🫧 Burbujas / Test' }, { id: 'PIKATRON', label: '🚀 Pikatron' }, { id: 'PLATAFORMAS', label: '🕹️ Plataformas' }];
 }
 
 function urlMitad(recurso, modo, i, version) {
@@ -71,6 +86,7 @@ export default function JuegoDual({ recurso, modoInicial, onSalir }) {
     const modo0 = juegos.some((j) => j.id === modoInicial) ? modoInicial : juegos[0].id;
     const [lados, setLados] = useState(() => [{ modo: modo0, v: 0 }, { modo: modo0, v: 0 }]);
     const [completa, setCompleta] = useState(false);
+    const iframes = useRef([null, null]);
 
     // El recurso para las dos mitades, antes de que se carguen los iframes
     useState(() => { window.__piktDual = { recurso }; });
@@ -83,6 +99,38 @@ export default function JuegoDual({ recurso, modoInicial, onSalir }) {
         const alCambiar = () => setCompleta(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', alCambiar);
         return () => document.removeEventListener('fullscreenchange', alCambiar);
+    }, []);
+
+    // Reparto del teclado entre las dos mitades (ver TECLAS_IZQ)
+    useEffect(() => {
+        const enviar = (lado, tipo, code) => {
+            try {
+                const win = iframes.current[lado]?.contentWindow;
+                if (!win || !win.__piktModoAccion) return false;
+                win.dispatchEvent(new win.KeyboardEvent(tipo, { key: code, code, bubbles: true, cancelable: true }));
+                return true;
+            } catch { return false; }
+        };
+        // desde: 0 | 1 (mitad con el foco) | null (barra de arriba). true = la tecla se ha llevado a su mitad
+        window.__piktDualTecla = (desde, tipo, code) => {
+            let destino, codigo;
+            if (TECLAS_IZQ[code]) { destino = 0; codigo = TECLAS_IZQ[code]; }
+            else if (TECLAS_DER.has(code)) { destino = 1; codigo = code; }
+            else return false;
+            if (destino === desde && codigo === code) return false; // ya está donde toca
+            return enviar(destino, tipo, codigo);
+        };
+        const enPrincipal = (e) => {
+            if (e.target?.closest?.('input, textarea, select')) return;
+            if (window.__piktDualTecla(null, e.type, e.code)) e.preventDefault();
+        };
+        window.addEventListener('keydown', enPrincipal);
+        window.addEventListener('keyup', enPrincipal);
+        return () => {
+            delete window.__piktDualTecla;
+            window.removeEventListener('keydown', enPrincipal);
+            window.removeEventListener('keyup', enPrincipal);
+        };
     }, []);
 
     const pantallaCompleta = useCallback(() => {
@@ -114,11 +162,18 @@ export default function JuegoDual({ recurso, modoInicial, onSalir }) {
                                     {j.label}
                                 </BotonBarra>
                             ))}
+                            {JUEGOS_ACCION.has(lados[i].modo) && (
+                                <span title={i === 0 ? 'Con un solo teclado: W saltar, A/D moverse' : 'Con un solo teclado: ↑ saltar, ←/→ moverse'}
+                                    style={{ color: '#8b949e', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                    ⌨️ {i === 0 ? 'W A D' : '↑ ← →'}
+                                </span>
+                            )}
                             <span style={{ flex: 1 }} />
                             <BotonBarra onPulsar={() => cambiar(i, {})} title="Empezar de nuevo solo en este lado">↻ Reiniciar</BotonBarra>
                             {i === 1 && <BotonBarra onPulsar={pantallaCompleta} title="Pantalla completa (las dos mitades)">{completa ? '⤡ Salir' : '⛶ Completa'}</BotonBarra>}
                         </div>
                         <iframe
+                            ref={(el) => { iframes.current[i] = el; }}
                             key={`${lados[i].modo}-${lados[i].v}`}
                             src={urlMitad(recurso, lados[i].modo, i, lados[i].v)}
                             title={`${lado}: ${juegos.find((j) => j.id === lados[i].modo)?.label || 'juego'}`}
@@ -159,6 +214,21 @@ export function BotonPantallaDual({ recurso, modo, style }) {
 /** Dentro del iframe: el juego ocupa la mitad con sus toques y su teclado táctil. */
 export function MarcoMitadDual({ lado, children }) {
     const i = String(lado) === '1' ? 1 : 0;
+    // Teclas de la otra mitad (o W A S D de esta): las reparte la ventana principal
+    useEffect(() => {
+        const f = (e) => {
+            if (!e.isTrusted || e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+            try {
+                if (window.parent !== window && window.parent.__piktDualTecla?.(i, e.type, e.code)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+            } catch { /* otra ventana */ }
+        };
+        window.addEventListener('keydown', f, true);
+        window.addEventListener('keyup', f, true);
+        return () => { window.removeEventListener('keydown', f, true); window.removeEventListener('keyup', f, true); };
+    }, [i]);
     // Sin barras de desplazamiento de la página: el desplazamiento lo lleva la mitad
     useEffect(() => {
         document.documentElement.style.overflow = 'hidden';

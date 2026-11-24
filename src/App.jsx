@@ -15,6 +15,7 @@ import { SolarSystemViewer, APPS } from './components/LandingGames3';
 const ImperiosGame = lazy(() => import('./components/ImperiosGame'));
 const Orientacion = lazy(() => import('./orientacion/Orientacion'));
 const CorrectorExamenes = lazy(() => import('./corrector/CorrectorExamenes.jsx'));
+const RetoSemana = lazy(() => import('./retoSemana/RetoSemana.jsx'));
 const DinamicasAula = lazy(() => import('./dinamicasAula/DinamicasAula'));
 const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
 const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
@@ -31,6 +32,7 @@ const JuegoCalamar = lazy(() => import('./JuegoCalamar'));
 const EscapeHalloween = lazy(() => import('./EscapeHalloween'));
 const MoneyBoard = lazy(() => import('./MoneyBoard'));
 const EnigmicLogic = lazy(() => import('./EnigmicLogic'));
+const CanguroAlumno = lazy(() => import('./pizarrasVerticales/CanguroReto'));
 const SixSeven = lazy(() => import('./SixSeven'));
 const QuizMandos = lazy(() => import('./mandos/QuizMandos.jsx'));
 const EscanerMovil = lazy(() => import('./tarjetas/EscanerMovil.jsx'));
@@ -39,6 +41,7 @@ const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const OvniAbduccion = lazy(() => import('./OvniAbduccion'));
 const RacingGame3D = lazy(() => import('./RacingGame3D'));
 const AvionesGame3D = lazy(() => import('./AvionesGame3D'));
+const MansionPitagoricaGame = lazy(() => import('./MansionPitagoricaGame'));
 const SimuladorConduccion = lazy(() => import('./conduccion/SimuladorConduccion'));
 const InvasoresArcade = lazy(() => import('./invasores/InvasoresArcade'));
 const VaniLa = lazy(() => import('./vanila/VaniLa'));
@@ -85,14 +88,14 @@ const RUTAS_RESERVADAS = new Set([
   'sopa','sopa_letras','question_sender','q-sender',
   'omninteractive','videoquizz','sintaxis','listening',
   'etiquetas','etiquetame',
-  'geometrix','calculo','calculadora','pizarras_verticales','pizarrasverticales','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
+  'geometrix','calculo','calculadora','pizarras_verticales','pizarrasverticales','canguro','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
   'ecuaciones','oca','domino','musica',
   'algebra','polinomios','estadistica','probabilidad',
   'api','admin','login','app','join','alumno',
   'irregular_verbs','sistema_solar',
   'retos','conectapuntos','sudoku',
   'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','invasores','manos','avatar','orientacion','dinamicas','corrector',
+  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','mansion','invasores','manos','avatar','orientacion','dinamicas','corrector','retosemana',
   'comunidades','comunidad','competicion','banco','pdf','imprimir',
   'fisica',
   'math_world','primaria','feria','patio',
@@ -216,13 +219,13 @@ function App() {
           }
         } catch (_) {}
       }
-      if (slug === 'corrector' || slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
+      if (slug === 'corrector' || slug === 'retosemana' || slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'comic' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'conducir' || slug === 'carreras' || slug === 'aviones' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'conducir' || slug === 'carreras' || slug === 'aviones' || slug === 'mansion' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas' || slug === 'canguro') {
         setRutaPublica(slug);
         return;
       }
@@ -296,6 +299,8 @@ function App() {
         }
         getDoc(doc(db, 'resources', recursoId)).then(snap => {
             if (snap.exists()) {
+                // Un enlace compartido (?r=) también cuenta como partida para el ranking de «más jugados»
+                import('./utils/valoracionRecursos').then(m => m.contarJugada({ id: snap.id })).catch(() => {});
                 setDeepLinkGame({
                     recurso: { id: snap.id, ...snap.data() },
                     hoja: params.get('h') || 'General',
@@ -428,15 +433,18 @@ function App() {
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'manos') return <><QuizManos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'dinamicas') return <><DinamicasAula onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'retosemana') return <><RetoSemana onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'corrector') return <><CorrectorExamenes onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'orientacion') return <><Orientacion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'avatar') return <><AvatarCuerpo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienhistorico') return <><QuienEsQuienHistorico onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'canguro') return <CanguroAlumno onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'vanila') return <><VaniLa onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conducir') return <><SimuladorConduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'carreras') return <><RacingGame3D usuario={usuario} alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'mansion') return <><MansionPitagoricaGame alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'aviones') return <><AvionesGame3D alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'ovni') return <><OvniAbduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'invasores') return <><InvasoresArcade onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

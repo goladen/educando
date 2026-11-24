@@ -1,7 +1,7 @@
 // 🖨️ PDF de la hoja de respuestas del Corrector (y del examen con las preguntas, si las hay).
 // Las posiciones salen de omr.js: el lector espera los círculos exactamente ahí.
 import { bitsTarjeta } from '../tarjetas/detectorTarjetas.js';
-import { HOJA, MARCAS, LADO_MARCA, R, LETRAS, posBurbuja, posNumero, posId, ID, RESP } from './omr.js';
+import { HOJA, MARCAS, LADO_MARCA, R, LETRAS, posBurbuja, posNumero, posId, ID, RESP, CAJA, filasTest, plantillaEscritas } from './omr.js';
 
 function marcador(pdf, m) {
   const bits = bitsTarjeta(m.tarjeta);
@@ -24,7 +24,8 @@ function burbuja(pdf, x, y, txt, lleno = false) {
 }
 
 /** Dibuja una hoja de respuestas en la página actual. */
-function hoja(pdf, { titulo, nPreguntas, nOpciones, nombre = '', lista = null }) {
+function hoja(pdf, { titulo, nPreguntas, nOpciones, nombre = '', lista = null, nEscritas = 0, letras = 8 }) {
+  const filas = filasTest({ nPreguntas, nEscritas });
   MARCAS.forEach((m) => marcador(pdf, m));
 
   pdf.setTextColor(15, 23, 42);
@@ -90,14 +91,37 @@ function hoja(pdf, { titulo, nPreguntas, nOpciones, nombre = '', lista = null })
   pdf.setTextColor(15, 23, 42);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);
-  pdf.text(`Respuestas · ${nPreguntas} ${nPreguntas === 1 ? 'pregunta' : 'preguntas'} (${LETRAS[0]}-${LETRAS[nOpciones - 1]})`, 28, RESP.y0 - 9);
+  if (nPreguntas > 0) pdf.text(`Respuestas · ${nPreguntas} ${nPreguntas === 1 ? 'pregunta' : 'preguntas'} (${LETRAS[0]}-${LETRAS[nOpciones - 1]})`, 28, RESP.y0 - 9);
   for (let q = 0; q < nPreguntas; q++) {
-    const n = posNumero(q);
+    const n = posNumero(q, filas);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(9);
     pdf.setTextColor(15, 23, 42);
     pdf.text(String(q + 1), n.x, n.y, { align: 'right', baseline: 'middle' });
-    for (let o = 0; o < nOpciones; o++) { const p = posBurbuja(q, o); burbuja(pdf, p.x, p.y, LETRAS[o]); }
+    for (let o = 0; o < nOpciones; o++) { const p = posBurbuja(q, o, filas); burbuja(pdf, p.x, p.y, LETRAS[o]); }
+  }
+
+  // Respuestas escritas: una MAYÚSCULA o cifra por casilla
+  if (nEscritas > 0) {
+    const P = plantillaEscritas({ nPreguntas, nEscritas, letras });
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Respuestas escritas', 28, P.titulo);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.4);
+    pdf.setTextColor(71, 85, 105);
+    // Debe caber en una línea (hasta x≈188): se comprueba en las pruebas con getTextWidth
+    pdf.text('· MAYÚSCULAS, una letra o cifra por casilla, sin tildes · el signo - y la coma (-3,5) en su casilla', 61, P.titulo);
+    for (const it of P.items) {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(String(it.num), it.x + 7, it.y, { align: 'right', baseline: 'middle' });
+      pdf.setDrawColor(185, 185, 185); // gris claro: se ve, pero el lector no lo confunde con tinta
+      pdf.setLineWidth(0.3);
+      for (const c of it.cajas) pdf.roundedRect(c.cx - CAJA.w / 2, c.cy - CAJA.h / 2, CAJA.w, CAJA.h, 0.8, 0.8, 'S');
+    }
   }
 
   pdf.setFont('helvetica', 'normal');
@@ -111,14 +135,14 @@ function hoja(pdf, { titulo, nPreguntas, nOpciones, nombre = '', lista = null })
  *   cfg: { titulo, nPreguntas, nOpciones, copias, alumnos: [{ nombre, lista }] (una hoja por alumno, con su nº ya marcado),
  *          preguntas: [{ texto, opciones }] (examen delante), conClave }
  */
-export async function descargarPdfCorrector({ titulo = '', nPreguntas, nOpciones, copias = 1, alumnos = [], preguntas = null, clave = null, conClave = false, soloExamen = false }) {
+export async function descargarPdfCorrector({ titulo = '', nPreguntas, nOpciones, nEscritas = 0, letras = 8, copias = 1, alumnos = [], preguntas = null, preguntasEscritas = null, clave = null, claveEscritas = null, conClave = false, soloExamen = false }) {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   let primera = true;
   const nueva = () => { if (!primera) pdf.addPage(); primera = false; };
 
-  if (preguntas?.length) {
-    // Examen: preguntas con sus opciones
+  if (preguntas?.length || preguntasEscritas?.length) {
+    // Examen: preguntas con sus opciones (y las de respuesta escrita)
     nueva();
     let y = 20;
     pdf.setFont('helvetica', 'bold');
@@ -148,11 +172,25 @@ export async function descargarPdfCorrector({ titulo = '', nPreguntas, nOpciones
       ops.forEach((l) => { pdf.text(l, 26, y); y += l.length * 4.6; });
       y += 4;
     });
+    (preguntasEscritas || []).slice(0, nEscritas).forEach((p, k) => {
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      const enun = pdf.splitTextToSize(`${nPreguntas + k + 1}. ${p.texto}`, 170);
+      if (y + enun.length * 5 + 9 > 282) { pdf.addPage(); y = 20; }
+      pdf.text(enun, 20, y);
+      y += enun.length * 5;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Escribe la respuesta en las casillas de la hoja (mayúsculas).', 26, y);
+      y += 8;
+    });
   }
 
   if (!soloExamen) {
     const lista = alumnos.length ? alumnos : Array.from({ length: Math.max(1, copias) }, () => ({ nombre: '', lista: null }));
-    lista.forEach((a) => { nueva(); hoja(pdf, { titulo, nPreguntas, nOpciones, nombre: a.nombre || '', lista: a.lista || null }); });
+    lista.forEach((a) => { nueva(); hoja(pdf, { titulo, nPreguntas, nOpciones, nEscritas, letras, nombre: a.nombre || '', lista: a.lista || null }); });
   }
 
   if (conClave && clave) {
@@ -169,10 +207,17 @@ export async function descargarPdfCorrector({ titulo = '', nPreguntas, nOpciones
       pdf.setFont('helvetica', 'bold');
       pdf.text(c || '—', 29 + col * 60, 35 + fila * 9);
     });
+    (claveEscritas || []).slice(0, nEscritas).forEach((c, k) => {
+      const q = nPreguntas + k, col = Math.floor(q / 25), fila = q % 25;
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${q + 1}.`, 25 + col * 60, 35 + fila * 9, { align: 'right' });
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(pdf.splitTextToSize(c || '—', 50)[0], 29 + col * 60, 35 + fila * 9);
+    });
   }
 
   const base = (titulo || 'examen').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'examen';
-  pdf.save(soloExamen ? `${base}-preguntas.pdf` : preguntas?.length ? `${base}-examen-y-hoja.pdf` : `${base}-hoja-respuestas.pdf`);
+  pdf.save(soloExamen ? `${base}-preguntas.pdf` : (preguntas?.length || preguntasEscritas?.length) ? `${base}-examen-y-hoja.pdf` : `${base}-hoja-respuestas.pdf`);
 }
 
 /** Para pruebas: devuelve el jsPDF de una hoja sin descargar. */

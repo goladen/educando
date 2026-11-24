@@ -22,6 +22,8 @@ import BotonPdfRecurso from './components/BotonPdfRecurso';
 import BuscarFichaCodigo from './components/BuscarFichaCodigo';
 import FichaFlotante from './components/FichaFlotante';
 import MandosEnJuego from './mandos/RelevosMandos.jsx';
+import { dibujarAjustado } from './utils/encajeTexto';
+import { BotonPantallaDual, ladoMitadDual } from './components/JuegoDual';
 // Jugar con el cuerpo (webcam): girar la cabeza = andar, saltar = saltar. Se carga al activarlo.
 const PanelControlCuerpo = React.lazy(() => import('./cuerpo/PanelControlCuerpo.jsx'));
 const LS_CUERPO = 'pikt_plataformas_cuerpo';
@@ -115,13 +117,14 @@ const CW = 800, CH = 450;
 const EDGE_MARGIN = 80;
 
 // Bloques de respuesta ocupan exactamente el 60% del ancho de su plataforma
-const ANS_GAP  = 14;
+const ANS_GAP  = 10;
 const ANS_H    = 56;
 const ANS_ABOVE = 152;  // px sobre la plataforma (separación respecto al tope)
 
-function getAnsLayout(platW) {
-  const blockW = Math.max(36, Math.floor((platW * 0.69 - 3 * ANS_GAP) / 4));
-  const totalW = 4 * blockW + 3 * ANS_GAP;
+function getAnsLayout(platW, n = 4) {
+  // Los bloques ocupan casi todo el ancho de la plataforma (siguen al alcance desde ella)
+  const blockW = Math.max(40, Math.min(130, Math.floor((platW + 10 - (n - 1) * ANS_GAP) / n)));
+  const totalW = n * blockW + (n - 1) * ANS_GAP;
   return { blockW, totalW };
 }
 
@@ -432,7 +435,12 @@ const GR_COLORS = ['#3d8b2a','#2c3e50','#6b1e1e','#2a3a28'];
 //  UI SCREENS
 // ──────────────────────────────────────────────────────────────────────────────
 function Scr({ children }) {
-  return <div style={{ minHeight:'100vh', background:'#1a1a2e', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20, fontFamily:'Arial,sans-serif' }}>{children}</div>;
+  // margin:auto centra sin cortar la parte de arriba cuando no cabe (pantallas bajas)
+  return (
+    <div style={{ minHeight:'100vh', background:'radial-gradient(ellipse at 50% 15%, #2a2f5a 0%, #1a1a2e 55%, #0d0d20 100%)', display:'flex', flexDirection:'column', padding:20, boxSizing:'border-box', fontFamily:'Arial,sans-serif' }}>
+      <div style={{ margin:'auto', display:'flex', flexDirection:'column', alignItems:'center', width:'100%' }}>{children}</div>
+    </div>
+  );
 }
 
 // Normaliza texto quitando tildes y pasando a minúsculas (igual que LandingGames)
@@ -681,6 +689,9 @@ function PantallaSelectorHoja({ recurso, onJugar, onBack }) {
           ▶ ¡Jugar!
         </button>
       </div>
+      <div style={{ width:'100%', maxWidth:320, marginTop:14 }}>
+        <BotonPantallaDual recurso={recurso} modo="PLATAFORMAS" style={{ marginBottom:0 }} />
+      </div>
     </Scr>
   );
 }
@@ -739,6 +750,7 @@ function PantallaMenu({ onEligir, onRecurso, onExit }) {
 
 function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack, cuerpo, onCuerpo }) {
   const m = materia ? MATERIAS[materia] : null;
+  const ladoDual = ladoMitadDual();
   return (
     <Scr>
       <div style={{ fontSize:'3.5rem' }}>{m?m.emoji:'📦'}</div>
@@ -747,7 +759,9 @@ function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack, cu
         Nivel {nivel} de {total}
       </div>
       <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:14, padding:'14px 20px', maxWidth:340, color:'rgba(255,255,255,0.78)', lineHeight:1.8, fontSize:'0.84rem', textAlign:'center', marginBottom:20 }}>
-        🕹️ <strong>← →</strong> moverse · <strong>↑/Espacio</strong> saltar<br/>
+        {ladoDual===0 ? <>🕹️ <strong>A D</strong> moverse · <strong>W</strong> saltar<br/></>
+          : ladoDual===1 ? <>🕹️ <strong>← →</strong> moverse · <strong>↑</strong> saltar<br/></>
+          : <>🕹️ <strong>← →</strong> moverse · <strong>↑/Espacio</strong> saltar · o los botones en pantalla<br/></>}
         Golpea los bloques de colores <strong>desde abajo</strong><br/>
         🟡 Recoge monedas{hasEnemigos?' · ☠️ Lee la frase del enemigo antes de tocarlo':''}
       </div>
@@ -763,6 +777,7 @@ function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack, cu
         <button onClick={onBack} style={{ padding:'8px 18px', borderRadius:20, border:'1.5px solid rgba(255,255,255,0.18)', background:'transparent', color:'rgba(255,255,255,0.45)', cursor:'pointer', fontFamily:'inherit' }}>← Atrás</button>
         <button onClick={onStart} style={{ padding:'11px 32px', borderRadius:28, border:'none', background:'#f1c40f', color:'#1a1a2e', fontWeight:'bold', fontSize:'1rem', cursor:'pointer', fontFamily:'inherit' }}>▶ ¡Empezar!</button>
       </div>
+      <div style={{ color:'rgba(255,255,255,0.35)', fontSize:'0.75rem', marginTop:10 }}>o pulsa {ladoDual===0 ? 'W' : ladoDual===1 ? '↑' : 'Espacio / Enter'}</div>
     </Scr>
   );
 }
@@ -1109,7 +1124,11 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
 
   // ── Pantalla completa ──
   const [fullscreen, setFullscreen] = useState(false);
-  const [canvasScale, setCanvasScale] = useState(1);
+  // Tamaño del canvas en pantalla (cabe entero en el hueco libre: móvil, tablet, PDI, media pantalla dual)
+  const zonaRef = useRef(null);
+  const [tam, setTam] = useState({ w: CW, h: CH });
+  const [esTactil, setEsTactil] = useState(()=>{ try { return (navigator.maxTouchPoints||0)>0 || 'ontouchstart' in window; } catch { return false; } });
+  const ladoDual = ladoMitadDual();
   const gameContainerRef = useRef(null);
 
   const toggleFullscreen = useCallback(async ()=>{
@@ -1133,19 +1152,21 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
   },[]);
 
   useEffect(()=>{
-    const update = ()=>{
-      if (fullscreen) {
-        setCanvasScale(Math.min(window.innerWidth/CW, window.innerHeight/CH));
-      } else {
-        setCanvasScale(1);
-      }
+    if (fase!=='PLAYING') return undefined;
+    const el = zonaRef.current; if (!el) return undefined;
+    const medir = ()=>{
+      const r = el.getBoundingClientRect();
+      const w = Math.max(240, Math.min(r.width, r.height*CW/CH));
+      setTam(t => Math.abs(t.w-w)<1 ? t : { w:Math.floor(w), h:Math.floor(w*CH/CW) });
     };
-    update();
-    window.addEventListener('resize', update);
-    const oc = ()=> setTimeout(update, 200);
+    medir();
+    const ro = typeof ResizeObserver!=='undefined' ? new ResizeObserver(medir) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', medir);
+    const oc = ()=> setTimeout(medir, 250);
     window.addEventListener('orientationchange', oc);
-    return ()=>{ window.removeEventListener('resize', update); window.removeEventListener('orientationchange', oc); };
-  },[fullscreen]);
+    return ()=>{ ro?.disconnect(); window.removeEventListener('resize', medir); window.removeEventListener('orientationchange', oc); };
+  },[fase, fullscreen]);
 
   const g = useRef({
     player:{ x:100,y:700, vx:0,vy:0, onGround:false, facing:1, frameX:0,frameY:0,ft:0, coyote:0,jumpBuffer:0, invulnerable:0 },
@@ -1186,7 +1207,15 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
       const plat = plats[qDef.pi];
       if (!plat) return;
 
-      const { blockW, totalW } = getAnsLayout(plat.w);
+      // Opciones válidas (una pregunta puede traer menos de 3 incorrectas)
+      const opciones = [
+        { text:pq.a, isCorrect:true },
+        ...(pq.inc||[]).slice(0,3).map(t=>({ text:t, isCorrect:false })),
+      ].filter(o=>o.text!==undefined && o.text!==null && String(o.text).trim()!=='')
+       .map(o=>({ ...o, text:String(o.text) }))
+       .sort(()=>Math.random()-.5);
+      if (!opciones.some(o=>o.isCorrect)) return;
+      const { blockW, totalW } = getAnsLayout(plat.w, opciones.length);
       const cx    = plat.x + plat.w/2;
       const blockY= plat.y - ANS_ABOVE;
 
@@ -1194,12 +1223,6 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
       let startX = cx - totalW/2;
       startX = Math.max(EDGE_MARGIN, Math.min(LEVEL_W - totalW - EDGE_MARGIN, startX));
 
-      const opciones = [
-        { text:pq.a, isCorrect:true },
-        { text:pq.inc[0], isCorrect:false },
-        { text:pq.inc[1], isCorrect:false },
-        { text:pq.inc[2], isCorrect:false },
-      ].sort(()=>Math.random()-.5);
 
       opciones.forEach((op,bi)=>{
         ansBlocks.push({
@@ -1213,7 +1236,7 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
 
       // Texto de pregunta centrado sobre los bloques, clampeado
       const qCX = Math.max(120, Math.min(LEVEL_W-120, startX + totalW/2));
-      stations.push({ cx:qCX, qY:blockY-38, qText:pq.q, answered:false, idx:qi });
+      stations.push({ cx:qCX, qY:blockY-38, qText:String(pq.q||''), answered:false, idx:qi });
     });
 
     // ── Monedas y enemigos en plataformas sin pregunta ──
@@ -1304,7 +1327,7 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
 
   // Iniciar con un recurso propio
   const iniciarRecurso = useCallback(({ recurso, modo, hojaIdx })=>{
-    const hojas = recurso.hojas || [];
+    const hojas = recurso.hojas?.length ? recurso.hojas : [{ nombreHoja:'General', preguntas: recurso.preguntas || [] }];
     const aleatorio = recurso.config?.aleatorio !== false;
     setRecursoActivo(recurso);
     setRecursoModo(modo);
@@ -1335,6 +1358,8 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
   },[buildLevel]);
 
   // ── Game Loop ──
+  // La lógica avanza a 60 pasos por segundo fijos (en pantallas de 120/144 Hz no va más rápido)
+  // y se dibuja una vez por fotograma.
   useEffect(()=>{
     if (fase!=='PLAYING') { cancelAnimationFrame(rafRef.current); return; }
     const canvas = canvasRef.current; if (!canvas) return;
@@ -1345,10 +1370,26 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
     const enemy  = enemyRef.current;
     const theme  = GR_COLORS[nivelIdx%4];
 
-    const loop = ()=>{
+    // Efectos (coordenadas del nivel)
+    const fx = { parts:[], textos:[], shake:0, flash:null };
+    const chispas = (x,y,n,colores,fuerza=5)=>{
+      for (let i=0;i<n;i++){
+        const a=Math.random()*Math.PI*2, v=(0.35+Math.random())*fuerza, vida=28+Math.random()*30;
+        fx.parts.push({ x,y, vx:Math.cos(a)*v, vy:Math.sin(a)*v-2, vida, max:vida, color:colores[i%colores.length], r:2+Math.random()*3 });
+      }
+    };
+    const flotante = (x,y,txt,color)=>fx.textos.push({ x,y,txt,color,vida:60 });
+    const aviso = (text,ok,ms)=>{
+      setFeedUI({ text, ok });
+      if (feedTimer.current) clearTimeout(feedTimer.current);
+      feedTimer.current=setTimeout(()=>setFeedUI(null),ms);
+    };
+
+    const update = ()=>{
       const ref = g.current;
       const p   = ref.player;
       ref.frame++;
+      ref.bgX-=0.3; if(ref.bgX<=-CW) ref.bgX=0;
 
       // ── Movimiento horizontal ──
       if (ref.keys.right) { p.vx= MOVE_SPEED; p.facing= 1; }
@@ -1364,6 +1405,7 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
 
       // ── Física vertical ──
       const wasGround = p.onGround;
+      const vyAntes = p.vy;
       p.vy = Math.min(p.vy+GRAVITY, 24);
       p.y += p.vy;
       p.onGround = false;
@@ -1376,6 +1418,16 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         }
       }
       if (p.y+PLAYER_H>GROUND+PLAT_H) { p.y=GROUND+PLAT_H-PLAYER_H; p.vy=0; p.onGround=true; }
+
+      // Aterrizaje: se aplasta un poco y levanta polvo
+      if (!wasGround && p.onGround && vyAntes>5) {
+        p.squash=8;
+        chispas(p.x+PLAYER_W/2, p.y+PLAYER_H-2, 7, ['rgba(255,255,255,0.8)','rgba(210,210,210,0.6)'], 2.2);
+      }
+      if (p.squash>0) p.squash--;
+      if (p.onGround && Math.abs(p.vx)>2 && ref.frame%8===0) {
+        fx.parts.push({ x:p.x+PLAYER_W/2-p.facing*16, y:p.y+PLAYER_H-3, vx:-p.facing*(1+Math.random()), vy:-0.5-Math.random()*0.6, vida:20, max:20, color:'rgba(255,255,255,0.5)', r:2+Math.random()*2 });
+      }
 
       // Coyote time
       if (wasGround&&!p.onGround) p.coyote=COYOTE_F;
@@ -1392,6 +1444,7 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
 
       // ── Golpe de bloques ──
       for (const blk of ref.ansBlocks) {
+        if (blk.shakeT>0) blk.shakeT--;
         if (blk.hit) continue;
         const oX  = p.x+PLAYER_W-22>blk.x && p.x+22<blk.x+blk.w;
         const pT  = p.y-p.vy;
@@ -1403,20 +1456,27 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
           ref.stations[si].answered=true;
           ref.ansBlocks.forEach(b=>{ if(b.stIdx===si){b.hit=true;b.shakeT=12;} });
           ref.answered++;
+          const bx=blk.x+blk.w/2, by=blk.y+blk.h/2;
           if (blk.isCorrect) {
             snd('correct');
             scoreRef.current++;    setScore(scoreRef.current);
             aciertosRef.current++; setAciertos(aciertosRef.current);
-            setFeedUI({text:'✅ ¡Correcto!',ok:true});
+            chispas(bx, by, 34, ['#f1c40f','#2ecc71','#ffffff'], 6.5);
+            flotante(bx, blk.y-12, '+1', '#2ecc71');
+            fx.flash={ color:'46,204,113', vida:14, max:14 };
+            blk.ok=true;
+            aviso('✅ ¡Correcto!', true, 1700);
           } else {
             snd('wrong');
             scoreRef.current = Math.max(0, scoreRef.current-1);
             setScore(scoreRef.current);
             const corr=ref.ansBlocks.find(b=>b.stIdx===si&&b.isCorrect);
-            setFeedUI({text:`❌ Era: ${corr?.text||'?'}`,ok:false});
+            if (corr) { corr.ok=true; chispas(corr.x+corr.w/2, corr.y+corr.h/2, 12, ['#2ecc71','#ffffff'], 3); }
+            chispas(bx, by, 26, ['#e74c3c','#c0392b','#ffffff'], 6);
+            flotante(bx, blk.y-12, '−1', '#e74c3c');
+            fx.shake=14; fx.flash={ color:'231,76,60', vida:20, max:20 };
+            aviso(`❌ Era: ${corr?.text||'?'}`, false, 1700);
           }
-          if (feedTimer.current) clearTimeout(feedTimer.current);
-          feedTimer.current=setTimeout(()=>setFeedUI(null),1700);
           if (ref.answered>=ref.total) {
             const snap = { correct: aciertosRef.current, total: ref.total, points: scoreRef.current };
             setLevelStats(prev => { const next=[...prev]; next[nivelIdx]=snap; return next; });
@@ -1437,9 +1497,9 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         if (Math.hypot(dx,dy)<COIN_R+PLAYER_W/2-6) {
           coin.active=false; snd('correct');
           scoreRef.current++; setScore(scoreRef.current);
-          setFeedUI({text:'🟡 +1 moneda',ok:true});
-          if (feedTimer.current) clearTimeout(feedTimer.current);
-          feedTimer.current=setTimeout(()=>setFeedUI(null),900);
+          chispas(coin.x, coin.y, 14, ['#f1c40f','#ffe066','#ffffff'], 4);
+          flotante(coin.x, coin.y-16, '+1', '#f1c40f');
+          aviso('🟡 +1 moneda', true, 900);
         }
       }
 
@@ -1458,15 +1518,19 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         if (oX&&oY) {
           en.active=false;
           p.invulnerable=ENEMY_INVUL_F;
+          const ex=en.x+en.w/2, ey=en.y+en.h/2;
           if (en.isTrue) {
             snd('correct'); scoreRef.current++; setScore(scoreRef.current);
-            setFeedUI({text:'✅ ¡Verdad! +1',ok:true});
+            chispas(ex, ey, 22, ['#3498db','#2ecc71','#ffffff'], 5);
+            flotante(ex, en.y-20, '+1', '#2ecc71');
+            aviso('✅ ¡Verdad! +1', true, 1700);
           } else {
             snd('wrong'); scoreRef.current=Math.max(0,scoreRef.current-1); setScore(scoreRef.current);
-            setFeedUI({text:'❌ ¡Falso! −1',ok:false});
+            chispas(ex, ey, 22, ['#e74c3c','#8e44ad','#ffffff'], 5);
+            flotante(ex, en.y-20, '−1', '#e74c3c');
+            fx.shake=12;
+            aviso('❌ ¡Falso! −1', false, 1700);
           }
-          if (feedTimer.current) clearTimeout(feedTimer.current);
-          feedTimer.current=setTimeout(()=>setFeedUI(null),1700);
         }
       }
 
@@ -1481,57 +1545,72 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         } else { p.frameX=0; p.frameY=0; }
       }
 
-      // ══════════ DIBUJO ══════════
+      // Efectos
+      for (const pt of fx.parts) { pt.x+=pt.vx; pt.y+=pt.vy; pt.vy+=0.22; pt.vida--; }
+      fx.parts = fx.parts.filter(pt=>pt.vida>0);
+      for (const t of fx.textos) { t.y-=0.9; t.vida--; }
+      fx.textos = fx.textos.filter(t=>t.vida>0);
+      if (fx.shake>0) fx.shake = fx.shake<0.5 ? 0 : fx.shake*0.86;
+      if (fx.flash && --fx.flash.vida<=0) fx.flash=null;
+    };
+
+    const draw = ()=>{
+      const ref = g.current;
+      const p   = ref.player;
+      ctx.save();
       ctx.clearRect(0,0,CW,CH);
+      if (fx.shake>0.5) ctx.translate((Math.random()-0.5)*fx.shake, (Math.random()-0.5)*fx.shake);
       const cx=Math.round(ref.camX), cy=Math.round(ref.camY);
 
-      // Fondo
-      ref.bgX-=0.3; if(ref.bgX<=-CW) ref.bgX=0;
+      // Fondo (con un poco de paralaje al moverse la cámara)
       if(bgImg?.complete&&bgImg.naturalWidth>0){
-        ctx.drawImage(bgImg,ref.bgX,0,CW,CH); ctx.drawImage(bgImg,ref.bgX+CW,0,CW,CH);
+        const bx = (((ref.bgX - cx*0.15) % CW) + CW) % CW - CW;
+        ctx.drawImage(bgImg,bx-2,-10,CW+4,CH+20); ctx.drawImage(bgImg,bx+CW-2,-10,CW+4,CH+20);
       } else {
         const grd=ctx.createLinearGradient(0,0,0,CH);
         grd.addColorStop(0,BG_THEMES[nivelIdx%4]); grd.addColorStop(1,'#000015');
-        ctx.fillStyle=grd; ctx.fillRect(0,0,CW,CH);
+        ctx.fillStyle=grd; ctx.fillRect(-20,-20,CW+40,CH+40);
       }
-      ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(0,0,CW,CH);
+      ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(-20,-20,CW+40,CH+40);
 
-      // ─ Plataformas ─
+      // ─ Plataformas (borde de hierba y ladrillos) ─
       for (const plat of ref.platforms) {
         const sx=plat.x-cx, sy=plat.y-cy;
         if(sx>CW+60||sx+plat.w<-60||sy>CH+20||sy<-20) continue;
-        ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(sx+4,sy+5,plat.w,plat.h);
-        ctx.fillStyle=theme; ctx.fillRect(sx,sy,plat.w,plat.h);
-        ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.fillRect(sx,sy,plat.w,4);
-        ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(sx,sy+plat.h-3,plat.w,3);
+        const x0=Math.max(sx,-30), x1=Math.min(sx+plat.w,CW+30), w=x1-x0;
+        ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(x0+4,sy+5,w,plat.h);
+        ctx.fillStyle=theme; ctx.fillRect(x0,sy,w,plat.h);
+        ctx.fillStyle='rgba(0,0,0,0.16)';
+        for (let bxp=sx+((Math.floor((x0-sx)/26))*26); bxp<x1; bxp+=26) ctx.fillRect(bxp,sy+7,2,plat.h-7);
+        ctx.fillStyle='rgba(255,255,255,0.32)'; ctx.fillRect(x0,sy,w,5);
+        ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(x0,sy+plat.h-3,w,3);
       }
 
-      // ─ Monedas ─
+      // ─ Monedas (giran) ─
       for (const coin of ref.coins) {
         if (!coin.active) continue;
-        const sx=coin.x-cx, sy=coin.y-cy;
+        const sx=coin.x-cx, sy=coin.y-cy+Math.sin((ref.frame+coin.x)*0.08)*2.5;
         if(sx<-20||sx>CW+20||sy<-20||sy>CH+20) continue;
-        // Brillo pulsante
-        const pulse=0.85+0.15*Math.sin(ref.frame*0.12);
+        const giro=Math.max(0.2, Math.abs(Math.cos((ref.frame+coin.x)*0.07)));
         ctx.save();
-        ctx.globalAlpha=pulse;
-        // Sombra
-        ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(sx+2,sy+3,COIN_R,0,Math.PI*2); ctx.fill();
-        // Moneda
+        const halo=ctx.createRadialGradient(sx,sy,2,sx,sy,COIN_R*2.4);
+        halo.addColorStop(0,'rgba(255,224,102,0.45)'); halo.addColorStop(1,'rgba(255,224,102,0)');
+        ctx.fillStyle=halo; ctx.fillRect(sx-COIN_R*2.4,sy-COIN_R*2.4,COIN_R*4.8,COIN_R*4.8);
         const grd=ctx.createRadialGradient(sx-2,sy-2,1,sx,sy,COIN_R);
         grd.addColorStop(0,'#ffe066'); grd.addColorStop(1,'#d4a000');
-        ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(sx,sy,COIN_R,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=grd; ctx.beginPath(); ctx.ellipse(sx,sy,COIN_R*giro,COIN_R,0,0,Math.PI*2); ctx.fill();
         ctx.strokeStyle='#a07800'; ctx.lineWidth=1.5; ctx.stroke();
-        // $ signo
-        ctx.fillStyle='#7a5800'; ctx.font=`bold ${COIN_R}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText('★',sx,sy);
+        if (giro>0.55) {
+          ctx.fillStyle='#7a5800'; ctx.font=`bold ${COIN_R}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText('★',sx,sy+0.5);
+        }
         ctx.restore();
       }
 
       // ─ Enemigos ─
       for (const en of ref.enemies) {
         if (!en.active) continue;
-        const sx=en.x-cx, sy=en.y-cy;
+        const sx=en.x-cx, sy=en.y-cy+Math.abs(Math.sin(en.frameT*0.15))*-3;
         if(sx<-60||sx>CW+60||sy<-60||sy>CH+60) continue;
 
         ctx.save();
@@ -1556,39 +1635,41 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         }
         ctx.restore();
 
-        // Frase del enemigo
+        // Frase del enemigo (bocadillo; la letra se ajusta, hasta 2 líneas)
         ctx.save();
-        ctx.font='bold 10px Arial';
+        ctx.font='bold 12px Arial';
         const tw=ctx.measureText(en.phrase).width;
-        const bw=Math.min(tw+14, CW-20), bh=18;
+        const bw=Math.min(tw+16, 210), bh=tw+16>210?34:21;
         const bx=Math.max(2, Math.min(CW-bw-2, sx+en.w/2-bw/2));
-        const by=sy-bh-5;
-        if (by>-20) {
-          ctx.fillStyle='rgba(30,100,210,0.92)';
-          rr(ctx,bx,by,bw,bh,4); ctx.fill();
-          ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1;
-          rr(ctx,bx,by,bw,bh,4); ctx.stroke();
-          ctx.fillStyle='white'; ctx.textAlign='center'; ctx.textBaseline='middle';
-          ctx.fillText(en.phrase.length>22?en.phrase.slice(0,21)+'…':en.phrase, bx+bw/2, by+bh/2);
+        const by=sy-bh-7;
+        if (by>-40) {
+          ctx.fillStyle='rgba(30,100,210,0.94)';
+          rr(ctx,bx,by,bw,bh,6); ctx.fill();
+          ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1.2;
+          rr(ctx,bx,by,bw,bh,6); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(sx+en.w/2-5,by+bh); ctx.lineTo(sx+en.w/2+5,by+bh); ctx.lineTo(sx+en.w/2,by+bh+6); ctx.closePath();
+          ctx.fillStyle='rgba(30,100,210,0.94)'; ctx.fill();
+          ctx.fillStyle='white';
+          dibujarAjustado(ctx, en.phrase, bx+bw/2, by+bh/2+1, bw-10, bh-4, { maxPx:12, minPx:8, maxLineas:2 });
         }
         ctx.restore();
       }
 
-      // ─ Preguntas (texto pequeño, siempre visible) ─
+      // ─ Preguntas (siempre visibles; el cartel crece hacia arriba) ─
       for (const st of ref.stations) {
         if (st.answered) continue;
         const rawSx = st.cx-cx;
-        const sx = Math.max(120, Math.min(CW-120, rawSx));
-        const sy = st.qY-cy;
-        if (sy<-80||sy>CH+30) continue;
+        const sx = Math.max(130, Math.min(CW-130, rawSx));
+        const fondo = st.qY+30-cy; // borde de abajo del cartel, justo encima de los bloques
+        if (fondo<-10||fondo>CH+90) continue;
 
         ctx.save();
         const qLen = st.qText.length;
-        const QFONT = qLen > 45 ? 9 : qLen > 28 ? 10 : 11;
+        const QFONT = qLen > 70 ? 12 : qLen > 40 ? 13 : 15;
         ctx.font=`bold ${QFONT}px Arial`;
 
         // ── Word-wrap hasta 4 líneas ──
-        const MAX_W = Math.min(370, CW - 24);
+        const MAX_W = Math.min(400, CW - 24);
         const LINE_H = QFONT + 4;
         const qwords = st.qText.split(' ');
         const lines = [];
@@ -1605,19 +1686,19 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         }
         if (lines.length < 4 && cur) lines.push(cur);
 
-        const bw = Math.min(Math.max(...lines.map(l=>ctx.measureText(l).width)) + 20, CW - 16);
-        const bh = lines.length * LINE_H + 10;
+        const bw = Math.min(Math.max(...lines.map(l=>ctx.measureText(l).width)) + 24, CW - 16);
+        const bh = lines.length * LINE_H + 12;
         const bx = Math.max(8, Math.min(CW - bw - 8, sx - bw/2));
-        const by = sy - bh / 2;
+        const by = fondo - bh;
 
-        ctx.fillStyle='rgba(0,0,0,0.9)';
-        rr(ctx, bx, by, bw, bh, 6); ctx.fill();
-        ctx.strokeStyle='#f1c40f'; ctx.lineWidth=1.5;
-        rr(ctx, bx, by, bw, bh, 6); ctx.stroke();
+        ctx.fillStyle='rgba(8,10,20,0.92)';
+        rr(ctx, bx, by, bw, bh, 8); ctx.fill();
+        ctx.strokeStyle='#f1c40f'; ctx.lineWidth=2;
+        rr(ctx, bx, by, bw, bh, 8); ctx.stroke();
 
         ctx.fillStyle='#f1c40f'; ctx.textAlign='center'; ctx.textBaseline='middle';
         lines.forEach((line, i) => {
-          ctx.fillText(line, bx + bw/2, by + (i + 0.5) * LINE_H + 5);
+          ctx.fillText(line, bx + bw/2, by + (i + 0.5) * LINE_H + 6);
         });
         ctx.restore();
       }
@@ -1627,49 +1708,21 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         const rawSx = blk.x-cx;
         const sx = Math.max(4, Math.min(CW-blk.w-4, rawSx));
         const shake=blk.shakeT>0?Math.sin(blk.shakeT*2)*3:0;
-        if (blk.shakeT>0) blk.shakeT--;
         const sy=blk.y-cy+shake;
-        if (sy>CH+20||sy<-50) continue;
+        if (sy>CH+20||sy<-70) continue;
 
-        ctx.globalAlpha = blk.hit ? 0.22 : 1;
-        // Sombra
-        ctx.fillStyle='rgba(0,0,0,0.3)'; rr(ctx,sx+3,sy+4,blk.w,blk.h,6); ctx.fill();
-        // Fondo coloreado
-        ctx.fillStyle = blk.color; rr(ctx,sx,sy,blk.w,blk.h,6); ctx.fill();
-        // Brillo superior
-        ctx.fillStyle='rgba(255,255,255,0.28)'; rr(ctx,sx+2,sy+2,blk.w-4,blk.h*0.45,4); ctx.fill();
-        // Borde
-        ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
-        rr(ctx,sx,sy,blk.w,blk.h,6); ctx.stroke();
+        // Ya respondidos: la correcta queda en verde y el resto apagado
+        ctx.globalAlpha = blk.hit ? (blk.ok ? 0.85 : 0.2) : 1;
+        ctx.fillStyle='rgba(0,0,0,0.3)'; rr(ctx,sx+3,sy+4,blk.w,blk.h,7); ctx.fill();
+        ctx.fillStyle = blk.hit && blk.ok ? '#27ae60' : blk.color; rr(ctx,sx,sy,blk.w,blk.h,7); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.26)'; rr(ctx,sx+3,sy+3,blk.w-6,blk.h*0.42,5); ctx.fill();
+        ctx.strokeStyle= blk.hit ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.75)'; ctx.lineWidth=2;
+        rr(ctx,sx,sy,blk.w,blk.h,7); ctx.stroke();
 
-        // Word-wrap adaptativo hasta 3 líneas
-        const txtLen=blk.text.length;
-        const FONT_SZ=txtLen>22?10:12, LINE_H=FONT_SZ+4, PAD=5;
-        const maxTW = blk.w - PAD*2;
-        ctx.font=`bold ${FONT_SZ}px Arial`;
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        const bwords=blk.text.split(' ');
-        const blines=[]; let bcur='';
-        for (const w of bwords) {
-          const test=bcur?bcur+' '+w:w;
-          if (ctx.measureText(test).width>maxTW && bcur) { blines.push(bcur); bcur=w; }
-          else { bcur=test; }
-          if (blines.length===3) { bcur=''; break; }
-        }
-        if (blines.length<3 && bcur) blines.push(bcur);
-        const lastI=blines.length-1;
-        if (blines[lastI] && ctx.measureText(blines[lastI]).width>maxTW) {
-          let l=blines[lastI];
-          while (l.length>1 && ctx.measureText(l+'…').width>maxTW) l=l.slice(0,-1);
-          blines[lastI]=l+'…';
-        }
-        const totalH=blines.length*LINE_H;
-        const startY=sy+blk.h/2-totalH/2+LINE_H/2;
-        blines.forEach((line,i)=>{
-          const ty=startY+i*LINE_H;
-          ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fillText(line,sx+blk.w/2+0.5,ty+0.5);
-          ctx.fillStyle='#111'; ctx.fillText(line,sx+blk.w/2,ty);
-        });
+        ctx.fillStyle='rgba(0,0,0,0.45)';
+        dibujarAjustado(ctx, blk.text, sx+blk.w/2+1, sy+blk.h/2+2, blk.w-8, blk.h-6, { maxPx:16, minPx:8, maxLineas:3 });
+        ctx.fillStyle='#ffffff';
+        dibujarAjustado(ctx, blk.text, sx+blk.w/2, sy+blk.h/2+1, blk.w-8, blk.h-6, { maxPx:16, minPx:8, maxLineas:3 });
         ctx.globalAlpha=1;
       }
 
@@ -1680,29 +1733,29 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         ref.ansBlocks.filter(b=>b.stIdx===st.idx).forEach(blk=>{
           const rawSx=blk.x-cx;
           const sx=Math.max(4,Math.min(CW-blk.w-4,rawSx));
-          const sy=blk.y-cy+blk.h+10;
+          const sy=blk.y-cy+blk.h+12+pulse*3;
           if(sy<-10||sy>CH+10) return;
-          ctx.globalAlpha=pulse*0.65; ctx.fillStyle=blk.color;
-          ctx.font='8px Arial'; ctx.textAlign='center';
+          ctx.globalAlpha=0.35+pulse*0.5; ctx.fillStyle=blk.color;
+          ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
           ctx.fillText('▲',sx+blk.w/2,sy); ctx.globalAlpha=1;
         });
       }
 
-      // ─ Jugador ─
+      // ─ Jugador (se aplasta un poco al aterrizar) ─
       const px=p.x-cx, py=p.y-cy;
-      // Parpadeo de invulnerabilidad
-      if (p.invulnerable>0 && Math.floor(p.invulnerable/5)%2===0) {
-        // Skip drawing player every other 5 frames
-      } else {
+      if (!(p.invulnerable>0 && Math.floor(p.invulnerable/5)%2===0)) {
         ctx.save();
         if (p.facing<0) {
           ctx.translate(px+PLAYER_W/2,py+PLAYER_H/2); ctx.scale(-1,1);
           ctx.translate(-(px+PLAYER_W/2),-(py+PLAYER_H/2));
         }
+        const s=(p.squash||0)/8;
+        const dw=PLAYER_W*(1+0.14*s), dh=PLAYER_H*(1-0.14*s);
+        const dx=px-(dw-PLAYER_W)/2, dy=py+(PLAYER_H-dh);
         const sw=sprite?.complete&&sprite.naturalWidth>0;
         if (sw) {
           const fw=sprite.width/2, fh=sprite.height/2;
-          ctx.drawImage(sprite,p.frameX*fw,p.frameY*fh,fw,fh,px,py,PLAYER_W,PLAYER_H);
+          ctx.drawImage(sprite,p.frameX*fw,p.frameY*fh,fw,fh,dx,dy,dw,dh);
         } else {
           ctx.fillStyle='#c0392b'; ctx.fillRect(px+6,py,PLAYER_W-12,PLAYER_H-14);
           ctx.fillStyle='#f1c40f'; ctx.fillRect(px+11,py+8,11,8); ctx.fillRect(px+34,py+8,11,8);
@@ -1711,13 +1764,29 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
         ctx.restore();
       }
 
+      // ─ Chispas y textos ─
+      for (const pt of fx.parts) {
+        ctx.globalAlpha=Math.max(0,pt.vida/pt.max); ctx.fillStyle=pt.color;
+        ctx.beginPath(); ctx.arc(pt.x-cx,pt.y-cy,pt.r,0,Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+      for (const t of fx.textos) {
+        ctx.globalAlpha=Math.min(1,t.vida/20);
+        ctx.font='900 28px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(t.txt,t.x-cx,t.y-cy);
+        ctx.fillStyle=t.color; ctx.fillText(t.txt,t.x-cx,t.y-cy);
+      }
+      ctx.globalAlpha=1;
+      ctx.restore();
+
       // ─ Mini mapa progreso ─
       const tot=ref.stations.length;
-      const mw=tot*20, mx0=CW/2-mw/2;
+      const mw=tot*26, mx0=CW/2-mw/2;
+      ctx.fillStyle='rgba(0,0,0,0.45)'; rr(ctx,mx0-6,3,mw+8,18,9); ctx.fill();
       for(let i=0;i<tot;i++){
-        ctx.fillStyle=ref.stations[i].answered?'#2ecc71':'rgba(255,255,255,0.18)';
-        rr(ctx,mx0+i*20,6,16,9,3); ctx.fill();
-        if(ref.stations[i].answered){ ctx.fillStyle='#fff'; ctx.font='7px Arial'; ctx.textAlign='center'; ctx.fillText('✓',mx0+i*20+8,13); }
+        ctx.fillStyle=ref.stations[i].answered?'#2ecc71':'rgba(255,255,255,0.22)';
+        rr(ctx,mx0+i*26,6,22,12,4); ctx.fill();
+        if(ref.stations[i].answered){ ctx.fillStyle='#fff'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('✓',mx0+i*26+11,12.5); }
       }
 
       // ─ Flecha hacia pregunta más cercana pendiente ─
@@ -1730,40 +1799,83 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
           const ang=Math.atan2(dy,dx);
           const ax=CW/2+Math.cos(ang)*175, ay=CH/2+Math.sin(ang)*115;
           ctx.save(); ctx.translate(ax,ay); ctx.rotate(ang);
-          ctx.fillStyle='rgba(241,196,15,0.85)';
-          ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(-7,6); ctx.lineTo(-7,-6); ctx.closePath(); ctx.fill();
+          ctx.fillStyle=`rgba(241,196,15,${0.6+pulse*0.35})`;
+          ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(-8,8); ctx.lineTo(-8,-8); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
           ctx.restore();
         }
       }
 
-      rafRef.current=requestAnimationFrame(loop);
+      // Destello (verde acierto, rojo fallo)
+      if (fx.flash) {
+        ctx.fillStyle=`rgba(${fx.flash.color},${0.3*fx.flash.vida/fx.flash.max})`;
+        ctx.fillRect(0,0,CW,CH);
+      }
     };
-    rafRef.current=requestAnimationFrame(loop);
+
+    let last=performance.now(), acc=0;
+    const STEP=1000/60;
+    const frame=(t)=>{
+      acc+=Math.min(200,t-last); last=t;
+      let n=0;
+      while(acc>=STEP && n<6){ update(); acc-=STEP; n++; }
+      if(n===6) acc=0;
+      draw();
+      rafRef.current=requestAnimationFrame(frame);
+    };
+    draw();
+    rafRef.current=requestAnimationFrame(frame);
     return ()=>cancelAnimationFrame(rafRef.current);
   },[fase,nivelIdx]);
 
-  // ── Controles teclado ──
+  // ── Empezar desde las pantallas de inicio (botón, Espacio/Enter o mando) ──
+  const empezarNivel = ()=>{
+    if (fase==='INTRO') iniciar(materia,nivelIdx);
+    else if (fase==='INTRO_REC') setFase('PLAYING');
+  };
+
+  // En pantalla dual: W/A/S/D van a la mitad izquierda y las flechas a la derecha
   useEffect(()=>{
-    if(fase!=='PLAYING') return;
+    window.__piktModoAccion = fase==='PLAYING' || fase==='INTRO' || fase==='INTRO_REC';
+    return ()=>{ window.__piktModoAccion = false; };
+  },[fase]);
+
+  // ── Controles teclado ── (e.code: funciona igual con mayúsculas y con las teclas que llegan de la pantalla dual)
+  useEffect(()=>{
+    if(fase!=='PLAYING' && fase!=='INTRO' && fase!=='INTRO_REC') return undefined;
+    const DER=new Set(['ArrowRight','KeyD']), IZQ=new Set(['ArrowLeft','KeyA']), SAL=new Set(['ArrowUp','KeyW','Space']);
+    const tecla=e=>e.code||(e.key===' '?'Space':e.key);
     const kd=e=>{
+      if(e.target?.closest?.('input, textarea, select')) return;
+      const c=tecla(e);
+      if(fase!=='PLAYING'){
+        if((SAL.has(c)||c==='Enter'||c==='NumpadEnter') && !e.repeat){ e.preventDefault(); if(document.activeElement?.tagName==='BUTTON') document.activeElement.blur(); empezarNivel(); }
+        return;
+      }
       const ref=g.current;
-      if(e.key==='ArrowRight'||e.key==='d'){ e.preventDefault(); ref.keys.right=true; }
-      if(e.key==='ArrowLeft' ||e.key==='a'){ e.preventDefault(); ref.keys.left=true;  }
-      if((e.key==='ArrowUp'||e.key==='w'||e.key===' ')){
+      if(DER.has(c)){ e.preventDefault(); ref.keys.right=true; }
+      if(IZQ.has(c)){ e.preventDefault(); ref.keys.left=true;  }
+      if(SAL.has(c)){
         e.preventDefault();
+        // Que Espacio no «pulse» el último botón con foco
+        if(document.activeElement?.tagName==='BUTTON') document.activeElement.blur();
         const p=ref.player;
         if(p.onGround||p.coyote>0){ p.vy=JUMP_POWER; p.onGround=false; p.coyote=0; snd('jump'); }
         else p.jumpBuffer=JBUF_F;
       }
     };
     const ku=e=>{
-      const ref=g.current;
-      if(e.key==='ArrowRight'||e.key==='d') ref.keys.right=false;
-      if(e.key==='ArrowLeft' ||e.key==='a') ref.keys.left=false;
+      if(fase!=='PLAYING') return;
+      const ref=g.current, c=tecla(e);
+      if(DER.has(c)) ref.keys.right=false;
+      if(IZQ.has(c)) ref.keys.left=false;
+      if(SAL.has(c)) e.preventDefault();
     };
-    window.addEventListener('keydown',kd); window.addEventListener('keyup',ku);
-    return ()=>{ window.removeEventListener('keydown',kd); window.removeEventListener('keyup',ku); };
-  },[fase]);
+    // Al perder el foco (cambiar de ventana) no se queda andando solo
+    const suelta=()=>{ g.current.keys.left=false; g.current.keys.right=false; };
+    window.addEventListener('keydown',kd); window.addEventListener('keyup',ku); window.addEventListener('blur',suelta);
+    return ()=>{ window.removeEventListener('keydown',kd); window.removeEventListener('keyup',ku); window.removeEventListener('blur',suelta); };
+  },[fase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Pointer Events (multi-touch) ──
   const ptrL = useCallback((e,down)=>{ e.preventDefault(); try{down?e.target.setPointerCapture(e.pointerId):e.target.releasePointerCapture(e.pointerId);}catch(_){} g.current.keys.left=down; },[]);
@@ -1806,13 +1918,11 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
   // --- AUTO-START DEEP LINK ---
   useEffect(() => {
     if (recursoInicial && fase === 'MENU') {
+      // Con varias hojas cada uno elige (también en cada mitad de la pantalla dual)
       const hojas = recursoInicial.hojas || [];
-      let hojaIdx = 0;
-      if (hojaInicial && hojaInicial !== 'General') {
-        const idx = hojas.findIndex(h => h.nombreHoja === hojaInicial);
-        if (idx >= 0) hojaIdx = idx;
-      }
-      iniciarRecurso({ recurso: recursoInicial, modo: 'HOJA', hojaIdx });
+      const idx = hojaInicial && hojaInicial !== 'General' ? hojas.findIndex(h => h.nombreHoja === hojaInicial) : -1;
+      if (idx >= 0 || hojas.length <= 1) iniciarRecurso({ recurso: recursoInicial, modo: 'HOJA', hojaIdx: Math.max(0, idx) });
+      else setFase('SELECTOR');
     }
   }, [recursoInicial, iniciarRecurso]);
 
@@ -1825,11 +1935,11 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
   useEffect(()=>{ if(fase==='FIN') mandosApi?.current?.finPartida([score],{ aciertos:[aciertos], intentos:[totalQ] }); },[fase]); // eslint-disable-line react-hooks/exhaustive-deps
   if (juegoMandos) juegoMandos.current.onEvento = (i, ev) => {
     if (ev.accion !== 'S') return;
-    if (fase==='INTRO') iniciar(materia,nivelIdx);
-    else if (fase==='INTRO_REC') setFase('PLAYING');
+    if (fase==='INTRO' || fase==='INTRO_REC') empezarNivel();
     else if (fase==='FIN') { if (nivelIdx+1<totalNivelesActuales) (recursoActivo ? siguienteNivelRecurso() : (setNivelIdx(nivelIdx+1), setFase('INTRO'))); else setFase(recursoActivo?'INTRO_REC':'INTRO'); }
   };
 
+  if(fase==='SELECTOR' && recursoInicial) return <PantallaSelectorHoja recurso={recursoInicial} onJugar={iniciarRecurso} onBack={onExit || (()=>setFase('MENU'))} />;
   if(fase==='MENU')    return <PantallaMenu onEligir={m=>{ setMateria(m); setNivelIdx(0); setLevelStats([]); setFase('INTRO'); }} onRecurso={iniciarRecurso} onExit={onExit}/>;
   if(fase==='INTRO')   return <PantallaIntro materia={materia} nivel={nivelIdx+1} total={4} hasEnemigos={nivelIdx>0} onStart={()=>iniciar(materia,nivelIdx)} onBack={()=>setFase('MENU')} cuerpo={controlCuerpo} onCuerpo={alternarCuerpo}/>;
   if(fase==='INTRO_REC') return <PantallaIntro materia={null} nivel={nivelIdx+1} total={totalNivelesActuales} hasEnemigos={hasEnemigos} onStart={()=>setFase('PLAYING')} onBack={()=>setFase('MENU')} cuerpo={controlCuerpo} onCuerpo={alternarCuerpo}/>;
@@ -1844,120 +1954,92 @@ function QuizPlataformasJuego({ onExit, recursoInicial = null, hojaInicial = nul
   />;
 
   const mat = materia ? MATERIAS[materia] : null;
-  const scaledW = Math.round(CW * canvasScale);
-  const scaledH = Math.round(CH * canvasScale);
-  const btnSz   = Math.max(50, Math.round(Math.min(scaledW, scaledH) * 0.13));
-
+  const btnSz = Math.max(48, Math.min(96, Math.round(tam.h * 0.17)));
   const exitFS = ()=>{ setFullscreen(false); if(document.fullscreenElement) document.exitFullscreen?.(); screen.orientation?.unlock?.(); };
+  const pistaTeclas = ladoDual===0 ? 'A D moverse · W saltar'
+    : ladoDual===1 ? '← → moverse · ↑ saltar'
+    : '← → (o A D) moverse · ↑ / Espacio / W saltar';
+  const chip = { padding:'3px 10px', borderRadius:18, fontWeight:'bold', fontSize:'0.9rem', whiteSpace:'nowrap' };
+  const icono = { padding:'4px 10px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontSize:'1rem', lineHeight:'1.2', fontFamily:'Arial' };
 
   return (
-    <div ref={gameContainerRef} style={{
-      ...(fullscreen ? { position:'fixed', inset:0, zIndex:9999 } : { width:'100%', minHeight:'100vh' }),
-      background:'#0a0a0a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-      userSelect:'none', WebkitUserSelect:'none', touchAction:'none',
-    }}>
+    <div ref={gameContainerRef} className="pl-root"
+      onPointerDown={e=>{ if(e.pointerType==='touch' && !esTactil) setEsTactil(true); }}
+      style={{
+        ...(fullscreen ? { position:'fixed', inset:0, zIndex:9999, height:'100%' } : { width:'100%' }),
+        background:'radial-gradient(ellipse at 50% 15%, #1f2a44 0%, #0d1020 60%, #05060c 100%)',
+        display:'flex', flexDirection:'column', alignItems:'center', boxSizing:'border-box',
+        padding: fullscreen ? 4 : '6px 8px', overflow:'hidden',
+        userSelect:'none', WebkitUserSelect:'none', touchAction:'none', fontFamily:'Arial,sans-serif',
+      }}>
+      <style>{`.pl-root{height:100vh;height:100dvh} .pl-btn:active{transform:scale(0.94);filter:brightness(1.2)} @keyframes plLatido{0%{transform:scale(1)}35%{transform:scale(1.25)}100%{transform:scale(1)}}`}</style>
 
-      {/* Barra superior — solo en modo normal */}
-      {!fullscreen && (
-        <div style={{ width:'100%', maxWidth:CW, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 10px', boxSizing:'border-box' }}>
-          <button onClick={()=>setFase('MENU')} style={{ padding:'3px 10px', borderRadius:18, border:'1.5px solid rgba(255,255,255,0.14)', background:'transparent', color:'rgba(255,255,255,0.38)', cursor:'pointer', fontSize:'0.74rem', fontFamily:'inherit' }}>← Menú</button>
-          <span style={{ color:'rgba(255,255,255,0.45)', fontSize:'0.76rem' }}>
-            {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
-          </span>
-          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-            <span style={{ background:'#2980b9', color:'white', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>✔ {aciertos}/{totalQ}</span>
-            <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>⭐ {Math.max(0,score)}</span>
-            <button onClick={alternarCuerpo} title="Jugar con el cuerpo (webcam)"
-              style={{ padding:'3px 9px', borderRadius:8, border:`1.5px solid ${controlCuerpo?'#22c55e':'rgba(255,255,255,0.25)'}`, background:controlCuerpo?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontSize:'0.9rem', lineHeight:'1.2' }}>
-              🕺
-            </button>
-            <button onClick={toggleFullscreen} title="Pantalla completa"
-              style={{ padding:'3px 9px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontSize:'1rem', lineHeight:'1.2', fontFamily:'Arial' }}>
-              ⛶
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Canvas + overlays */}
-      <div style={{ position:'relative', flexShrink:0, touchAction:'none',
-        width: fullscreen ? scaledW : undefined, height: fullscreen ? scaledH : undefined }}>
-        <canvas ref={canvasRef} style={{ display:'block', touchAction:'none',
-          borderRadius: fullscreen ? 0 : 8,
-          boxShadow: fullscreen ? 'none' : '0 0 36px rgba(0,0,0,0.7)',
-          border: fullscreen ? 'none' : '2px solid #1a1a1a',
-          ...(fullscreen
-            ? { width:scaledW, height:scaledH }
-            : { maxWidth:'100vw' })
-        }}/>
-
-        {/* Feedback */}
-        {feedUI && (
-          <div style={{ position:'absolute', top:'36%', left:'50%', transform:'translate(-50%,-50%)',
-            background:feedUI.ok?'rgba(39,174,96,0.93)':'rgba(192,57,43,0.93)',
-            color:'white', padding:'10px 22px', borderRadius:12,
-            fontSize: fullscreen ? `${Math.round(btnSz*0.32)}px` : '1.05rem',
-            fontWeight:'bold', fontFamily:'Arial', pointerEvents:'none', whiteSpace:'nowrap',
-            boxShadow:'0 4px 16px rgba(0,0,0,0.4)', zIndex:3 }}>{feedUI.text}
-          </div>
+      {/* Marcador */}
+      <div style={{ width:'100%', maxWidth:tam.w, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', padding:'2px 2px 6px', boxSizing:'border-box', flexShrink:0,
+        // a la izquierda queda el botón 🏠 de la página (fuera de la pantalla dual y de la pantalla completa)
+        paddingLeft: !fullscreen && ladoDual===null ? 54 : 2 }}>
+        <button onClick={()=>{ exitFS(); setFase('MENU'); }} style={{ padding:'4px 12px', borderRadius:18, border:'1.5px solid rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:'0.8rem', fontFamily:'inherit' }}>← Menú</button>
+        <span style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.85rem', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+          {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
+        </span>
+        <span style={{ ...chip, background:'#2980b9', color:'white' }}>✔ {aciertos}/{totalQ}</span>
+        <span key={score} style={{ ...chip, background:'#f1c40f', color:'#1a1a2e', animation:'plLatido 0.35s ease-out', display:'inline-block' }}>⭐ {Math.max(0,score)}</span>
+        <button onClick={alternarCuerpo} title="Jugar con el cuerpo (webcam)"
+          style={{ ...icono, border:`1.5px solid ${controlCuerpo?'#22c55e':'rgba(255,255,255,0.25)'}`, background:controlCuerpo?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.08)' }}>
+          🕺
+        </button>
+        {ladoDual===null && (
+          <button onClick={fullscreen ? exitFS : toggleFullscreen} title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'} style={icono}>
+            {fullscreen ? '✕' : '⛶'}
+          </button>
         )}
-
-        {/* Jugar con el cuerpo: cámara + gestos */}
-        {controlCuerpo && fase==='PLAYING' && (
-          <React.Suspense fallback={null}>
-            <PanelControlCuerpo onDir={cuerpoDir} onSalto={cuerpoSalto} onCerrar={alternarCuerpo}
-              ancho={fullscreen ? Math.max(160, Math.round(scaledW*0.17)) : 170}
-              style={{ position:'absolute', zIndex:4, right:8, top: fullscreen ? Math.round(scaledH*0.1) : 8, opacity:0.95 }} />
-          </React.Suspense>
-        )}
-
-        {/* HUD + mandos en pantalla completa */}
-        {fullscreen && (<>
-          {/* HUD superior */}
-          <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:3,
-            display:'flex', justifyContent:'space-between', alignItems:'center',
-            padding:`${Math.round(scaledH*0.018)}px ${Math.round(scaledW*0.015)}px`,
-            background:'rgba(0,0,0,0.5)' }}>
-            <button onClick={()=>{ exitFS(); setFase('MENU'); }}
-              style={{ padding:'3px 10px', borderRadius:14, border:'1.5px solid rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:`${Math.round(btnSz*0.24)}px`, fontFamily:'inherit' }}>← Menú</button>
-            <span style={{ color:'rgba(255,255,255,0.6)', fontSize:`${Math.round(btnSz*0.24)}px` }}>
-              {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
-            </span>
-            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-              <span style={{ background:'#2980b9', color:'white', padding:'2px 8px', borderRadius:12, fontWeight:'bold', fontSize:`${Math.round(btnSz*0.26)}px` }}>✔ {aciertos}/{totalQ}</span>
-              <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 8px', borderRadius:12, fontWeight:'bold', fontSize:`${Math.round(btnSz*0.26)}px` }}>⭐ {Math.max(0,score)}</span>
-              <button onClick={alternarCuerpo} title="Jugar con el cuerpo (webcam)"
-                style={{ padding:'2px 8px', borderRadius:8, border:`1.5px solid ${controlCuerpo?'#22c55e':'rgba(255,255,255,0.25)'}`, background:controlCuerpo?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.1)', color:'white', cursor:'pointer', fontSize:`${Math.round(btnSz*0.3)}px`, lineHeight:'1.2' }}>🕺</button>
-              <button onClick={exitFS}
-                style={{ padding:'2px 8px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.1)', color:'white', cursor:'pointer', fontSize:`${Math.round(btnSz*0.3)}px`, lineHeight:'1.2', fontFamily:'Arial' }}>✕</button>
-            </div>
-          </div>
-
-          {/* Mandos izquierda */}
-          <div style={{ position:'absolute', bottom:Math.round(scaledH*0.04), left:Math.round(scaledW*0.02), zIndex:3, display:'flex', gap:Math.round(scaledW*0.018) }}>
-            <Btn size={btnSz} onDown={e=>ptrL(e,true)} onUp={e=>ptrL(e,false)}>◀</Btn>
-            <Btn size={btnSz} onDown={e=>ptrR(e,true)} onUp={e=>ptrR(e,false)}>▶</Btn>
-          </div>
-          {/* Botón saltar derecha */}
-          <div style={{ position:'absolute', bottom:Math.round(scaledH*0.04), right:Math.round(scaledW*0.02), zIndex:3 }}>
-            <Btn size={btnSz} wide onDown={ptrJ} accent>▲</Btn>
-          </div>
-        </>)}
       </div>
 
-      {/* Controles normales — solo en modo normal */}
-      {!fullscreen && (<>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%', maxWidth:CW, padding:'8px 12px', boxSizing:'border-box' }}>
-          <div style={{ display:'flex', gap:8 }}>
-            <Btn onDown={e=>ptrL(e,true)} onUp={e=>ptrL(e,false)}>◀</Btn>
-            <Btn onDown={e=>ptrR(e,true)} onUp={e=>ptrR(e,false)}>▶</Btn>
-          </div>
-          <Btn onDown={ptrJ} accent>▲ SALTAR</Btn>
+      {/* Canvas: ocupa todo el hueco libre manteniendo la proporción 16:9 */}
+      <div ref={zonaRef} style={{ flex:1, minHeight:150, width:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ position:'relative', width:tam.w, height:tam.h, flexShrink:0, touchAction:'none' }}>
+          <canvas ref={canvasRef} width={CW} height={CH} style={{ display:'block', width:'100%', height:'100%', touchAction:'none',
+            borderRadius: fullscreen ? 4 : 10, boxShadow:'0 0 36px rgba(0,0,0,0.7)', border:'2px solid #1a1a2e' }}/>
+
+          {/* Feedback */}
+          {feedUI && (
+            <div style={{ position:'absolute', top:'30%', left:'50%', transform:'translate(-50%,-50%)',
+              background:feedUI.ok?'rgba(39,174,96,0.93)':'rgba(192,57,43,0.93)',
+              color:'white', padding:'10px 22px', borderRadius:12, maxWidth:'90%', textAlign:'center',
+              fontSize: `${Math.max(15, Math.round(tam.h*0.045))}px`,
+              fontWeight:'bold', fontFamily:'Arial', pointerEvents:'none',
+              boxShadow:'0 4px 16px rgba(0,0,0,0.4)', zIndex:3 }}>{feedUI.text}
+            </div>
+          )}
+
+          {/* Jugar con el cuerpo: cámara + gestos */}
+          {controlCuerpo && fase==='PLAYING' && (
+            <React.Suspense fallback={null}>
+              <PanelControlCuerpo onDir={cuerpoDir} onSalto={cuerpoSalto} onCerrar={alternarCuerpo}
+                ancho={Math.max(140, Math.min(220, Math.round(tam.w*0.18)))}
+                style={{ position:'absolute', zIndex:4, right:8, top:28, opacity:0.95 }} />
+            </React.Suspense>
+          )}
+
+          {/* Botones táctiles encima del juego (solo en pantallas táctiles) */}
+          {esTactil && (<>
+            <div style={{ position:'absolute', bottom:Math.round(tam.h*0.04), left:Math.round(tam.w*0.02), zIndex:3, display:'flex', gap:Math.round(btnSz*0.25) }}>
+              <Btn size={btnSz} onDown={e=>ptrL(e,true)} onUp={e=>ptrL(e,false)}>◀</Btn>
+              <Btn size={btnSz} onDown={e=>ptrR(e,true)} onUp={e=>ptrR(e,false)}>▶</Btn>
+            </div>
+            <div style={{ position:'absolute', bottom:Math.round(tam.h*0.04), right:Math.round(tam.w*0.02), zIndex:3 }}>
+              <Btn size={btnSz} wide onDown={ptrJ} accent>▲</Btn>
+            </div>
+          </>)}
         </div>
-        <div style={{ color:'rgba(255,255,255,0.18)', fontSize:'0.64rem', marginTop:2 }}>
-          ← → moverse · ↑/Espacio saltar · golpea los bloques desde abajo
+      </div>
+
+      {!fullscreen && (
+        <div style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.78rem', marginTop:5, textAlign:'center', flexShrink:0 }}>
+          ⌨️ {pistaTeclas} · golpea con la cabeza, <b style={{ color:'rgba(255,255,255,0.7)' }}>desde abajo</b>, el bloque de la respuesta correcta
+          {!esTactil && <> · <button onClick={()=>setEsTactil(true)} style={{ background:'none', border:'none', color:'#7ec8f7', cursor:'pointer', fontSize:'inherit', textDecoration:'underline', padding:0 }}>botones en pantalla</button></>}
         </div>
-      </>)}
+      )}
     </div>
   );
 }
@@ -1967,13 +2049,15 @@ function Btn({ children, onDown, onUp=()=>{}, accent=false, size=null, wide=fals
   const w = size ? (wide ? Math.round(size*1.8) : size) : (accent ? 120 : 56);
   const fs = size ? `${Math.round(size*0.38)}px` : (accent ? '0.85rem' : '1.3rem');
   return (
-    <button
-      onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp}
-      style={{ width:w, height:h, borderRadius:size?Math.round(h*0.16):10, border:'none',
-        background:accent?'#f1c40f':'#2c3e50', color:accent?'#1a1a2e':'white',
+    <button className="pl-btn"
+      onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp} onLostPointerCapture={onUp}
+      onContextMenu={e=>e.preventDefault()}
+      style={{ width:w, height:h, borderRadius:size?Math.round(h*0.22):10,
+        border:`2px solid ${accent?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.25)'}`,
+        background:accent?'rgba(241,196,15,0.78)':'rgba(20,30,48,0.62)', color:accent?'#1a1a2e':'white',
         fontWeight:'bold', fontSize:fs, cursor:'pointer',
         userSelect:'none', WebkitUserSelect:'none', fontFamily:'Arial',
-        boxShadow:'0 3px 10px rgba(0,0,0,0.4)', touchAction:'none' }}>
+        boxShadow:'0 3px 10px rgba(0,0,0,0.4)', touchAction:'none', backdropFilter:'blur(2px)' }}>
       {children}
     </button>
   );

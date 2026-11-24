@@ -24,7 +24,6 @@ const JUEGOS_DISPONIBLES = [
   { id:'kartinged',       nombre:'Karting',             emoji:'🚗', desc:'Carreras con preguntas',        grupo:'general' },
   { id:'kartinged_multi', nombre:'Racing 3D',           emoji:'🏁', desc:'Carreras en coche o moto contra la IA', grupo:'general' },
   { id:'pilive',          nombre:'PiLive',              emoji:'🎯', desc:'Quiz en vivo',                  grupo:'vivo' },
-  { id:'mathlive',        nombre:'MathLive',            emoji:'📊', desc:'Matemáticas en tiempo real',    grupo:'vivo' },
   { id:'olympiclive',     nombre:'Olympic Live',        emoji:'🏅', desc:'Minijuegos en directo',         grupo:'vivo' },
   { id:'geometrix',       nombre:'Geometrix',           emoji:'📐', desc:'Áreas y volúmenes',             grupo:'math' },
   { id:'calculo',         nombre:'Cálculo',             emoji:'🧠', desc:'Agilidad mental',               grupo:'math' },

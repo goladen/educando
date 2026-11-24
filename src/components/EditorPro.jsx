@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Type, List, AlignCenter, MoreHorizontal, Settings } from 'lucide-react';
 import PublicarModal from './PublicarModal';
+import { CONFIG_OPERACIONES_DEFECTO } from '../utils/operacionesMathLive';
 
 export default function EditorPro({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
@@ -15,6 +16,8 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                 ...prev,
                 // Aseguramos el tipo siempre
                 tipo: 'PRO',
+                // Los antiguos recursos MathLive pasan a ser PiLive (con el bloque de operaciones)
+                ...(prev.tipoJuego === 'MATHLIVE' ? { tipoJuego: 'THINKHOOT' } : {}),
 
                 // Configuración base
                 config: {
@@ -300,6 +303,7 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
 
                 {/* AREA PREGUNTAS */}
                 <div style={styles.body}>
+                    {(datos.tipoJuego === 'THINKHOOT' || datos.tipoJuego === 'MATHLIVE') && <BloqueOperaciones datos={datos} setDatos={setDatos} />}
                     {datos.hojas[hojaActiva]?.preguntas.length === 0 ? (
                         <div style={{ textAlign: 'center', color: '#95a5a6', marginTop: '50px' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📭</div>
@@ -378,7 +382,7 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                                 </div>
                                 <h4 style={styles.sectionTitle}>Ajustes de Juego (Global)</h4>
                                 <div style={{ marginBottom: '10px' }}>
-                                    <label style={styles.label}>Nº de Preguntas a Jugar</label>
+                                    <label style={styles.label}>{datos.config?.isMathLive ? 'Nº de preguntas a jugar (además de las operaciones)' : 'Nº de Preguntas a Jugar'}</label>
                                     <input
                                         type="number"
                                         value={datos.config?.numPreguntas || 10}
@@ -408,6 +412,81 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
 
             </div>
             <style>{`.hide-mobile { display: inline; } .hide-mobile-xs { display: inline; } @media (max-width: 600px) { .hide-mobile { display: none; } .hide-mobile-xs { display: none; } }`}</style>
+        </div>
+    );
+}
+
+// --- BLOQUE OPCIONAL: OPERACIONES AUTOMÁTICAS (antes la app aparte «MathLive») ---
+// Con config.isMathLive = true, al lanzar se generan operaciones que se mezclan con las
+// preguntas (en vivo: motor MathLive.jsx; solo/tarjetas/mandos: utils/operacionesMathLive.js).
+function BloqueOperaciones({ datos, setDatos }) {
+    const config = datos.config || {};
+    const activo = config.isMathLive === true;
+    const setConfig = (cambios) => setDatos(prev => ({ ...prev, config: { ...prev.config, ...cambios } }));
+    const toggleArr = (key, value) => {
+        const arr = config[key] || [];
+        setConfig({ [key]: arr.includes(value) ? arr.filter(x => x !== value) : [...arr, value] });
+    };
+    const activar = () => {
+        if (activo) return setConfig({ isMathLive: false });
+        const faltan = {};
+        Object.entries(CONFIG_OPERACIONES_DEFECTO).forEach(([k, v]) => { if (config[k] === undefined) faltan[k] = v; });
+        setConfig({ ...faltan, isMathLive: true });
+    };
+    const num = (key) => (
+        <input type="number" value={config[key] ?? ''} onChange={e => setConfig({ [key]: parseInt(e.target.value) || 0 })}
+            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '14px' }} />
+    );
+    const lbl = { display: 'block', marginBottom: '4px', fontWeight: 'bold', fontSize: '12px', color: '#444' };
+    const grupo = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', background: '#f9f9f9', padding: '10px', borderRadius: '8px', fontSize: '14px' };
+    const hayMusicales = (datos.hojas || []).some(h => (h.preguntas || []).some(p => p.tipo === 'MUSICAL'));
+
+    return (
+        <div style={{ maxWidth: '800px', margin: '0 auto 18px', background: 'white', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', borderTop: `5px solid ${activo ? '#009688' : '#cfd8dc'}`, overflow: 'hidden' }}>
+            <div onClick={activar} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', cursor: 'pointer' }}>
+                <span style={{ fontSize: '1.6rem' }}>🧮</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 'bold', color: activo ? '#00796b' : '#455a64' }}>Operaciones automáticas <span style={{ fontWeight: 'normal', fontSize: '12px', color: '#90a4ae' }}>(opcional)</span></div>
+                    <div style={{ fontSize: '12px', color: '#78909c' }}>Genera cuentas al azar y las mezcla con tus preguntas. Los alumnos responden con teclado numérico.</div>
+                </div>
+                <div style={{ ...styles.toggleBtn, background: activo ? '#009688' : '#ccc', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}><div style={styles.toggleCircle}></div></div>
+            </div>
+            {activo && (
+                <div style={{ padding: '0 15px 15px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
+                        <div><label style={lbl}>Nº de operaciones</label>{num('mathCount')}</div>
+                        <div><label style={lbl}>Tiempo (s)</label>{num('mathTime')}</div>
+                        <div><label style={lbl}>Pts máx.</label>{num('mathPuntosMax')}</div>
+                        <div><label style={lbl}>Pts mín.</label>{num('mathPuntosMin')}</div>
+                    </div>
+                    <div>
+                        <label style={lbl}>Tipos de números</label>
+                        <div style={grupo}>
+                            {[['POSITIVOS', 'Positivos'], ['NEGATIVOS', 'Negativos'], ['DECIMALES', 'Decimales'], ['FRACCIONES', 'Fracciones']].map(([k, t]) => (
+                                <label key={k} style={{ cursor: 'pointer' }}><input type="checkbox" checked={!!config.mathTypes?.includes(k)} onChange={() => toggleArr('mathTypes', k)} /> {t}</label>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label style={lbl}>Operaciones</label>
+                        <div style={grupo}>
+                            {[['SUMA', '+ Suma'], ['RESTA', '− Resta'], ['MULT', '× Multiplicación'], ['DIV', '÷ División']].map(([k, t]) => (
+                                <label key={k} style={{ cursor: 'pointer' }}><input type="checkbox" checked={!!config.mathOps?.includes(k)} onChange={() => toggleArr('mathOps', k)} /> {t}</label>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label style={lbl}>Rango de números</label>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', maxWidth: '260px' }}>
+                            {num('mathMin')}<span>a</span>{num('mathMax')}
+                        </div>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#607d8b', background: '#e0f2f1', padding: '8px 10px', borderRadius: '8px' }}>
+                        Las preguntas que añadas abajo son opcionales: se juegan {parseInt(config.numPreguntas) || 0} además de las operaciones (cámbialo en ⚙️ Configuración).
+                        {hayMusicales && <><br />⚠️ Las preguntas musicales 🎵 no se usan cuando las operaciones están activadas.</>}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

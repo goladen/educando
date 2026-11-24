@@ -76,10 +76,12 @@ export const JUEGOS_REGISTRO_META = {
     PATIO:               { nombre: 'Patio de Juegos',     emoji: '🛝', color: '#8e5cff' },
     CALCULADORA:         { nombre: 'Calculadora',         emoji: '🧮', color: '#0f766e' },
     PIZARRAS_VERTICALES: { nombre: 'Pizarras verticales', emoji: '🧱', color: '#4338ca' },
+    CANGURO:             { nombre: 'Canguro Matemático',  emoji: '🦘', color: '#b91c1c' },
     QUIZ_MANOS:          { nombre: 'Quiz con los dedos',  emoji: '✋', color: '#7c3aed' },
     AVATAR_CUERPO:       { nombre: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2' },
     ORIENTACION:         { nombre: 'Orientación',          emoji: '🚩', color: '#c026d3' },
     CORRECTOR:           { nombre: 'Corrector de exámenes', emoji: '📝', color: '#0f766e' },
+    RETO_SEMANA:         { nombre: 'Reto de la semana',   emoji: '🔥', color: '#ee5a24' },
     MBOT_RETOS:          { nombre: 'Retos del mBot2',     emoji: '🚗', color: '#0284c7' },
     EMPRESA_SOLAR:       { nombre: 'Mi empresa solar',    emoji: '☀️', color: '#d97706' },
 };

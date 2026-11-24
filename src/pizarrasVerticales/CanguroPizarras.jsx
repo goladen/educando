@@ -5,6 +5,7 @@ import { CANGURO_INFO as INFO, CANGURO_NIVELES } from './canguro2026';
 import { INTERACTIVOS } from './CanguroInteractivos';
 import { sonidoCorrecto, sonidoIncorrecto } from '../utils/sonidosFeedback';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
+import { ModalCompartirCanguro } from './CanguroReto';
 
 const LS_NIVEL = 'pv_canguro_2026_nivel';
 const claveNivel = id => `pv_canguro_2026_${id}_v1`;
@@ -132,6 +133,7 @@ function CanguroNivel({ nivel, selector }) {
     const [actual, setActual] = useState(null);
     const [grande, setGrande] = useState(false);
     const [verPdf, setVerPdf] = useState(false);
+    const [compartir, setCompartir] = useState(false);
     const [inicioPrueba, setInicioPrueba] = useState(null);
     const [ahora, setAhora] = useState(Date.now());
     const { resp, modoPrueba, corregida } = datos;
@@ -202,12 +204,14 @@ function CanguroNivel({ nivel, selector }) {
                     <div style={{ fontWeight: 900, fontSize: '1.25rem' }}>{INFO.titulo} · {nivel.nivel}</div>
                     <div style={{ fontSize: '0.85rem', opacity: 0.9 }}>{INFO.fecha} · 30 preguntas (3, 4 y 5 puntos) · empiezas con 30 puntos y cada fallo resta ¼</div>
                 </div>
+                <button onClick={() => setCompartir(true)} style={btn('white', '#b91c1c')}>🔗 Compartir con alumnos</button>
                 <button onClick={() => setVerPdf(v => !v)} style={btn('rgba(255,255,255,0.22)')}>📄 {verPdf ? 'Ocultar PDF' : 'Ver el PDF'}</button>
                 <a href={nivel.pdf} download style={{ ...btn('rgba(255,255,255,0.22)'), textDecoration: 'none' }}>⬇️ Descargar</a>
                 <a href={INFO.web} target="_blank" rel="noreferrer" style={{ ...btn('rgba(255,255,255,0.22)'), textDecoration: 'none' }}>🌐 canguromat.es</a>
             </div>
 
             {selector}
+            {compartir && <ModalCompartirCanguro nivel={nivel} onClose={() => setCompartir(false)} />}
 
             {verPdf && (
                 <div style={{ marginBottom: 14, background: 'white', borderRadius: 14, overflow: 'hidden', border: '1px solid #e5e7eb' }}>

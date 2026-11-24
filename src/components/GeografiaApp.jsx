@@ -6,7 +6,7 @@ import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import { CompeticionCuerda } from './TironCuerdaEscena';
 import { useMandoPregunta, LetraMando } from './MandosCuerda';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
-import { leerRetoUrl } from '../utils/retoLink';
+import { leerRetoUrl, textoEnvioCompeticion } from '../utils/retoLink';
 import BotonFichas from './BotonFichas';
 import { validarNombre } from '../utils/filtroNombres';
 
@@ -1352,7 +1352,7 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive, onAbrirINE }) {
           </div>
           <button onClick={() => setModalEnviar(true)}
             style={{ width:'100%', padding:'11px 0', borderRadius:12, border:'none', background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'rgba(124,58,237,0.85)', color:'white', fontWeight:700, fontSize:'0.92rem', cursor:'pointer' }}>
-            {esRetoCompeticion ? '🏆 Enviar a la competición' : '📤 Enviar resultado al Profesor'}
+            {esRetoCompeticion ? textoEnvioCompeticion() : '📤 Enviar resultado al Profesor'}
           </button>
         </div>
 

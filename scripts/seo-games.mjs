@@ -147,11 +147,25 @@ export const GAMES = [
     nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
   },
   {
+    slug: 'mansion', emoji: '🏚️', color: '#7c3aed',
+    h1: 'La Mansión Pitagórica: escape room 3D con preguntas',
+    title: 'Escape room 3D con preguntas y gafas VR, gratis | PiKT',
+    desc: 'Explora una mansión encantada, una pirámide o una nave espacial: responde para abrir las puertas, encuentra las pistas del candado y escapa de fantasmas y trampas ocultas con tu linterna. Ordenador, móvil y gafas VR (Meta Quest).',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
+  },
+  {
     slug: 'conducir', emoji: '🚗', color: '#fb8c00',
     h1: 'Simulador de conducción y educación vial',
     title: 'Simulador de conducción 3D, señales y test DGT gratis | PiKT',
     desc: 'Aprende las señales, haz el test teórico tipo DGT (coche y moto) y conduce un coche o una moto por una ciudad 3D con glorieta, semáforos y tráfico. Examen práctico y pista de moto. Ordenador, móvil y gafas VR.',
     nivel: 'Secundaria y Bachillerato', materia: 'Educación vial, Tutoría y Tecnología',
+  },
+  {
+    slug: 'retosemana', emoji: '🔥', color: '#ee5a24',
+    h1: 'Reto de la semana: un juego educativo nuevo cada semana con ranking',
+    title: 'Reto de la semana: juega, entra en el ranking y gana | PiKT',
+    desc: 'Cada semana un juego de PiKT (cálculo mental, Pasapalabra, ecuaciones, geografía…) con la misma configuración para todos. Juega gratis, envía tu puntuación con un alias y sube en el ranking. Ganadores en Instagram.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
   },
   {
     slug: 'corrector', emoji: '📝', color: '#0f766e',
@@ -197,8 +211,8 @@ export const GAMES = [
   },
   {
     slug: 'mathlive', emoji: '➗', color: '#009688',
-    h1: 'MathLive',
-    title: 'MathLive: matemáticas en tiempo real | PiKT',
+    h1: 'PiLive con operaciones (MathLive)',
+    title: 'MathLive: cálculo mental en vivo con PiLive | PiKT',
     desc: 'Compite con las matemáticas en tiempo real con toda la clase. Gratis, sin registro y proyectable para practicar cálculo de forma colaborativa.',
     nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
   },

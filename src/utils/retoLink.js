@@ -94,6 +94,24 @@ export const leerCompeticionUrl = () => {
     return compId && catId ? { compId, catId, titulo: (p.get('t') || '').trim() } : null;
 };
 
+// ─── Reto de la semana ───────────────────────────────────────────────────────
+// Reutiliza el contexto de competición con un compId reservado:
+//   &comp=semana&cat=<idDelReto>  → el envío va a retos_semana/<id> (ranking público).
+// Los ~40 juegos que ya envían a una competición funcionan sin tocarlos: el
+// ModalEnviarCompeticion desvía a ModalEnviarRetoSemana cuando compId === 'semana'.
+export const COMP_RETO_SEMANA = 'semana';
+
+export const esRetoSemanaUrl = () => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('comp') === COMP_RETO_SEMANA;
+};
+
+/** Texto del botón de envío en contexto de competición (o de reto semanal). */
+export const textoEnvioCompeticion = (conEmoji = true) =>
+    esRetoSemanaUrl()
+        ? `${conEmoji ? '🔥 ' : ''}Enviar al reto de la semana`
+        : `${conEmoji ? '🏆 ' : ''}Enviar a la competición`;
+
 /** Copia de un objeto solo con valores simples (para guardar un «detalle» en Firestore). */
 export const soloPrimitivos = (obj) => Object.fromEntries(
     Object.entries(obj || {}).filter(([, v]) => v == null || typeof v !== 'object')

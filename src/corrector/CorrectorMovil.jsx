@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import CamaraTarjetas from '../tarjetas/CamaraTarjetas.jsx';
 import { leerHoja, MARCAS } from './omr.js';
 import { pintarLectura, crearConfirmador } from './dibujo.js';
+import { hayEscritas, leerEscritas } from './escritas.js';
 import { escucharCorrector, enviarHoja, latidoCorrector, TIPO_CORRECTOR } from './escanerCorrector.js';
 import { sonidoCorrecto, sonidoIncorrecto, despertarAudio } from '../utils/sonidosFeedback';
 
@@ -25,6 +26,7 @@ export default function CorrectorMovil({ codigoInicial = '', onExit }) {
   const confirmador = useRef(crearConfirmador(3));
   const ultimaFirma = useRef('');
   const pendienteId = useRef(null);
+  const ocupado = useRef(false); // leyendo las casillas escritas
   const estadoRef = useRef('');
   const ponerEstado = (t) => { if (estadoRef.current !== t) { estadoRef.current = t; setEstado(t); } };
 
@@ -65,7 +67,8 @@ export default function CorrectorMovil({ codigoInicial = '', onExit }) {
     if (!s) return;
     const marcas = dets.filter((d) => IDS.has(d.tarjeta));
     if (marcas.length < 3) { lecturaRef.current = null; confirmador.current.reiniciar(); ponerEstado(marcas.length ? `Veo ${marcas.length} de las 4 esquinas: encuadra la hoja entera.` : 'Enfoca una hoja (que se vean las 4 esquinas negras).'); return; }
-    const r = leerHoja(img, marcas, { nPreguntas: s.nPreguntas, nOpciones: s.nOpciones });
+    if (ocupado.current) return;
+    const r = leerHoja(img, marcas, { nPreguntas: s.nPreguntas, nOpciones: s.nOpciones, nEscritas: s.nEscritas || 0, letras: s.letras || 8 });
     if (!r.ok) { lecturaRef.current = null; confirmador.current.reiniciar(); ponerEstado(r.motivo === 'lejos' ? 'Acércate un poco más.' : 'Una parte de la hoja se sale de la imagen.'); return; }
     lecturaRef.current = { r, t: Date.now() };
     const modo = s.modo || 'alumnos';
@@ -77,15 +80,19 @@ export default function CorrectorMovil({ codigoInicial = '', onExit }) {
     setCartel(modo === 'clave' ? { clave: true } : { lista: r.lista, enviando: true });
     ponerEstado(modo === 'clave' ? '🔑 Clave enviada al ordenador' : `📤 Nº ${r.lista} enviada`);
     if (modo === 'clave') sonidoCorrecto();
-    enviarHoja(codigo, { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas, modo })
+    // Respuestas escritas: se leen aquí y viajan solo las probabilidades de cada casilla (sin imagen)
+    ocupado.current = true;
+    (hayEscritas(s) ? leerEscritas(r, s, () => false) : Promise.resolve([]))
+      .then((escritas) => enviarHoja(codigo, { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas, escritas, modo }))
       .then((id) => { if (modo === 'alumnos') pendienteId.current = id; setEnviadas((n) => n + 1); setError(''); })
-      .catch(() => { ultimaFirma.current = ''; setError('No se pudo enviar (¿sin red?). Vuelve a enfocar la hoja.'); });
+      .catch(() => { ultimaFirma.current = ''; setError('No se pudo enviar (¿sin red?). Vuelve a enfocar la hoja.'); })
+      .finally(() => { ocupado.current = false; });
   }, [codigo]);
 
   const pintarExtra = useCallback((ctx, ex) => {
     const L = lecturaRef.current, s = sesionRef.current;
     if (!L || !s || Date.now() - L.t > 700) return;
-    pintarLectura(ctx, L.r, { nPreguntas: s.nPreguntas, nOpciones: s.nOpciones, ex });
+    pintarLectura(ctx, L.r, { nPreguntas: s.nPreguntas, nOpciones: s.nOpciones, nEscritas: s.nEscritas || 0, letras: s.letras || 8, ex });
   }, []);
 
   if (!codigo) {
@@ -131,7 +138,7 @@ export default function CorrectorMovil({ codigoInicial = '', onExit }) {
             {cartel.enviando ? <div style={{ fontSize: 20, fontWeight: 900 }}>Enviando…</div> : (
               <>
                 <div style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.1 }}>{String(cartel.nota).replace('.', ',')}</div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>✅ {cartel.aciertos} · ❌ {cartel.fallos} · ⚪ {cartel.blancos}</div>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>✅ {cartel.aciertos} · ❌ {cartel.fallos} · ⚪ {cartel.blancos}{cartel.pendientes ? ` · 🔍 ${cartel.pendientes}` : ''}</div>
               </>
             )}
           </div>

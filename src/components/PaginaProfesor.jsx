@@ -47,7 +47,7 @@ const JUEGOS_INFO = {
   kartinged:       { nombre:'Karting',               emoji:'🚗', url:'/kartinged' },
   kartinged_multi: { nombre:'Racing 3D',             emoji:'🏁', url:'/carreras' },
   pilive:          { nombre:'PiLive',                emoji:'🎯', url:'/thinkhoot' },
-  mathlive:        { nombre:'MathLive',              emoji:'📊', url:'/mathlive' },
+  mathlive:        { nombre:'PiLive · Operaciones',  emoji:'📊', url:'/thinkhoot' }, // MathLive ahora es parte de PiLive
   olympiclive:     { nombre:'Olympic Live',          emoji:'🏅', url:'/olympiclive' },
   geometrix:       { nombre:'Geometrix',             emoji:'📐', url:'/geometrix' },
   calculo:         { nombre:'Cálculo',               emoji:'🧠', url:'/calculo' },

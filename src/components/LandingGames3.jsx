@@ -15,6 +15,7 @@ import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
 import { basePublica } from '../utils/urlPublica';
 import { validarNombre } from '../utils/filtroNombres';
+import { tieneOperaciones, recursoConOperaciones } from '../utils/operacionesMathLive';
 import useAvatarLocal from '../hooks/useAvatarLocal';
 import AvatarSVG from './avatar/AvatarSVG';
 import { useT } from '../i18n/LanguageContext';
@@ -26,6 +27,7 @@ const AvionesGame3D = lazy(() => import('../AvionesGame3D'));
 const ThinkHootGame = lazy(() => import('../ThinkHootGame'));
 const PiLiveSolo = lazy(() => import('../PiLiveSolo'));
 const QuizTarjetas = lazy(() => import('../tarjetas/QuizTarjetas.jsx'));
+import { crearBuscador, contarJugada, alternarMeGusta, meGusta, ORDENES } from '../utils/valoracionRecursos';
 const RuletaGame = lazy(() => import('../RuletaGame'));
 const MathLive = lazy(() => import('../MathLive'));
 const OlympicLive = lazy(() => import('../OlympicLive'));
@@ -119,6 +121,7 @@ const QuizManos = lazy(() => import('../manos/QuizManos.jsx'));
 const AvatarCuerpo = lazy(() => import('../cuerpo/AvatarCuerpo.jsx'));
 const Orientacion = lazy(() => import('../orientacion/Orientacion.jsx'));
 const CorrectorExamenes = lazy(() => import('../corrector/CorrectorExamenes.jsx'));
+const RetoSemana = lazy(() => import('../retoSemana/RetoSemana.jsx'));
 const DinamicasAula = lazy(() => import('../dinamicasAula/DinamicasAula.jsx'));
 const SemaforoAlumno = lazy(() => import('../dinamicasAula/SemaforoLive.jsx'));
 const AlgebraApp = lazy(() => import('../Algebra'));
@@ -171,7 +174,6 @@ import imgRuleta from '../assets/icono_ruleta.png';
 import imgWordle from '../assets/icono_wordle.png';
 import imgMathle from '../assets/icono_mathle.png';
 import imgPilive from '../assets/icono_pilive.png';
-import imgMathlive from '../assets/icono_mathlive.png';
 import imgSopa from '../assets/icono_sopa.png';
 import imgOlympic from '../assets/icono_olympic.png';
 
@@ -702,10 +704,12 @@ export const APPS = [
     {
         id: 'MANSION_PITAGORICA',
         name: 'Mansión Pitagórica',
-        desc: 'Explora la mansión respondiendo preguntas de opción múltiple.',
+        desc: 'Escape room 3D: responde, busca las pistas del candado y escapa. También con gafas VR.',
         color: '#7c3aed',
-        emoji: '🏛️',
-        shareable: true
+        emoji: '🏚️',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/mansion`
     },
 
 
@@ -714,7 +718,6 @@ export const APPS = [
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle, shareable: true },
     { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true, shareable: true },
     { id: 'EAE', name: 'PictoTabú', desc: 'Dibuja o describe sin usar palabras tabú.', color: '#e67e22', emoji: '🎨✍️', img: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg80nlTKknMfTBotTp1CGlbyfxwhJALm8EsZoOrxi3qKUZ5z8dgiezpsnVAh9UoCSvtA7FJ_0XifE0lN9_t8mAAQiH_nebCwjN5IwpvhjAi4JF-NcSEP0M972qoXd3HPtyjfzRWj-dZM9s/s1600/Captura+de+pantalla+2020-03-30+a+las+10.29.34.png', isLive: true, shareable: false },
-    { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true, shareable: true },
     { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true, shareable: true },
     { id: 'AHORCADO', name: 'Ahorcado', desc: 'Adivina la palabra letra a letra.', color: '#6d28d9', emoji: '🪢', shareable: true },
     { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa, shareable: true },
@@ -1092,10 +1095,10 @@ export const GAME_INFO = {
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     MANSION_PITAGORICA: {
-        descripcion: 'Aventura de exploración por una mansión misteriosa. El alumno responde preguntas de opción múltiple para desbloquear habitaciones y avanzar por la historia.',
+        descripcion: 'Escape room en 3D (también con gafas VR): el alumno explora una mansión, una pirámide o una nave, responde preguntas para abrir las puertas, recoge las pistas del código del candado y escapa evitando fantasmas y trampas ocultas que solo se ven con la linterna.',
         tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
-        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
-        multiplayer: 'Individual.',
+        biblioteca: 'Recursos de PiKT y de los profesores. Sin recurso: tablas, cuadrados, raíces y Pitágoras.',
+        multiplayer: 'Individual. Ordenador, móvil o gafas de realidad virtual (Meta Quest).',
         materias: ['Universal', 'Matemáticas'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
@@ -1146,14 +1149,6 @@ export const GAME_INFO = {
         multiplayer: 'Sí, toda la clase participa en vivo (multijugador).',
         materias: ['Arte', 'Lengua y Literatura', 'Inglés', 'Universal'],
         etapas: ['ESO', 'Bachillerato'],
-    },
-    MATHLIVE: {
-        descripcion: 'Competición matemática en tiempo real. Los alumnos resuelven operaciones contrarreloj compitiendo contra sus compañeros. El profesor controla la partida.',
-        tipoPreguntas: 'Operaciones matemáticas (suma, resta, multiplicación, división, potencias, fracciones). Configurable por el profesor.',
-        biblioteca: 'Sí, genera operaciones automáticamente según la configuración del profesor (tipo y rango de números).',
-        multiplayer: 'Sí, toda la clase a la vez (multijugador en tiempo real).',
-        materias: ['Matemáticas'],
-        etapas: ['Primaria', 'ESO'],
     },
     OLYMPICLIVE: {
         descripcion: 'Olimpiadas matemáticas en vivo: los alumnos compiten en minijuegos de cálculo mental para ganar medallas. Muy dinámico y motivador para la clase.',
@@ -1426,6 +1421,14 @@ export const GAME_INFO = {
         biblioteca: 'No: cada profesor crea sus carreras en su centro. Se comparten con un código de 6 letras o un QR.',
         multiplayer: 'Individual o por equipos, cada uno con su móvil. Resultado (balizas, tiempo, preguntas) al profesor y en «Mis registros».',
         materias: ['Educación Física', 'Geografía', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    RETO_SEMANA: {
+        descripcion: 'Cada semana, un juego o herramienta de Pikt con la misma configuración para todos y un ranking público con la mejor puntuación de cada jugador. Se juega desde el enlace (con o sin cuenta), al terminar se envía la puntuación con un alias y una contraseña, se puede repetir para mejorar la marca y al acabar la semana se anuncian los ganadores en Instagram. Ranking en directo, cuenta atrás y podio de los retos anteriores.',
+        tipoPreguntas: 'Las del juego elegido cada semana (cálculo mental, Pasapalabra, Burbujas, ecuaciones, geografía…).',
+        biblioteca: 'Un reto nuevo cada semana propuesto por Pikt.',
+        multiplayer: 'Abierto a todo el mundo: ranking público por alias, cuenta la mejor puntuación de cada uno.',
+        materias: ['Todas'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     CORRECTOR: {
@@ -1707,7 +1710,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'PIZARRAS_VERTICALES', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI', 'INVASORES', 'PATIO_JUEGOS'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'PIZARRAS_VERTICALES', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI', 'INVASORES', 'PATIO_JUEGOS'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1790,7 +1793,7 @@ const MATERIA_SLUGS = {
     tutoria: 'TUTORIA',
 };
 
-const MATH_ONLY_IDS = new Set(['MATHLIVE', 'SIXSEVEN']);
+const MATH_ONLY_IDS = new Set(['SIXSEVEN']);
 const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ', 'FUNCIONES_EJECUTIVAS', 'CORRECTOR'];
 // Herramientas con IA, siempre disponibles en todas las materias (separadas de la gestión de aula)
 const IA_IDS = ['MINIAPP_CREATOR'];
@@ -1879,6 +1882,20 @@ const esJuegoEnVivo = (r) => {
     if (r.tipo === 'PRO' && r.tipoJuego !== 'WORDLE' && r.tipoJuego !== 'MATHLIVE') return true;
     return false;
 };
+// Recursos de OTROS juegos cuyas preguntas son de 4 respuestas (1 correcta + 3 incorrectas): también se
+// juegan en PiLive (en vivo, yo solo, tarjetas, mandos). Se cuentan los mismos campos que convierte
+// lanzarComoGestor (pregunta, correcta/respuesta, incorrectas). Al menos 3 preguntas y la mitad del recurso.
+const TIPOS_NO_PILIVE = new Set(['QUESTION_SENDER', 'EAE', 'LISTENING', 'LISTENING_RECURSO', 'DINAMICA_SEMAFORO', 'CALAMAR', 'OLYMPIC']);
+const tieneCuatroRespuestas = (r) => {
+    if (!r || esJuegoEnVivo(r) || TIPOS_NO_PILIVE.has(r.tipoJuego) || r.tipo === 'OLYMPIC') return false;
+    const ps = Array.isArray(r.hojas) && r.hojas.length ? r.hojas.flatMap(h => h.preguntas || []) : (r.preguntas || []);
+    if (!ps.length) return false;
+    const cuatro = ps.filter(p => p && String(p.pregunta || '').trim() && String(p.correcta || p.respuesta || '').trim()
+        && Array.isArray(p.incorrectas) && p.incorrectas.filter(x => String(x ?? '').trim()).length >= 3).length;
+    return cuatro >= 3 && cuatro >= ps.length * 0.5;
+};
+// Copia del recurso para usarlo como PiLive (el original no se toca)
+const comoPiLive = (r) => ({ ...r, tipoJuego: 'THINKHOOT', tipoJuegoOriginal: r.tipoJuego });
 
 const getAppInfo = (tipoJuego) => {
     if (!tipoJuego) return { name: 'Recurso', color: '#999' };
@@ -2251,12 +2268,16 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CONDUCCION' });
             } else if (path === 'carreras' || path === 'racing3d') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'RACING3D' });
+            } else if (path === 'mansion' || path === 'mansionpitagorica') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MANSION_PITAGORICA' });
             } else if (path === 'aviones' || path === 'avion') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'AVIONES' });
             } else if (path === 'ovni') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
             } else if (path === 'corrector') {
                 setCorrectorApp(true);
+            } else if (path === 'retosemana') {
+                setRetoSemanaApp(true);
             } else if (path === 'invasores') {
                 setJuegoActivo({ tipoJuego: 'INVASORES' });
             } else if (path === 'vanila') {
@@ -2274,6 +2295,9 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CALAMAR' });
             } else if (path === 'escaperoom') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'ESCAPE_HALLOWEEN' });
+            } else if (path === 'mathlive') {
+                // MathLive ya es parte de PiLive (bloque «Operaciones automáticas»)
+                openById('THINKHOOT');
             } else if (path === '' || path === 'inicio') {
                 setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
             } else if (!path.includes('/') && (enVistaAlumno() || APPS.some(a => a.id.toLowerCase() === path))) {
@@ -2324,7 +2348,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
 
 
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
-    const [filtros, setFiltros] = useState({ tipoJuego: '', ciclo: '', tema: '', pais: '', region: '', poblacion: '', autor: '' });
+    const [filtros, setFiltros] = useState({ tipoJuego: '', ciclo: '', tema: '', pais: '', region: '', poblacion: '', autor: '', orden: 'recientes' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
     const [codigo, setCodigo] = useState('');
     const [resultados, setResultados] = useState([]);
@@ -2367,6 +2391,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [avatarCuerpoApp,     setAvatarCuerpoApp]     = useState(false);
     const [orientacionApp,      setOrientacionApp]      = useState(false);
     const [correctorApp,        setCorrectorApp]        = useState(false);
+    const [retoSemanaApp,       setRetoSemanaApp]       = useState(false);
     const [dinamicasApp,        setDinamicasApp]        = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
@@ -2417,6 +2442,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     useEffect(() => { if (!avatarCuerpoApp) refrescarRegistros(); }, [avatarCuerpoApp]);
     useEffect(() => { if (!orientacionApp) refrescarRegistros(); }, [orientacionApp]);
     useEffect(() => { if (!correctorApp) refrescarRegistros(); }, [correctorApp]);
+    useEffect(() => { if (!retoSemanaApp) refrescarRegistros(); }, [retoSemanaApp]);
     useEffect(() => { if (!dinamicasApp) refrescarRegistros(); }, [dinamicasApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
@@ -2513,9 +2539,27 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [isMathLiveHost, setIsMathLiveHost] = useState(false);
 
+    // Paginación de la búsqueda (20 + «Ver más»): buscador en curso y lo ya mostrado
+    const paginaRef = useRef(null);
+    const [hayMas, setHayMas] = useState(false);
+    const [cargandoMas, setCargandoMas] = useState(false);
+    const verMas = async () => {
+        const p = paginaRef.current;
+        if (!p || cargandoMas) return;
+        setCargandoMas(true);
+        try {
+            const { items, fin } = await p.buscador.siguiente();
+            p.profe = [...p.profe, ...p.preparar(items)];
+            setResultados([...p.profe, ...p.extras]);
+            setHayMas(!fin);
+        } catch (e) { console.error(e); }
+        setCargandoMas(false);
+    };
+
     const buscar = async () => {
         setBuscando(true);
         setResultados([]);
+        setHayMas(false);
         const ref = collection(db, 'resources');
 
         try {
@@ -2579,12 +2623,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 }
 
             } else {
-                // --- BÚSQUEDA POR FILTROS MEJORADA ---
-                const q = query(ref, orderBy("fechaCreacion", "desc"), limit(150));
-                const snap = await getDocs(q);
-                const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-
-                const filtrados = raw.filter(r => {
+                // --- BÚSQUEDA POR FILTROS: de 20 en 20 («Ver más»), en el orden elegido ---
+                const pasaFiltros = (r) => {
                     if (r.tipoJuego === 'QUESTION_SENDER') return false;
 
                     const isTerminado = r.isFinished === true || r.config?.isFinished === true;
@@ -2593,7 +2633,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                     // Filtro Tipo Juego
                     if (filtros.tipoJuego) {
                         if (filtros.tipoJuego === 'THINKHOOT') {
-                            if (!esJuegoEnVivo(r) || r.tipoJuego === 'MATHLIVE') return false;
+                            // incluye los antiguos MathLive (PiLive con operaciones) y los recursos de 4 respuestas de otros juegos
+                            if (!esJuegoEnVivo(r) && !tieneCuatroRespuestas(r)) return false;
                         } else if (filtros.tipoJuego === 'CAZABURBUJAS') {
                             if (r.tipoJuego !== 'CAZABURBUJAS' && r.tipoJuego !== 'PIKATRON') return false;
                         } else if (filtros.tipoJuego === 'SOPA' || filtros.tipoJuego === 'WORDLE') {
@@ -2631,7 +2672,13 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                     if (filtros.autor && !cleanText(r.profesorNombre).includes(cleanText(filtros.autor))) return false;
 
                     return true;
-                });
+                };
+                // Con el filtro «📡 Live», los recursos de 4 respuestas de otros juegos salen como PiLive (copia)
+                const preparar = (lista) => (filtros.tipoJuego === 'THINKHOOT' ? lista.map(r => (esJuegoEnVivo(r) ? r : comoPiLive(r))) : lista);
+                const buscador = crearBuscador({ orden: filtros.orden || 'recientes', filtro: pasaFiltros });
+                paginaRef.current = { buscador, preparar, profe: [], extras: [] };
+                const { items, fin } = await buscador.siguiente();
+                const filtrados = preparar(items);
 
                 const temaMate = cleanText(filtros.tema);
                 const buscarMate = !temaMate || temaMate.includes('matematica') || temaMate.includes('mates') || temaMate.includes('calculo');
@@ -2640,12 +2687,15 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 if (buscarMate && buscarJuego) {
                     filtrados.unshift(FAKE_MATHLE);
                 }
-                // Recursos PiKT del juego elegido, detrás de los de los profesores
+                // Recursos PiKT del juego elegido, detrás de los de los profesores (siempre al final de la lista)
                 const conPikt = juegoAdmitePikt(filtros.tipoJuego)
                     ? await conRecursosPikt(filtrados, filtros.tipoJuego, filtros)
                     : filtrados;
+                paginaRef.current.profe = filtrados;
+                paginaRef.current.extras = conPikt.filter(r => !filtrados.includes(r));
                 if (conPikt.length === 0) alert("No se encontraron recursos con esos filtros.");
                 setResultados(conPikt);
+                setHayMas(!fin);
             }
         } catch (e) { console.error(e); alert("Error en búsqueda."); }
         setBuscando(false);
@@ -2717,6 +2767,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
             return;
         }
         if (appId === 'MANSION_PITAGORICA') {
+            window.history.pushState({}, '', '/mansion');
             setJuegoActivo({ tipoJuego: 'MANSION_PITAGORICA' });
             return;
         }
@@ -2989,7 +3040,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
             if (r.config?.aleatorio !== false) pool.sort(() => Math.random() - 0.5);
 
-            if (!pool.length) return alert("El recurso no tiene preguntas válidas.");
+            if (!pool.length && !tieneOperaciones(r)) return alert("El recurso no tiene preguntas válidas.");
 
             const pFin = pool.slice(0, limitePreguntas).map(p => {
                 if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
@@ -3025,7 +3076,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     };
 
     const procesarClickTarjeta = (r) => {
-        if (r.tipoJuego === 'THINKHOOT' && esJuegoEnVivo(r)) setEligiendoModoPiLive(r);
+        contarJugada(r); // ranking «🔥 Más jugados» (una vez por recurso y sesión)
+        if ((r.tipoJuego === 'THINKHOOT' || r.tipoJuego === 'MATHLIVE') && esJuegoEnVivo(r)) setEligiendoModoPiLive(r);
         else if (esJuegoEnVivo(r)) lanzarComoGestor(r);
         else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
         else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);
@@ -3164,6 +3216,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     if (quizManosApp) return <Suspense fallback={null}><QuizManos onExit={() => { setQuizManosApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (dinamicasApp) return <Suspense fallback={null}><DinamicasAula onExit={() => { setDinamicasApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (orientacionApp) return <Suspense fallback={null}><Orientacion onExit={() => { setOrientacionApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
+    if (retoSemanaApp) return <Suspense fallback={null}><RetoSemana onExit={() => { setRetoSemanaApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (correctorApp) return <Suspense fallback={null}><CorrectorExamenes onExit={() => { setCorrectorApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (avatarCuerpoApp) return <Suspense fallback={null}><AvatarCuerpo onExit={() => { setAvatarCuerpoApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (pizarraApp) return (
@@ -3531,7 +3584,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingTrack alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'AVIONES') return <AvionesGame3D alTerminar={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'INVASORES') return <ConAvisoEncaje recurso={juegoActivo.recurso || null} juego="INVASORES" onCancelar={() => setJuegoActivo(null)}>{(rc) => <InvasoresArcade recurso={rc} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />}</ConAvisoEncaje>;
         if (juegoActivo.tipoJuego === 'CONDUCCION') return <SimuladorConduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
@@ -4044,9 +4097,9 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                 <ModalEligeModoPiLive
                     recurso={eligiendoModoPiLive}
                     onPresentar={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); lanzarComoGestor(r); }}
-                    onJugarSolo={() => { setConfigSoloPiLive(eligiendoModoPiLive); setEligiendoModoPiLive(null); }}
-                    onTarjetas={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_TARJETAS' }); }}
-                    onMandos={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_MANDOS' }); }}
+                    onJugarSolo={() => { setConfigSoloPiLive(recursoConOperaciones(eligiendoModoPiLive)); setEligiendoModoPiLive(null); }}
+                    onTarjetas={() => { const r = recursoConOperaciones(eligiendoModoPiLive); setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_TARJETAS' }); }}
+                    onMandos={() => { const r = recursoConOperaciones(eligiendoModoPiLive); setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_MANDOS' }); }}
                     onClose={() => setEligiendoModoPiLive(null)}
                 />
             )}
@@ -4339,6 +4392,9 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                         <option value="Otros">Otros</option>
                                     </select>
                                     <input style={styles.input} placeholder="Tema (Ej: Mates...)" value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} />
+                                    <select style={styles.input} value={filtros.orden || 'recientes'} onChange={e => setFiltros({ ...filtros, orden: e.target.value })} title="Ordenar los resultados">
+                                        {Object.entries(ORDENES).map(([k, o]) => <option key={k} value={k}>{o.texto}</option>)}
+                                    </select>
                                 </div>
                                 <div style={{ textAlign: 'right', marginTop: '10px' }}>
                                     <button onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)} style={{ background: 'none', border: 'none', color: '#2196F3', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
@@ -4367,6 +4423,13 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                             <ResourceCard key={r.id} r={r} onClick={() => { procesarClickTarjeta(r); setBuscadorVisible(false); }} />
                                         ))}
                                     </div>
+                                    {hayMas && (
+                                        <div style={{ textAlign: 'center', marginTop: 12 }}>
+                                            <button onClick={verMas} disabled={cargandoMas} style={{ background: 'white', color: '#2196F3', border: '2px solid #2196F3', padding: '9px 22px', borderRadius: 10, fontWeight: 'bold', cursor: 'pointer' }}>
+                                                {cargandoMas ? 'Cargando…' : '⬇️ Ver más'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -4589,6 +4652,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: esMovilVista ? '1fr 1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
+                    // ── Reto de la semana (destacado)
+                    { id: 'RETO_SEMANA', label: 'Reto de la semana', emoji: '🔥', color: '#ee5a24', action: () => { setRetoSemanaApp(true); window.history.pushState({}, '', '/retosemana'); }, shareable: true, shareUrl: `${window.location.origin}/retosemana` },
                     // ── Gestión del aula
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${basePublica()}?gestion=menu` },
                     { id: 'CENTRO_PDF', label: 'Generar en PDF', emoji: '🖨️', color: '#6D28D9', action: () => { setCentroPdf(true); window.history.pushState({}, '', '/pdf'); }, shareable: true, shareUrl: `${window.location.origin}/pdf` },
@@ -4868,6 +4933,21 @@ export const ResourceCard = ({ r, onClick }) => {
     const isLive = esJuegoEnVivo(r);
     const [mostrarOpciones, setMostrarOpciones] = useState(false);
     const [copiado, setCopiado] = useState(null);
+    // ❤️ Me gusta (uno por navegador) y partidas jugadas
+    const valorable = !!r.id && !r.esPikt && !String(r.id).startsWith('fake') && !String(r.id).startsWith('pikt');
+    const [gusta, setGusta] = useState(() => valorable && meGusta(r.id));
+    const [likes, setLikes] = useState(Number(r.likes) || 0);
+    const [enviandoLike, setEnviandoLike] = useState(false);
+    const pulsarLike = async (e) => {
+        e.stopPropagation();
+        if (!valorable || enviandoLike) return;
+        setEnviandoLike(true);
+        const antes = gusta;
+        setGusta(!antes); setLikes((n) => Math.max(0, n + (antes ? -1 : 1)));
+        try { await alternarMeGusta(r); }
+        catch { setGusta(antes); setLikes((n) => Math.max(0, n + (antes ? 1 : -1))); }
+        setEnviandoLike(false);
+    };
     const esBurbujasPikatron = r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON';
     const [modoEnlace, setModoEnlace] = useState(r.tipoJuego === 'PIKATRON' ? 'PIKATRON' : 'BURBUJAS');
 
@@ -4902,6 +4982,10 @@ export const ResourceCard = ({ r, onClick }) => {
                         <div style={{ display: 'inline-block', marginBottom: 6, background: '#009688', color: 'white', borderRadius: 8, padding: '2px 8px', fontSize: '0.7rem', fontWeight: 800 }}
                             title="Preguntas de las herramientas de PiKT, ordenadas por etapa y materia">π Preguntas de PiKT</div>
                     )}
+                    {r.tipoJuegoOriginal && (
+                        <div style={{ display: 'inline-block', marginBottom: 6, marginLeft: r.esPikt ? 6 : 0, background: '#7c3aed', color: 'white', borderRadius: 8, padding: '2px 8px', fontSize: '0.7rem', fontWeight: 800 }}
+                            title="Recurso de otro juego con preguntas de 4 respuestas: se juega también en PiLive">↪ De {(APPS.find(a => a.id === r.tipoJuegoOriginal) || {}).name || r.tipoJuegoOriginal}</div>
+                    )}
                     <div style={{ marginBottom: '4px' }}><b>📚 Tema:</b> {r.temas || 'General'}</div>
                     <div style={{ marginBottom: '4px' }}><b>🎓 Ciclo:</b> {r.ciclo || r.config?.ciclo || 'Todos'}</div>
                     <div style={{ color: '#888', fontSize: '0.75rem', marginTop: '6px' }}>
@@ -4914,6 +4998,15 @@ export const ResourceCard = ({ r, onClick }) => {
                 <span style={{ background: '#eee', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', color: '#555' }}>
                     <Key size={12} style={{ verticalAlign: 'middle' }} /> {r.accessCode || '---'}
                 </span>
+                {valorable && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span title="Veces que se ha jugado" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#555' }}>▶ {Number(r.playCount) || 0}</span>
+                        <button onClick={pulsarLike} disabled={enviandoLike} title={gusta ? 'Quitar «me gusta»' : 'Me gusta'}
+                            style={{ border: `1px solid ${gusta ? '#e11d48' : '#ddd'}`, background: gusta ? '#ffe4e6' : 'white', color: gusta ? '#e11d48' : '#888', borderRadius: 999, padding: '2px 8px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                            {gusta ? '❤️' : '🤍'} {likes}
+                        </button>
+                    </span>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {/* Ficha en papel del recurso */}
                     <BotonPdfRecurso recurso={r} style={{ padding: '4px 8px', fontSize: '0.72rem' }} />
@@ -5032,7 +5125,7 @@ const QuestionSenderWrapper = ({ onHome, initialJuegoActivo, usuario = null }) =
 const SpecificGamePageInterno = ({ appData, onHome, onLoginRequest, usuario = null }) => {
     const t = useT();
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
-    const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
+    const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '', orden: 'recientes' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
     const [codigo, setCodigo] = useState('');
     const [resultados, setResultados] = useState([]);
@@ -5045,6 +5138,7 @@ const [entrando, setEntrando] = useState(false);
     const [isMathLiveAlumno, setIsMathLiveAlumno] = useState(false);
     // Gestor/Single Player
     const [liveModeHost, setLiveModeHost] = useState(false);
+    const [hostConOperaciones, setHostConOperaciones] = useState(false); // PiLive con operaciones → motor MathLive
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
@@ -5054,6 +5148,10 @@ const [entrando, setEntrando] = useState(false);
     // En los juegos que admiten preguntas de PiKT, al entrar se lanza la búsqueda completa:
     // primero los recursos de los profes y detrás los de PiKT por etapa y materia.
     const buscarAlEntrarRef = useRef(null);
+    // Paginación de la búsqueda (20 + «Ver más»): arriba, antes de cualquier return
+    const paginaRef = useRef(null);
+    const [hayMas, setHayMas] = useState(false);
+    const [cargandoMas, setCargandoMas] = useState(false);
     useEffect(() => {
         if (juegoAdmitePikt(appData.id)) buscarAlEntrarRef.current?.();
     }, [appData.id]);
@@ -5127,7 +5225,21 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
         return <QuestionSenderWrapper onHome={onHome} initialJuegoActivo={juegoActivo} usuario={usuario} />;
     }
 
+    const verMas = async () => {
+        const p = paginaRef.current;
+        if (!p || cargandoMas) return;
+        setCargandoMas(true);
+        try {
+            const { items, fin } = await p.buscador.siguiente();
+            p.profe = [...p.profe, ...p.preparar(items)];
+            setResultados([...p.profe, ...p.extras]);
+            setHayMas(!fin);
+        } catch (e) { console.error(e); }
+        setCargandoMas(false);
+    };
+
     const buscarEspecífico = async () => {
+        setHayMas(false);
         try {
             const ref = collection(db, 'resources');
             let filtrados = [];
@@ -5150,17 +5262,19 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
 
 
                     const esPiLiveAntiguo = appData.id === 'THINKHOOT' && data.tipo === 'PRO' && data.tipoJuego !== 'WORDLE';
+                    const deCuatro = appData.id === 'THINKHOOT' && !esEsteJuego && tieneCuatroRespuestas(data);
 
-                    if (esEsteJuego || esPiLiveAntiguo) {
+                    if (deCuatro) {
+                        filtrados = [comoPiLive({ ...data, id: snap.docs[0].id })];
+                    } else if (esEsteJuego || esPiLiveAntiguo) {
                         filtrados = [{ ...data, id: snap.docs[0].id }];
                     } else {
                         alert("Código no encontrado para este juego.");
                     }
                 } else alert("Código no encontrado.");
             } else {
-                const q = query(ref, limit(150));
-                const snap = await getDocs(q);
-                filtrados = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
+                // De 20 en 20 («Ver más»), en el orden elegido; el filtro es el de siempre
+                const pasaFiltros = (r) => {
                   //  const esEsteJuego = r.tipoJuego === appData.id;
                     let esEsteJuego = r.tipoJuego === appData.id;
                     if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
@@ -5175,8 +5289,9 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
 
 
                     const esPiLiveAntiguo = appData.id === 'THINKHOOT' && r.tipo === 'PRO' && r.tipoJuego !== 'WORDLE';
+                    const deCuatro = appData.id === 'THINKHOOT' && !esEsteJuego && tieneCuatroRespuestas(r);
 
-                    if (!esEsteJuego && !esPiLiveAntiguo) return false;
+                    if (!esEsteJuego && !esPiLiveAntiguo && !deCuatro) return false;
                     if (r.isFinished !== true && r.config?.isFinished !== true) return false;
 
                     if (filtros.tema && !cleanText(r.temas).includes(cleanText(filtros.tema)) && !cleanText(r.titulo).includes(cleanText(filtros.tema))) return false;
@@ -5192,9 +5307,16 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                     if (filtros.autor && !cleanText(r.profesorNombre).includes(cleanText(filtros.autor))) return false;
 
                     return true;
-                });
-                // Recursos PiKT detrás de los de los profesores
-                if (juegoAdmitePikt(appData.id)) filtrados = await conRecursosPikt(filtrados, appData.id, filtros);
+                };
+                // En PiLive, los recursos de 4 respuestas de otros juegos se usan como PiLive (copia)
+                const preparar = (lista) => (appData.id === 'THINKHOOT' ? lista.map(r => (r.tipoJuego === 'THINKHOOT' || esJuegoEnVivo(r) ? r : comoPiLive(r))) : lista);
+                const buscador = crearBuscador({ orden: filtros.orden || 'recientes', filtro: pasaFiltros });
+                const { items, fin } = await buscador.siguiente();
+                const profe = preparar(items);
+                // Recursos PiKT detrás de los de los profesores (siempre al final de la lista)
+                filtrados = juegoAdmitePikt(appData.id) ? await conRecursosPikt(profe, appData.id, filtros) : profe;
+                paginaRef.current = { buscador, preparar, profe, extras: filtrados.filter(r => !profe.includes(r)) };
+                setHayMas(!fin);
             }
             setResultados(filtrados);
         } catch (e) { console.error(e); }
@@ -5240,11 +5362,13 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
             });
 
             setHostRoomCode(sala);
+            setHostConOperaciones(tieneOperaciones(r) || r.tipoJuego === 'MATHLIVE');
             setLiveModeHost(true);
         } catch (error) { console.error(error); alert("Error al crear la sala."); }
     };
 
     const procesarClickTarjeta = (r) => {
+        contarJugada(r); // ranking «🔥 Más jugados» (una vez por recurso y sesión)
         if (appData.isLive) {
             if (appData.id === 'THINKHOOT') {
                 setEligiendoModoPiLive(r);
@@ -5263,7 +5387,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
     // --- RENDERIZADO PANTALLA COMPLETA ---
     // En móviles al usar position:fixed u ocupar 100vh se verá a pantalla completa
     if (liveModeHost && hostRoomCode) {
-        if (appData.id === 'MATHLIVE') return <MathLive isHost={true} codigoSala={hostRoomCode} usuario={{ uid: "host", displayName: "Profe" }} onExit={() => setLiveModeHost(false)} />;
+        if (hostConOperaciones) return <MathLive isHost={true} codigoSala={hostRoomCode} usuario={{ uid: "host", displayName: "Profe" }} onExit={() => setLiveModeHost(false)} />;
         return <ThinkHootGame isHost={true} codigoSala={hostRoomCode} usuario={{ uid: "host", displayName: "Profe" }} onExit={() => setLiveModeHost(false)} />;
     }
 
@@ -5305,9 +5429,9 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                         if (r.hojas && r.hojas.length > 1) setSelectorHojaRecurso(r);
                         else lanzarComoGestor(r);
                     }}
-                    onJugarSolo={() => { setConfigSoloPiLive(eligiendoModoPiLive); setEligiendoModoPiLive(null); }}
-                    onTarjetas={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_TARJETAS' }); }}
-                    onMandos={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_MANDOS' }); }}
+                    onJugarSolo={() => { setConfigSoloPiLive(recursoConOperaciones(eligiendoModoPiLive)); setEligiendoModoPiLive(null); }}
+                    onTarjetas={() => { const r = recursoConOperaciones(eligiendoModoPiLive); setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_TARJETAS' }); }}
+                    onMandos={() => { const r = recursoConOperaciones(eligiendoModoPiLive); setEligiendoModoPiLive(null); setJuegoActivo({ ...r, modoEspecial: 'PILIVE_MANDOS' }); }}
                     onClose={() => setEligiendoModoPiLive(null)}
                 />
             )}
@@ -5497,6 +5621,9 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                                 <option value="FP">FP</option>
                                 <option value="Otros">Otros</option>
                             </select>
+                            <select value={filtros.orden || 'recientes'} onChange={e => setFiltros({ ...filtros, orden: e.target.value })} style={styles.input} title="Ordenar los resultados">
+                                {Object.entries(ORDENES).map(([k, o]) => <option key={k} value={k}>{o.texto}</option>)}
+                            </select>
                         </div>
 
                         <div style={{ textAlign: 'right', marginTop: '10px' }}>
@@ -5519,6 +5646,13 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', marginTop: '25px' }}>
                             {resultados.map(r => <ResourceCard key={r.id} r={r} onClick={() => procesarClickTarjeta(r)} />)}
                         </div>
+                        {hayMas && (
+                            <div style={{ textAlign: 'center', marginTop: 18 }}>
+                                <button onClick={verMas} disabled={cargandoMas} style={{ background: 'white', color: appData.color, border: `2px solid ${appData.color}`, padding: '11px 26px', borderRadius: 10, fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem' }}>
+                                    {cargandoMas ? 'Cargando…' : '⬇️ Ver más'}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 

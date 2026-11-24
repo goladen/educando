@@ -7,7 +7,7 @@ import { CheckCircle, XCircle, RotateCcw, Play, Trophy, PaintBucket, ArrowRight,
          Users, AlertTriangle, Volume2, Send } from 'lucide-react';
 import { CATEGORIAS, NIVELES, FRASES } from './BibliotecaFrases';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
-import { leerRetoUrl } from './utils/retoLink';
+import { leerRetoUrl, textoEnvioCompeticion } from './utils/retoLink';
 import BotonFichas from './components/BotonFichas';
 import { CATEGORIAS_FR, NIVELES_FR, FRASES_FR } from './BibliotecaFrances';
 import { CATEGORIAS_CA, NIVELLS_CA, FRASES_CA } from './BibliotecaCatalana';
@@ -1769,7 +1769,7 @@ function ModoLocal({ nivel, recurso, onBack }) {
                         <Desglose tokens={frase.tokens} results={results}/>
                         <div style={{display:'flex',gap:10,justifyContent:'center',marginTop:16,flexWrap:'wrap'}}>
                             <button onClick={siguiente} style={g.btnPrimary}><ChevronRight size={17}/> Siguiente Frase</button>
-                            <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary, ...(esRetoCompeticion ? {background:'linear-gradient(135deg,#f39c12,#e67e22)'} : {})}}><Send size={15}/> {esRetoCompeticion ? 'Enviar a la competición' : 'Enviar al profesor'}</button>
+                            <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary, ...(esRetoCompeticion ? {background:'linear-gradient(135deg,#f39c12,#e67e22)'} : {})}}><Send size={15}/> {esRetoCompeticion ? textoEnvioCompeticion(false) : 'Enviar al profesor'}</button>
                             <button onClick={onBack} style={g.btnGray}><BookOpen size={15}/> Cambiar Nivel</button>
                         </div>
                       </>

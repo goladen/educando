@@ -7,13 +7,15 @@
 // Todo se guarda en este dispositivo (localStorage) para no perder lo corregido.
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CamaraTarjetas from '../tarjetas/CamaraTarjetas.jsx';
-import { leerHoja, puntuar, aGris, LETRAS, MAX_PREGUNTAS, MARCAS } from './omr.js';
+import { leerHoja, puntuar, aGris, LETRAS, MAX_PREGUNTAS, MARCAS, MAX_LETRAS, plantillaEscritas } from './omr.js';
+import { hayEscritas, leerEscritas, estadosEscritas, textosLeidos } from './escritas.js';
+import { verificarEscrita, normalizarRespuesta } from './ocrLetras.js';
 import { pintarLectura } from './dibujo.js';
 import useSesionMovil from './useSesionMovil.js';
 import { urlCorrectorMovil } from './escanerCorrector.js';
 import { descargarPdfCorrector } from './hojaPdf.js';
 import { hojasTarjetas } from '../tarjetas/preguntasTarjetas.js';
-import { barajar } from '../utils/normalizarPreguntas';
+import { barajar, preguntasDeRecurso } from '../utils/normalizarPreguntas';
 import { sonidoCorrecto, sonidoIncorrecto, despertarAudio } from '../utils/sonidosFeedback';
 import { nombresGrupoActivo } from '../utils/gruposDispositivo';
 import { BotonGrupoDispositivo } from '../components/GruposDispositivo';
@@ -28,8 +30,8 @@ const LS_NOMBRES = 'pikt_tarjetas_nombres'; // nº de lista = nº de tarjeta de 
 const leerLS = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } };
 const guardarLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 
-const CFG_INICIAL = { titulo: '', nPreguntas: 20, nOpciones: 4, clave: Array(MAX_PREGUNTAS).fill(''), penalizacion: 0, preguntas: null, recursoTitulo: '' };
-const COLOR = { bien: '#16a34a', mal: '#dc2626', blanco: '#f59e0b', doble: '#7c3aed', anulada: '#94a3b8' };
+const CFG_INICIAL = { titulo: '', nPreguntas: 20, nOpciones: 4, clave: Array(MAX_PREGUNTAS).fill(''), penalizacion: 0, preguntas: null, recursoTitulo: '', nEscritas: 0, letras: 8, claveEscritas: [], preguntasEscritas: null };
+const COLOR = { bien: '#16a34a', mal: '#dc2626', blanco: '#f59e0b', doble: '#7c3aed', anulada: '#94a3b8', dudosa: '#7c3aed' };
 const IDS_MARCAS = new Set(MARCAS.map((m) => m.tarjeta));
 
 export default function CorrectorExamenes({ onExit }) {
@@ -47,15 +49,20 @@ export default function CorrectorExamenes({ onExit }) {
 
   const set = (cambios) => setCfg((c) => ({ ...c, ...cambios }));
   const clave = cfg.clave.slice(0, cfg.nPreguntas);
-  const nClave = clave.filter(Boolean).length;
+  const nClave = clave.filter(Boolean).length + (cfg.claveEscritas || []).slice(0, cfg.nEscritas || 0).filter((c) => String(c || '').trim()).length;
   const nombre = useCallback((n) => {
     const g = nombresGrupoActivo();
     return String(nombres[n] || g[n - 1] || '').trim();
   }, [nombres]);
 
+  // La nota se recalcula siempre (si cambia la clave, cambian las notas sin reescanear)
+  const notaHoja = useCallback((h) => {
+    const est = estadosEscritas(h, cfg);
+    return { ...puntuar(h.respuestas, clave, { penalizacion: cfg.penalizacion, escritas: est }), escritasEst: est };
+  }, [cfg, clave]);
   const filas = useMemo(() => Object.values(resultados)
-    .map((r) => ({ ...r, ...puntuar(r.respuestas, clave, { penalizacion: cfg.penalizacion }) }))
-    .sort((a, b) => a.lista - b.lista), [resultados, clave, cfg.penalizacion]);
+    .map((r) => ({ ...r, ...notaHoja(r) }))
+    .sort((a, b) => a.lista - b.lista), [resultados, notaHoja]);
 
   // Registro local (icono Pi ×N de la tarjeta) al pasar a resultados con hojas nuevas
   const registradasRef = useRef(Object.keys(guardado?.resultados || {}).length);
@@ -73,9 +80,28 @@ export default function CorrectorExamenes({ onExit }) {
     setPestana(p);
   };
 
-  const guardarHoja = useCallback((r) => setResultados((prev) => ({ ...prev, [r.lista]: { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas || [], hora: Date.now(), reescaneada: !!prev[r.lista] } })), []);
-  const ponerClave = useCallback((resp) => {
-    setCfg((c) => ({ ...c, clave: [...resp, ...Array(MAX_PREGUNTAS).fill('')].slice(0, MAX_PREGUNTAS) }));
+  const guardarHoja = useCallback((r) => setResultados((prev) => ({ ...prev, [r.lista]: { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas || [], escritas: r.escritas || [], hora: Date.now(), reescaneada: !!prev[r.lista] } })), []);
+  // Lectura de una hoja ya localizada → hoja para guardar (con las respuestas escritas, si las hay)
+  const cfgRef = useRef(cfg);
+  cfgRef.current = cfg;
+  const prepararHoja = useCallback(async (r) => {
+    const c = cfgRef.current;
+    let escritas = [];
+    if (hayEscritas(c)) {
+      // La imagen de la fila solo se guarda si no está claramente bien (para revisarla)
+      escritas = await leerEscritas(r, c, (k, cajas) => verificarEscrita(cajas, c.claveEscritas?.[k] || '').estado !== 'bien');
+    }
+    return { lista: r.lista, respuestas: r.respuestas, dudosas: r.dudosas || [], escritas };
+  }, []);
+  const revisar = useCallback((lista, k, estado) => setResultados((prev) => {
+    const h = prev[lista];
+    if (!h) return prev;
+    const revision = { ...(h.revision || {}) };
+    if (estado) revision[k] = estado; else delete revision[k];
+    return { ...prev, [lista]: { ...h, revision } };
+  }), []);
+  const ponerClave = useCallback((resp, textos = null) => {
+    setCfg((c) => ({ ...c, clave: [...resp, ...Array(MAX_PREGUNTAS).fill('')].slice(0, MAX_PREGUNTAS), ...(textos ? { claveEscritas: textos } : {}) }));
     setModoEscaneo('alumnos');
     setAviso('🔑 Clave leída: revísala en «Preparar» si quieres.');
   }, []);
@@ -107,11 +133,11 @@ export default function CorrectorExamenes({ onExit }) {
         )}
         {pestana === 'corregir' && (
           <Corregir cfg={cfg} clave={clave} modo={modoEscaneo} setModo={setModoEscaneo} nombre={nombre} resultados={resultados}
-            onClave={ponerClave} onHoja={guardarHoja} movil={movil}
+            onClave={ponerClave} onHoja={guardarHoja} movil={movil} prepararHoja={prepararHoja} notaHoja={notaHoja}
             onVerResultados={() => irA('resultados')} />
         )}
         {pestana === 'resultados' && (
-          <Resultados cfg={cfg} clave={clave} filas={filas} nombre={nombre} nombres={nombres} setNombres={setNombres}
+          <Resultados cfg={cfg} clave={clave} filas={filas} nombre={nombre} nombres={nombres} setNombres={setNombres} onRevisar={revisar}
             onBorrar={(n) => setResultados((prev) => { const s = { ...prev }; delete s[n]; return s; })}
             onNueva={nuevaCorreccion} onSeguir={() => { setModoEscaneo('alumnos'); setPestana('corregir'); }} />
         )}
@@ -133,9 +159,20 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
 
   const hojas = useMemo(() => hojasTarjetas(recurso, 5), [recurso]);
   const disponibles = hojaSel < 0 ? hojas.flatMap((h) => h.preguntas) : hojas[hojaSel]?.preguntas || [];
+  const [conCortas, setConCortas] = useState(true);
+  // Preguntas de respuesta corta del recurso que caben en las casillas (hasta 16 letras o cifras)
+  const cortas = useMemo(() => {
+    if (!recurso) return [];
+    const r = hojaSel >= 0 && Array.isArray(recurso.hojas) ? { ...recurso, hojas: [recurso.hojas[hojaSel]] } : recurso;
+    return preguntasDeRecurso(r).filter((p) => p.tipo === 'CORTA' && normalizarRespuesta(p.correcta).length >= 1 && normalizarRespuesta(p.correcta).length <= MAX_LETRAS);
+  }, [recurso, hojaSel]);
+  const capacidad = plantillaEscritas({ nPreguntas: cfg.nPreguntas, nEscritas: 99, letras: cfg.letras || 8 }).capacidad;
+  // Si ya no caben (más preguntas tipo test o casillas más largas), se recortan
+  useEffect(() => { if ((cfg.nEscritas || 0) > capacidad) set({ nEscritas: capacidad }); }, [capacidad]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ponerEscrita = (k, v) => { const c = [...(cfg.claveEscritas || [])]; c[k] = v; set({ claveEscritas: c }); };
 
   const usarRecurso = () => {
-    if (!disponibles.length) return;
+    if (!disponibles.length && !(conCortas && cortas.length)) return;
     let lista = disponibles.map((p) => {
       if (p.fijas) return p;
       const orden = barajar(p.opciones.map((_, i) => i));
@@ -144,8 +181,21 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
     if (aleatorio) lista = barajar(lista);
     lista = lista.slice(0, MAX_PREGUNTAS);
     const nOpciones = Math.max(2, Math.min(5, Math.max(...lista.map((p) => p.opciones.length))));
-    const clave = [...lista.map((p) => LETRAS[p.correcta]), ...Array(MAX_PREGUNTAS).fill('')].slice(0, MAX_PREGUNTAS);
-    set({ preguntas: lista.map((p) => ({ texto: p.texto, opciones: p.opciones })), clave, nPreguntas: lista.length, nOpciones, recursoTitulo: recurso.titulo || '', titulo: cfg.titulo || recurso.titulo || '' });
+    // Preguntas de respuesta corta → respuestas escritas (si se pide y caben)
+    let escritas = {};
+    if (conCortas && cortas.length) {
+      const letras = Math.max(...cortas.map((p) => normalizarRespuesta(p.correcta).length)) <= 8 ? 8 : cortas.some((p) => normalizarRespuesta(p.correcta).length > 12) ? 16 : 12;
+      let nTest = lista.length, cap = 0;
+      // si no caben, se quitan preguntas tipo test hasta que quepan al menos la mitad de las cortas (máx. 12)
+      const quiero = Math.min(cortas.length, 12);
+      while (nTest > 0 && (cap = plantillaEscritas({ nPreguntas: nTest, nEscritas: 99, letras }).capacidad) < Math.ceil(quiero / 2)) nTest -= 3;
+      lista = lista.slice(0, Math.max(0, nTest));
+      cap = plantillaEscritas({ nPreguntas: lista.length, nEscritas: 99, letras }).capacidad;
+      const elegidas = (aleatorio ? barajar(cortas) : cortas).slice(0, Math.min(cap, quiero));
+      escritas = { nEscritas: elegidas.length, letras, claveEscritas: elegidas.map((p) => p.correcta), preguntasEscritas: elegidas.map((p) => ({ texto: p.enunciado })) };
+    } else escritas = { nEscritas: 0, preguntasEscritas: null };
+    const clave2 = [...lista.map((p) => LETRAS[p.correcta]), ...Array(MAX_PREGUNTAS).fill('')].slice(0, MAX_PREGUNTAS);
+    set({ preguntas: lista.map((p) => ({ texto: p.texto, opciones: p.opciones })), clave: clave2, nPreguntas: lista.length, nOpciones, recursoTitulo: recurso.titulo || '', titulo: cfg.titulo || recurso.titulo || '', ...escritas });
     setVerRecurso(false);
   };
 
@@ -169,8 +219,11 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
     try {
       await descargarPdfCorrector({
         titulo: cfg.titulo, nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones,
+        nEscritas: cfg.nEscritas || 0, letras: cfg.letras || 8,
         alumnos: tipo === 'personal' ? alumnos : [],
-        preguntas: tipo === 'examen' || tipo === 'soloExamen' ? cfg.preguntas : null,
+        preguntas: tipo === 'examen' || tipo === 'soloExamen' ? cfg.preguntas || [] : null,
+        preguntasEscritas: tipo === 'examen' || tipo === 'soloExamen' ? cfg.preguntasEscritas : null,
+        claveEscritas: cfg.claveEscritas,
         soloExamen: tipo === 'soloExamen',
         clave: cfg.clave, conClave: conClave && tipo !== 'soloExamen',
       });
@@ -193,7 +246,7 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
             <input value={cfg.titulo} onChange={(e) => set({ titulo: e.target.value.slice(0, 80) })} placeholder="Examen tema 3 · Biología" style={st.input} />
           </label>
           <label style={st.label}>Preguntas
-            <input type="number" min={1} max={MAX_PREGUNTAS} value={cfg.nPreguntas} onChange={(e) => set({ nPreguntas: Math.max(1, Math.min(MAX_PREGUNTAS, Number(e.target.value) || 1)) })} style={{ ...st.input, width: 80 }} />
+            <input type="number" min={cfg.nEscritas > 0 ? 0 : 1} max={MAX_PREGUNTAS} value={cfg.nPreguntas} onChange={(e) => set({ nPreguntas: Math.max(cfg.nEscritas > 0 ? 0 : 1, Math.min(MAX_PREGUNTAS, Number(e.target.value) || 0)) })} style={{ ...st.input, width: 80 }} />
           </label>
           <label style={st.label}>Respuestas
             <select value={cfg.nOpciones} onChange={(e) => set({ nOpciones: Number(e.target.value) })} style={st.input}>
@@ -242,7 +295,8 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
                 )}
                 <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={aleatorio} onChange={(e) => setAleatorio(e.target.checked)} /> Orden aleatorio</label>
                 <span>{Math.min(MAX_PREGUNTAS, disponibles.length)} preguntas de opción múltiple</span>
-                <button style={st.btnPrim} disabled={!disponibles.length} onClick={usarRecurso}>Usar estas preguntas</button>
+                {cortas.length > 0 && <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={conCortas} onChange={(e) => setConCortas(e.target.checked)} /> y {cortas.length} de respuesta corta como respuestas escritas</label>}
+                <button style={st.btnPrim} disabled={!disponibles.length && !(conCortas && cortas.length)} onClick={usarRecurso}>Usar estas preguntas</button>
               </div>
             )}
           </div>
@@ -263,6 +317,44 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
           <button style={st.btnSec} onClick={() => set({ clave: Array(MAX_PREGUNTAS).fill('') })}>Borrar clave</button>
         </div>
         <p style={st.ayuda}>Una pregunta sin clave no cuenta (sirve para anular una pregunta mal planteada).</p>
+      </section>
+
+      <section style={st.panel}>
+        <h3 style={st.h3}>✍️ Respuestas escritas <span style={{ fontWeight: 600, fontSize: 13, color: '#64748b' }}>(palabras o números en casillas, una MAYÚSCULA por casilla)</span></h3>
+        <div style={st.fila}>
+          <label style={st.label}>Cuántas
+            <input type="number" min={0} max={capacidad} value={cfg.nEscritas || 0} onChange={(e) => set({ nEscritas: Math.max(0, Math.min(capacidad, Number(e.target.value) || 0)), nPreguntas: Math.max(Number(e.target.value) > 0 ? 0 : 1, cfg.nPreguntas) })} style={{ ...st.input, width: 80 }} />
+          </label>
+          <label style={st.label}>Casillas por respuesta
+            <select value={cfg.letras || 8} onChange={(e) => set({ letras: Number(e.target.value) })} style={st.input}>
+              <option value={8}>8 (dos columnas)</option>
+              <option value={12}>12</option>
+              <option value={16}>16</option>
+            </select>
+          </label>
+          <span style={st.ayuda}>Con {cfg.nPreguntas} preguntas tipo test caben <b>{capacidad}</b>.{capacidad < 4 && cfg.nPreguntas > 0 ? ' Para que quepan más, baja el nº de preguntas tipo test.' : ''}</span>
+        </div>
+        {(cfg.nEscritas || 0) > 0 && (
+          <div style={st.claveGrid}>
+            {Array.from({ length: cfg.nEscritas }, (_, k) => {
+              const t = normalizarRespuesta(String(cfg.claveEscritas?.[k] || '').split('/')[0]);
+              const larga = t.length > (cfg.letras || 8);
+              return (
+                <label key={k} style={st.claveFila}>
+                  <b style={{ width: 26, textAlign: 'right', color: '#475569' }}>{cfg.nPreguntas + k + 1}</b>
+                  <input value={cfg.claveEscritas?.[k] || ''} onChange={(e) => ponerEscrita(k, e.target.value.slice(0, 60))} placeholder={k === 0 ? 'PARIS (o varias: PARIS / PARÍS)' : 'respuesta'}
+                    style={{ ...st.input, flex: 1, minWidth: 0, textTransform: 'uppercase', borderColor: larga ? '#dc2626' : '#cbd5e1' }} title={larga ? 'No cabe en las casillas' : ''} />
+                </label>
+              );
+            })}
+          </div>
+        )}
+        <p style={st.ayuda}>
+          Se reconocen letras y números escritos a mano en este dispositivo (sin internet). La respuesta se <b>compara con la tuya</b>:
+          las que no están claras se marcan «a revisar» y las decides tú con un toque viendo lo que escribió. Las tildes no cuentan
+          (PARÍS = PARIS) y los fallos escritos no restan. <b>Números</b>: enteros, negativos y decimales; el signo − y la coma
+          ocupan su casilla, y valen igual -3,5, -3.5 y -3,50.
+        </p>
       </section>
 
       <section style={st.panel}>
@@ -299,7 +391,7 @@ const MOTIVOS = {
 };
 
 const LS_FUENTE = 'pikt_corrector_fuente';
-function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHoja, onVerResultados, movil }) {
+function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHoja, onVerResultados, movil, prepararHoja, notaHoja }) {
   // De dónde salen las hojas: cámara de este dispositivo, móvil conectado o archivos
   const [fuente, setFuente] = useState(() => leerLS(LS_FUENTE, 'camara'));
   useEffect(() => guardarLS(LS_FUENTE, fuente), [fuente]);
@@ -311,6 +403,8 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
   const bloqueoRef = useRef({ hasta: 0, firma: '' });
   const resultadosRef = useRef(resultados);
   resultadosRef.current = resultados;
+  const escritasRef = useRef({ firma: '', escritas: null });
+  const procesandoRef = useRef(false); // leyendo las casillas escritas (no se acepta otra hoja mientras)
   const estadoRef = useRef('');
   const ponerEstado = (tipo, texto) => {
     const k = tipo + texto;
@@ -329,12 +423,13 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
       if (Date.now() > bloqueoRef.current.hasta) ponerEstado('info', marcas.length ? MOTIVOS.marcas(marcas.length) : 'Enfoca una hoja con la cámara (que se vean las 4 esquinas).');
       return;
     }
-    const r = leerHoja(img, marcas, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones }, aGris(img));
+    if (procesandoRef.current) return;
+    const r = leerHoja(img, marcas, cfg, aGris(img));
     if (!r.ok) { lecturaRef.current = null; ponerEstado('info', MOTIVOS[r.motivo]?.(r.vistas.length) || 'No leo la hoja.'); return; }
-    lecturaRef.current = { r, t: Date.now() };
-
     // Misma lectura en 3 fotogramas seguidos → se acepta
     const firma = `${modo === 'clave' ? 'K' : r.lista}|${r.respuestas.join(',')}`;
+    // Mientras siga a la vista la hoja ya corregida, se mantienen los colores de sus respuestas escritas
+    lecturaRef.current = { r, t: Date.now(), escritas: escritasRef.current.firma === firma ? escritasRef.current.escritas : null };
     const racha = rachaRef.current;
     if (racha.clave === firma) racha.n++; else rachaRef.current = { clave: firma, n: 1 };
     if (rachaRef.current.n < 3) { if (Date.now() > bloqueoRef.current.hasta) ponerEstado('leyendo', 'Leyendo… no muevas el móvil'); return; }
@@ -343,7 +438,14 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
     if (modo === 'clave') {
       bloqueoRef.current = { hasta: Date.now() + 1500, firma };
       sonidoCorrecto();
-      onClave(r.respuestas.map((x) => (x === '*' ? '' : x)));
+      const resp = r.respuestas.map((x) => (x === '*' ? '' : x));
+      if (!hayEscritas(cfg)) { onClave(resp); return; }
+      procesandoRef.current = true;
+      ponerEstado('leyendo', '✍️ Leyendo las respuestas escritas de la clave…');
+      leerEscritas(r, cfg, () => false)
+        .then((esc) => onClave(resp, textosLeidos(esc)))
+        .catch(() => { onClave(resp); ponerEstado('error', 'No se pudo cargar el lector de letras: escribe las respuestas escritas a mano en «Preparar».'); })
+        .finally(() => { procesandoRef.current = false; });
       return;
     }
     if (!r.lista) { ponerEstado('error', 'No leo el nº de lista: que rellene un círculo de las decenas (0 si es menor de 10) y otro de las unidades.'); return; }
@@ -354,19 +456,28 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
       return;
     }
     bloqueoRef.current = { hasta: Date.now() + 2500, firma };
-    const p = puntuar(r.respuestas, clave, { penalizacion: cfg.penalizacion });
-    (p.nota >= 5 ? sonidoCorrecto : sonidoIncorrecto)();
-    onHoja(r);
-    setUltima({ lista: r.lista, ...p, dudosas: r.dudosas, reescaneada: !!previa });
-    ponerEstado('ok', '');
-  }, [cfg.nPreguntas, cfg.nOpciones, cfg.penalizacion, clave, modo, onClave, onHoja]);
+    procesandoRef.current = true;
+    if (hayEscritas(cfg)) ponerEstado('leyendo', '✍️ Leyendo las respuestas escritas…');
+    prepararHoja(r)
+      .then((h) => {
+        const p = notaHoja(h);
+        (p.nota >= 5 ? sonidoCorrecto : sonidoIncorrecto)();
+        onHoja(h);
+        escritasRef.current = { firma, escritas: p.escritasEst };
+        lecturaRef.current = { r, t: Date.now(), escritas: p.escritasEst };
+        setUltima({ lista: r.lista, ...p, dudosas: r.dudosas, reescaneada: !!previa });
+        ponerEstado('ok', '');
+      })
+      .catch(() => ponerEstado('error', 'No se pudo cargar el lector de letras (¿sin internet la primera vez?). Vuelve a enfocar la hoja.'))
+      .finally(() => { bloqueoRef.current.hasta = Date.now() + 2500; procesandoRef.current = false; });
+  }, [cfg, modo, onClave, onHoja, prepararHoja, notaHoja]);
 
   // Círculos de colores sobre la hoja (ver dibujo.js)
   const pintarExtra = useCallback((ctx, ex) => {
     const L = lecturaRef.current;
     if (!L || Date.now() - L.t > 700) return;
-    pintarLectura(ctx, L.r, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, clave: modo === 'clave' ? null : clave, ex });
-  }, [cfg.nPreguntas, cfg.nOpciones, clave, modo]);
+    pintarLectura(ctx, L.r, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, nEscritas: cfg.nEscritas || 0, letras: cfg.letras || 8, escritas: L.escritas || null, clave: modo === 'clave' ? null : clave, ex });
+  }, [cfg.nPreguntas, cfg.nOpciones, cfg.nEscritas, cfg.letras, clave, modo]);
 
   const enCartel = ultima && estado.tipo === 'ok';
   const nHojas = Object.keys(resultados).length;
@@ -390,7 +501,7 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
       {fuente === 'movil' && <PanelMovil movil={movil} nombre={nombre} />}
       {fuente === 'archivos' && (
         <Suspense fallback={<p>Cargando…</p>}>
-          <SubirArchivos cfg={cfg} clave={clave} modo={modo} onHoja={onHoja} onClave={onClave} nombre={nombre} />
+          <SubirArchivos cfg={cfg} clave={clave} modo={modo} onHoja={onHoja} onClave={onClave} nombre={nombre} prepararHoja={prepararHoja} notaHoja={notaHoja} />
         </Suspense>
       )}
       {fuente === 'camara' && <>
@@ -402,7 +513,7 @@ function Corregir({ cfg, clave, modo, setModo, nombre, resultados, onClave, onHo
           <div style={st.cartel(ultima.nota >= 5)}>
             <div style={{ fontSize: 15, opacity: 0.9 }}>Nº {ultima.lista}{nombre(ultima.lista) ? ` · ${nombre(ultima.lista)}` : ''}{ultima.reescaneada ? ' (otra vez)' : ''}</div>
             <div style={{ fontSize: 40, fontWeight: 900, lineHeight: 1.1 }}>{String(ultima.nota).replace('.', ',')}</div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>✅ {ultima.aciertos} · ❌ {ultima.fallos} · ⚪ {ultima.blancos}{ultima.dobles ? ` · ⚠️ ${ultima.dobles} dobles` : ''}</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>✅ {ultima.aciertos} · ❌ {ultima.fallos} · ⚪ {ultima.blancos}{ultima.dobles ? ` · ⚠️ ${ultima.dobles} dobles` : ''}{ultima.pendientes ? ` · 🔍 ${ultima.pendientes} por revisar` : ''}</div>
             {ultima.dudosas?.length > 0 && <div style={{ fontSize: 12, marginTop: 4 }}>Revisa a mano: {ultima.dudosas.map((q) => q + 1).join(', ')} (marca floja o borrada)</div>}
           </div>
         )}
@@ -466,7 +577,35 @@ function PanelMovil({ movil, nombre }) {
 }
 
 // ───────────────────────── 3 · Resultados ─────────────────────────
-function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, onNueva, onSeguir }) {
+const TXT_ESTADO = { bien: '✓', mal: '✗', blanco: '—', dudosa: '?', anulada: 'sin clave' };
+
+/** Una respuesta escrita para revisar: lo que escribió (imagen), lo esperado y botones ✔ / ✘. */
+function RevisarEscrita({ f, k, cfg, nombre, onRevisar, compacta = false }) {
+  const e = f.escritasEst[k];
+  const img = f.escritas?.[k]?.img;
+  return (
+    <div style={{ ...st.revision, borderColor: COLOR[e.estado] || '#cbd5e1' }}>
+      <div style={{ fontSize: 13 }}>
+        {!compacta && <b>Nº {f.lista}{nombre(f.lista) ? ' · ' + nombre(f.lista) : ''} · </b>}
+        <b>P{cfg.nPreguntas + k + 1}</b> · esperado <b>{String(cfg.claveEscritas?.[k] || '—').toUpperCase()}</b>
+        {e.leida ? <> · leído <b style={{ fontFamily: 'monospace' }}>{e.leida}</b></> : null}
+        {e.manual && <span style={{ color: '#64748b' }}> (corregida a mano)</span>}
+      </div>
+      {img ? <img src={img} alt="Lo que escribió" style={{ maxWidth: '100%', height: 44, objectFit: 'contain', alignSelf: 'flex-start', background: '#fff', borderRadius: 6 }} />
+        : <span style={st.ayuda}>{e.estado === 'dudosa' ? 'Sin imagen (leída con el móvil): mírala en la hoja.' : ''}</span>}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button style={{ ...st.mini, background: e.estado === 'bien' ? '#16a34a' : '#fff', color: e.estado === 'bien' ? '#fff' : '#0f172a' }} onClick={() => onRevisar(f.lista, k, 'bien')}>✔ Bien</button>
+        <button style={{ ...st.mini, background: e.estado === 'mal' ? '#dc2626' : '#fff', color: e.estado === 'mal' ? '#fff' : '#0f172a' }} onClick={() => onRevisar(f.lista, k, 'mal')}>✘ Mal</button>
+        {e.manual && <button style={st.mini} onClick={() => onRevisar(f.lista, k, null)}>↺ Automático</button>}
+      </div>
+    </div>
+  );
+}
+
+function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, onNueva, onSeguir, onRevisar }) {
+  // Cola de respuestas escritas dudosas (las decide el profe)
+  const porRevisar = filas.flatMap((f) => (f.escritasEst || []).map((e, k) => ({ f, k, e })).filter(({ e }) => e.estado === 'dudosa'));
+  const [verRevision, setVerRevision] = useState(true);
   const [abierta, setAbierta] = useState(null);
   const n = filas.length;
   const media = n ? filas.reduce((s, f) => s + f.nota, 0) / n : 0;
@@ -478,9 +617,13 @@ function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, 
   });
 
   const csv = () => {
-    const cab = ['Nº lista', 'Nombre', 'Aciertos', 'Fallos', 'En blanco', 'Dobles', 'Nota', ...clave.map((_, q) => `P${q + 1}`)];
-    const lineas = filas.map((f) => [f.lista, nombre(f.lista), f.aciertos, f.fallos, f.blancos, f.dobles, String(f.nota).replace('.', ','), ...clave.map((_, q) => f.respuestas[q] || '')]);
-    lineas.push(['', 'CLAVE', '', '', '', '', '', ...clave]);
+    const nE = cfg.nEscritas || 0;
+    const cabE = Array.from({ length: nE }, (_, k) => `P${cfg.nPreguntas + k + 1} (escrita)`);
+    const cab = ['Nº lista', 'Nombre', 'Aciertos', 'Fallos', 'En blanco', 'Dobles', 'Por revisar', 'Nota', ...clave.map((_, q) => `P${q + 1}`), ...cabE];
+    const lineas = filas.map((f) => [f.lista, nombre(f.lista), f.aciertos, f.fallos, f.blancos, f.dobles, f.pendientes || 0, String(f.nota).replace('.', ','),
+      ...clave.map((_, q) => f.respuestas[q] || ''),
+      ...(f.escritasEst || []).map((e) => (e.leida ? `${e.leida} ${TXT_ESTADO[e.estado] || ''}` : TXT_ESTADO[e.estado] || ''))]);
+    lineas.push(['', 'CLAVE', '', '', '', '', '', '', ...clave, ...Array.from({ length: nE }, (_, k) => String(cfg.claveEscritas?.[k] || '').toUpperCase())]);
     const txt = [cab, ...lineas].map((l) => l.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + txt], { type: 'text/csv;charset=utf-8' }));
@@ -507,6 +650,21 @@ function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, 
         <div><b style={{ fontSize: 26, color: '#dc2626' }}>{n - aprobados}</b><br />suspensos</div>
       </div>
 
+      {porRevisar.length > 0 && (
+        <section style={{ ...st.panel, borderColor: '#c4b5fd', background: '#faf5ff' }}>
+          <div style={{ ...st.fila, justifyContent: 'space-between' }}>
+            <h3 style={{ ...st.h3, margin: 0 }}>🔍 {porRevisar.length} {porRevisar.length === 1 ? 'respuesta escrita' : 'respuestas escritas'} por revisar</h3>
+            <button style={st.mini} onClick={() => setVerRevision((v) => !v)}>{verRevision ? 'Ocultar' : 'Revisar'}</button>
+          </div>
+          <p style={st.ayuda}>No está claro si coincide con la respuesta: decide tú. Hasta entonces no suman (la nota puede subir).</p>
+          {verRevision && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8, marginTop: 8 }}>
+              {porRevisar.map(({ f, k }) => <RevisarEscrita key={f.lista + '-' + k} f={f} k={k} cfg={cfg} nombre={nombre} onRevisar={onRevisar} />)}
+            </div>
+          )}
+        </section>
+      )}
+
       <section style={st.panel}>
         <div style={{ overflowX: 'auto' }}>
           <table style={st.tabla}>
@@ -525,7 +683,7 @@ function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, 
                     <td style={st.td}>{f.aciertos}</td>
                     <td style={st.td}>{f.fallos}{f.dobles ? <span title="dobles marcas" style={{ color: COLOR.doble }}> ({f.dobles}⚠)</span> : ''}</td>
                     <td style={st.td}>{f.blancos}</td>
-                    <td style={{ ...st.td, fontWeight: 900, color: f.nota >= 5 ? '#16a34a' : '#dc2626' }}>{String(f.nota).replace('.', ',')}{f.dudosas?.length ? <span title="Hay marcas dudosas" style={{ color: '#b45309' }}> ⚠</span> : ''}</td>
+                    <td style={{ ...st.td, fontWeight: 900, color: f.nota >= 5 ? '#16a34a' : '#dc2626' }}>{String(f.nota).replace('.', ',')}{f.dudosas?.length ? <span title="Hay marcas dudosas" style={{ color: '#b45309' }}> ⚠</span> : ''}{f.pendientes ? <span title="Respuestas escritas por revisar" style={{ color: COLOR.dudosa }}> 🔍{f.pendientes}</span> : ''}</td>
                     <td style={{ ...st.td, whiteSpace: 'nowrap' }}>
                       <button style={st.mini} onClick={() => setAbierta(abierta === f.lista ? null : f.lista)}>{abierta === f.lista ? 'Ocultar' : 'Ver'}</button>
                       <button style={st.mini} onClick={() => window.confirm(`¿Quitar la hoja del nº ${f.lista}?`) && onBorrar(f.lista)}>🗑</button>
@@ -541,6 +699,21 @@ function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, 
                         ))}
                       </div>
                       {f.dudosas?.length > 0 && <p style={st.ayuda}>⚠ Marcas dudosas (flojas o borradas) en: {f.dudosas.map((q) => q + 1).join(', ')}. Compruébalas en la hoja.</p>}
+                      {(f.escritasEst || []).length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {f.escritasEst.map((e, k) => (
+                              <span key={k} title={'Esperado: ' + String(cfg.claveEscritas?.[k] || '—').toUpperCase()} style={{ ...st.chip, background: COLOR[e.estado] || '#64748b' }}>
+                                {cfg.nPreguntas + k + 1}: {e.leida || '—'} {TXT_ESTADO[e.estado]}{e.manual ? ' ✋' : ''}
+                              </span>
+                            ))}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 6, marginTop: 6 }}>
+                            {f.escritasEst.map((e, k) => (e.estado !== 'anulada' && e.estado !== 'blanco' && (f.escritas?.[k]?.img || e.manual || e.estado !== 'bien')
+                              ? <RevisarEscrita key={k} f={f} k={k} cfg={cfg} nombre={nombre} onRevisar={onRevisar} compacta /> : null))}
+                          </div>
+                        </div>
+                      )}
                     </td></tr>
                   )}
                 </React.Fragment>
@@ -568,8 +741,8 @@ function Resultados({ cfg, clave, filas, nombre, nombres, setNombres, onBorrar, 
         <GuardarResultadosMandos
           tipo="CORRECTOR" juego="Corrector de exámenes" modalidad="Hoja de respuestas (cámara)" claveNombres={LS_NOMBRES}
           recursoTitulo={cfg.titulo || cfg.recursoTitulo || ''}
-          config={{ preguntas: cfg.nPreguntas, opciones: LETRAS.slice(0, cfg.nOpciones).join(''), penalizacion: cfg.penalizacion }}
-          jugadores={filas.map((f) => ({ id: f.lista, nombre: nombre(f.lista), aciertos: f.aciertos, intentos: f.validas, fallos: f.fallos, puntos: f.nota, extra: { nota: f.nota, blancos: f.blancos, respuestas: f.respuestas.join('') || '' } }))}
+          config={{ preguntas: cfg.nPreguntas, escritas: cfg.nEscritas || 0, opciones: LETRAS.slice(0, cfg.nOpciones).join(''), penalizacion: cfg.penalizacion }}
+          jugadores={filas.map((f) => ({ id: f.lista, nombre: nombre(f.lista), aciertos: f.aciertos, intentos: f.validas, fallos: f.fallos, puntos: f.nota, extra: { nota: f.nota, blancos: f.blancos, porRevisar: f.pendientes || 0, respuestas: f.respuestas.join('') || '', escritas: (f.escritasEst || []).map((e) => e.leida || '-').join(' ') } }))}
           estilo={{ padding: '10px 16px' }}
         />
         <button style={st.btnSec} onClick={onNueva}>🧹 Nueva corrección</button>
@@ -614,5 +787,6 @@ const st = {
   fuentes: { display: 'flex', gap: 6, flexWrap: 'wrap', background: '#e2e8f0', padding: 4, borderRadius: 12 },
   fuente: (on) => ({ flex: 1, minWidth: 120, padding: '9px 10px', borderRadius: 9, border: 'none', background: on ? '#fff' : 'transparent', boxShadow: on ? '0 1px 4px rgba(0,0,0,0.15)' : 'none', fontWeight: 800, color: on ? '#0f766e' : '#475569', cursor: 'pointer', fontSize: 14 }),
   recibida: { display: 'flex', gap: 10, alignItems: 'center', background: '#f8fafc', borderRadius: 8, padding: '6px 10px', fontSize: 14 },
+  revision: { display: 'flex', flexDirection: 'column', gap: 6, background: '#fff', border: '2px solid', borderRadius: 10, padding: 8 },
   toast: { position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', color: '#fff', padding: '10px 18px', borderRadius: 12, fontWeight: 700, zIndex: 50 },
 };

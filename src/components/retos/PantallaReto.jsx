@@ -1,4 +1,5 @@
 import React from 'react';
+import { esRetoSemanaUrl, textoEnvioCompeticion } from '../../utils/retoLink';
 
 // Pantalla previa común de un reto por enlace (?reto=…): el alumno ve la
 // configuración fijada por el profesor y solo tiene que pulsar «Empezar».
@@ -33,7 +34,9 @@ export default function PantallaReto({ reto, nombreJuego, emoji = '🎯', color 
 
                 {esCompeticion && (
                     <div style={{ background: 'rgba(245,158,11,0.14)', color: '#b45309', borderRadius: 10, padding: '8px 12px', fontSize: '0.8rem', fontWeight: 600, marginBottom: 16 }}>
-                        🏆 Prueba de competición · al terminar envía tu puntuación con tu alias y tu contraseña
+                        {esRetoSemanaUrl()
+                            ? '🔥 Reto de la semana · al terminar envía tu puntuación con tu alias y entra en el ranking'
+                            : '🏆 Prueba de competición · al terminar envía tu puntuación con tu alias y tu contraseña'}
                     </div>
                 )}
 
@@ -55,4 +58,4 @@ export default function PantallaReto({ reto, nombreJuego, emoji = '🎯', color 
  * Botón final de envío que respeta el contexto del reto: en una competición
  * abre el envío a la prueba; si no, el «Enviar al profesor» del propio juego.
  */
-export const textoBotonEnvio = (reto) => (reto?.compId && reto?.catId) ? '🏆 Enviar a la competición' : '📤 Enviar al profesor';
+export const textoBotonEnvio = (reto) => (reto?.compId && reto?.catId) ? textoEnvioCompeticion() : '📤 Enviar al profesor';

@@ -13,7 +13,7 @@ import bg1 from './assets/pantalla5.jpeg';
 import bg2 from './assets/pantalla2.jpeg';
 import bg3 from './assets/pantalla3.jpeg';
 import bg4 from './assets/pantalla4.jpeg';
-import { BotonPantallaDual, esMitadDual } from './components/JuegoDual';
+import { BotonPantallaDual, esMitadDual, ladoMitadDual } from './components/JuegoDual';
 
 // --- CONFIGURACIÓN VISUAL POR NIVEL ---
 const LEVEL_THEMES = [
@@ -231,6 +231,11 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
     const [hojaJugada, setHojaJugada] = useState('General');
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const lastModeRef = useRef({ modo: 'SIMPLE', hoja: null }); // Recuerda el último modo jugado
+    const [progreso, setProgreso] = useState({ n: 0, total: 0 });
+    // Tamaño del canvas en pantalla: cabe entero en el hueco libre (móvil, tablet, PDI, media pantalla dual)
+    const zonaRef = useRef(null);
+    const [tamCanvas, setTamCanvas] = useState({ w: 800, h: 400 });
+    const ladoDual = ladoMitadDual();
 
 
 
@@ -372,6 +377,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
 
         gameRef.current.levelsQueue = levels;
         gameRef.current.currentLevelIdx = 0;
+        gameRef.current.vidas = 3;
         setLives(3);
         setScore(0);
         cargarNivel(0);
@@ -381,8 +387,11 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
         const levelData = gameRef.current.levelsQueue[levelIndex];
         gameRef.current.allQuestions = levelData.questions;
         gameRef.current.qIndex = 0;
+        gameRef.current.activo = false; // el bucle deja de jugar hasta el «¡VAMOS!»
         gameRef.current.obstacles = [];
-        gameRef.current.pikatron.y = 0;
+        gameRef.current.pikatron.y = 0;   // entra cayendo desde arriba
+        gameRef.current.pikatron.vy = 0;
+        gameRef.current.pikatron.jumping = true;
         gameRef.current.bgX = 0;
         gameRef.current.coins = []; // Limpiar monedas viejas
         if (levelData.preguntaEspecial && levelData.preguntaEspecial.activo) {
@@ -419,10 +428,12 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                 gameRef.current.currentLevelIdx = nextLevelIdx;
                 cargarNivel(nextLevelIdx);
             } else {
+                gameRef.current.activo = false;
                 setGameState('WIN');
             }
             return;
         }
+        setProgreso({ n: index + 1, total: questions.length });
 
         const p = questions[index];
         // Adaptar campos (puede venir como 'respuesta' o 'correcta' o 'a')
@@ -443,233 +454,156 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
     };
 
     // --- BUCLE PRINCIPAL ---
-    // --- BUCLE PRINCIPAL ---
-    // --- BUCLE PRINCIPAL ---
+    // La lógica avanza a 60 pasos por segundo fijos (en pantallas de 120/144 Hz el juego no va
+    // más rápido) y se dibuja una vez por fotograma.
     useEffect(() => {
         if (gameState !== 'PLAYING') return;
-
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        let animationFrameId;
-        const sprite = new Image();
-        sprite.src = pikatronImg;
-        const coinSprite = new Image();
-        coinSprite.src = coinImgFile;
-
         if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const W = 800, H = 400;
+        canvas.width = W;
+        canvas.height = H;
+        const groundLevel = H - 50;
+        const G = gameRef.current;
+        G.activo = true;
 
-        canvas.width = 800;
-        canvas.height = 400;
-        const groundLevel = canvas.height - 50;
+        const sprite = new Image(); sprite.src = pikatronImg;
+        const coinSprite = new Image(); coinSprite.src = coinImgFile;
+        const currentTheme = LEVEL_THEMES[G.currentLevelIdx % LEVEL_THEMES.length];
+        const bgImg = new Image(); bgImg.src = currentTheme.img;
 
-        // --- PREPARAR IMAGEN DE FONDO ---
-        const themeIndex = gameRef.current.currentLevelIdx % LEVEL_THEMES.length;
-        const currentTheme = LEVEL_THEMES[themeIndex];
-        const bgImg = new Image();
-        bgImg.src = currentTheme.img;
+        const pika = G.pikatron;
+        pika.groundY = groundLevel - pika.height;
+        if (pika.y > pika.groundY) pika.y = pika.groundY;
 
-        if (gameRef.current.pikatron.groundY === 0) {
-            gameRef.current.pikatron.groundY = groundLevel - gameRef.current.pikatron.height;
-            gameRef.current.pikatron.y = gameRef.current.pikatron.groundY;
-        }
-
-        const loop = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 1. DIBUJAR FONDO
-            gameRef.current.bgX -= gameRef.current.speed * 0.5;
-            const anchoCanvas = 800;
-            gameRef.current.bgX = gameRef.current.bgX % anchoCanvas;
-
-            if (bgImg.complete && bgImg.naturalWidth > 0) {
-                ctx.drawImage(bgImg, gameRef.current.bgX, 0, anchoCanvas, canvas.height);
-                ctx.drawImage(bgImg, gameRef.current.bgX + anchoCanvas, 0, anchoCanvas, canvas.height);
-            } else {
-                ctx.fillStyle = "#87CEEB";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Efectos: chispas, textos flotantes, temblor y destello
+        const fx = { parts: [], textos: [], shake: 0, flash: null, groundX: 0 };
+        const chispas = (x, y, n, colores, fuerza = 5) => {
+            for (let i = 0; i < n; i++) {
+                const a = Math.random() * Math.PI * 2, v = (0.35 + Math.random()) * fuerza;
+                const vida = 30 + Math.random() * 30;
+                fx.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, vida, max: vida, color: colores[i % colores.length], r: 2 + Math.random() * 3 });
             }
+        };
+        const textoFlotante = (x, y, txt, color) => fx.textos.push({ x, y, txt, color, vida: 55 });
 
-            // SUELO TEMÁTICO
-            ctx.fillStyle = currentTheme.ground;
-            ctx.fillRect(0, groundLevel, canvas.width, 50);
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-            ctx.fillRect(0, groundLevel, canvas.width, 5);
+        const update = () => {
+            if (!G.activo) return;
+            G.frame++;
+            G.bgX = (G.bgX - G.speed * 0.5) % W;
+            fx.groundX = (fx.groundX - G.speed) % 40;
 
-            // 2. DIBUJAR ENUNCIADO DE PREGUNTA ESPECIAL (FIJO Y ESTILO VIDEOJUEGO)
-            const special = gameRef.current.specialPool;
-            if (special && special.enunciado) {
-                ctx.save();
-                ctx.font = "900 28px monospace"; // Fuente tipo videojuego (negrita monoespaciada)
-                ctx.textAlign = "center";
-                ctx.textBaseline = "top";
-
-                // Borde Negro (Efecto Retro)
-                ctx.strokeStyle = "black";
-                ctx.lineWidth = 6;
-                ctx.strokeText(special.enunciado, canvas.width / 2, 20); // Posición fija arriba
-
-                // Relleno Amarillo
-                ctx.fillStyle = "#f1c40f";
-                ctx.fillText(special.enunciado, canvas.width / 2, 20);
-                ctx.restore();
-            }
-
-            // 3. PIKATRON
-            const pika = gameRef.current.pikatron;
-            const gravity = gameRef.current.speed < 6 ? 0.25 : 0.4;
-
+            // 1. PIKATRON (salto y gravedad)
+            const gravity = G.speed < 6 ? 0.25 : 0.4;
             if (pika.y < pika.groundY || pika.vy < 0) {
                 pika.y += pika.vy;
                 pika.vy += gravity;
+                if (pika.y >= pika.groundY) {
+                    pika.y = pika.groundY; pika.vy = 0; pika.jumping = false;
+                    pika.squash = 8;
+                    chispas(pika.x + pika.width / 2, groundLevel - 2, 7, ['rgba(255,255,255,0.8)', 'rgba(220,220,220,0.6)'], 2.2);
+                }
             } else {
-                pika.y = pika.groundY;
-                pika.vy = 0;
-                pika.jumping = false;
+                pika.y = pika.groundY; pika.vy = 0; pika.jumping = false;
             }
-
-            if (gameRef.current.frame % 10 === 0) {
+            if (pika.squash > 0) pika.squash--;
+            // polvo al correr
+            if (!pika.jumping && G.frame % 7 === 0) {
+                fx.parts.push({ x: pika.x + 22, y: groundLevel - 4, vx: -1.5 - Math.random(), vy: -0.6 - Math.random() * 0.6, vida: 22, max: 22, color: 'rgba(255,255,255,0.55)', r: 2 + Math.random() * 2.5 });
+            }
+            if (G.frame % 10 === 0) {
                 if (pika.jumping) {
                     pika.frameX = 1; pika.frameY = 0;
                 } else {
                     const runFrames = [[0, 0], [0, 1], [1, 1]];
-                    const step = (gameRef.current.frame / 10) % 3;
+                    const step = (G.frame / 10) % 3;
                     pika.frameX = runFrames[step][0];
                     pika.frameY = runFrames[step][1];
                 }
             }
 
-            const sW = sprite.width / 2;
-            const sH = sprite.height / 2;
-            ctx.drawImage(sprite, pika.frameX * sW, pika.frameY * sH, sW, sH, pika.x, pika.y, pika.width, pika.height);
-
-            // 4. OBSTÁCULOS (CAJAS SUELO)
-            const spawnRate = Math.floor(1100 / gameRef.current.speed);
-            gameRef.current.spawnTimer++;
-            if (gameRef.current.spawnTimer > spawnRate) {
-                const list = gameRef.current.currentAnswers;
+            // 2. CAJAS DE RESPUESTA
+            const spawnRate = Math.floor(1100 / G.speed);
+            G.spawnTimer++;
+            if (G.spawnTimer > spawnRate) {
+                const list = G.currentAnswers;
                 if (list.length > 0) {
-                    const nextData = list[gameRef.current.nextAnswerIndex];
-                    const color = BLOCK_COLORS[gameRef.current.nextAnswerIndex % BLOCK_COLORS.length];
-                    gameRef.current.obstacles.push({
+                    const nextData = list[G.nextAnswerIndex];
+                    const color = BLOCK_COLORS[G.nextAnswerIndex % BLOCK_COLORS.length];
+                    G.obstacles.push({
                         // Respuestas largas: caja algo más ancha (hasta 150 px)
-                        x: canvas.width, y: groundLevel - 40, width: Math.min(150, 100 + Math.max(0, String(nextData?.text ?? '').length - 10) * 4), height: 40, data: nextData, color: color
+                        x: W, y: groundLevel - 40, width: Math.min(150, 100 + Math.max(0, String(nextData?.text ?? '').length - 10) * 4), height: 40, data: nextData, color
                     });
-                    gameRef.current.nextAnswerIndex = (gameRef.current.nextAnswerIndex + 1) % list.length;
+                    G.nextAnswerIndex = (G.nextAnswerIndex + 1) % list.length;
                 }
-                gameRef.current.spawnTimer = 0;
+                G.spawnTimer = 0;
             }
 
-            gameRef.current.obstacles.forEach((obs) => {
-                obs.x -= gameRef.current.speed;
-                ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                ctx.fillRect(obs.x + 4, obs.y + 4, obs.width, obs.height);
-                ctx.fillStyle = obs.color || '#3498db';
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
-                ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
-                ctx.fillStyle = 'white';
-                // Antes se cortaba a 10 letras: ahora se encoge la letra y se parte en dos líneas
-                dibujarAjustado(ctx, String(obs.data.text ?? ''), obs.x + (obs.width / 2), obs.y + (obs.height / 2) + 1, obs.width - 8, obs.height - 4, { maxPx: 16, minPx: 9, maxLineas: 2 });
-                ctx.textAlign = 'start';
-
-                const paddingX = 25; const paddingY = 20;
+            const paddingX = 25, paddingY = 20;
+            for (const obs of G.obstacles) {
+                obs.x -= G.speed;
                 if (
                     pika.x + pika.width - paddingX > obs.x &&
                     pika.x + paddingX < obs.x + obs.width &&
                     pika.y + pika.height - paddingY > obs.y &&
                     pika.y + paddingY < obs.y + obs.height
                 ) {
+                    const cx = obs.x + obs.width / 2;
                     if (obs.data.isCorrect) {
                         playSound('RES_COR');
-                        setScore(s => s + gameRef.current.puntosAcierto);
-                        prepararSiguientePregunta(gameRef.current.qIndex + 1);
+                        setScore(s => s + G.puntosAcierto);
+                        chispas(cx, obs.y, 30, ['#f1c40f', '#2ecc71', '#ffffff'], 6.5);
+                        textoFlotante(cx, obs.y - 14, `+${G.puntosAcierto}`, '#2ecc71');
+                        fx.flash = { color: '46,204,113', vida: 14, max: 14 };
+                        prepararSiguientePregunta(G.qIndex + 1);
                     } else {
-                        gameRef.current.obstacles = [];
-                        setLives(prevLives => {
-                            const newLives = prevLives - 1;
-                            if (newLives > 0) {
-                                playSound('LOSE_LIFE');
-                                setScore(s => Math.max(0, s - gameRef.current.puntosFallo));
-                                return newLives;
-                            } else {
-                                playSound('GAMEOVER');
-                                setGameState('GAMEOVER');
-                                return 0;
-                            }
-                        });
+                        G.obstacles = [];
+                        G.vidas = (G.vidas ?? 3) - 1;
+                        setLives(Math.max(0, G.vidas));
+                        chispas(cx, obs.y + 10, 26, ['#e74c3c', '#c0392b', '#ffffff'], 6);
+                        fx.shake = 16;
+                        fx.flash = { color: '231,76,60', vida: 20, max: 20 };
+                        if (G.vidas > 0) {
+                            playSound('LOSE_LIFE');
+                            setScore(s => Math.max(0, s - G.puntosFallo));
+                            if (G.puntosFallo > 0) textoFlotante(cx, obs.y - 14, `-${G.puntosFallo}`, '#e74c3c');
+                        } else {
+                            playSound('GAMEOVER');
+                            G.activo = false;
+                            setGameState('GAMEOVER');
+                        }
                     }
+                    break; // la lista de cajas ha cambiado
                 }
-            });
-            gameRef.current.obstacles = gameRef.current.obstacles.filter(obs => obs.x > -200);
+            }
+            G.obstacles = G.obstacles.filter(obs => obs.x > -200);
+            if (!G.activo) return;
 
-            // 5. LÓGICA DE MONEDAS (MODIFICADA: TEXTO GIGANTE Y ALTURA MAYOR)
-            gameRef.current.coinSpawnTimer++;
-
-            if (gameRef.current.coinSpawnTimer > 120 + Math.random() * 100) {
+            // 3. MONEDAS (pregunta especial: correctas +1, incorrectas −1)
+            const special = G.specialPool;
+            G.coinSpawnTimer++;
+            if (G.coinSpawnTimer > 120 + Math.random() * 100) {
                 let coinData = { isCorrect: true, text: '' };
-
                 if (special && (special.correctas.length > 0 || special.incorrectas.length > 0)) {
                     let sacarCorrecta = Math.random() < 0.5;
                     if (!sacarCorrecta && special.incorrectas.length === 0) sacarCorrecta = true;
                     if (sacarCorrecta && special.correctas.length === 0) sacarCorrecta = false;
-
-                    if (sacarCorrecta) {
-                        coinData.isCorrect = true;
-                        coinData.text = special.correctas[Math.floor(Math.random() * special.correctas.length)];
-                    } else {
-                        coinData.isCorrect = false;
-                        coinData.text = special.incorrectas[Math.floor(Math.random() * special.incorrectas.length)];
-                    }
-                } else {
-                    coinData.isCorrect = true;
-                    coinData.text = "";
+                    coinData = sacarCorrecta
+                        ? { isCorrect: true, text: special.correctas[Math.floor(Math.random() * special.correctas.length)] }
+                        : { isCorrect: false, text: special.incorrectas[Math.floor(Math.random() * special.incorrectas.length)] };
                 }
-
-                gameRef.current.coins.push({
-                    x: canvas.width,
-                    // CAMBIO AQUÍ: groundLevel - 230 hace que salgan mucho más arriba (salto alto)
+                G.coins.push({
+                    x: W,
                     y: groundLevel - 230 - (Math.random() * 60),
-                    width: 70,
-                    height: 70,
-                    data: coinData,
-                    active: true
+                    width: 70, height: 70,
+                    data: coinData, active: true,
                 });
-                gameRef.current.coinSpawnTimer = 0;
+                G.coinSpawnTimer = 0;
             }
-
-            gameRef.current.coins.forEach(coin => {
-                if (!coin.active) return;
-
-                coin.x -= gameRef.current.speed * 0.5;
-
-                // Dibujar Moneda
-                if (coinSprite.complete) {
-                    ctx.drawImage(coinSprite, coin.x, coin.y, coin.width, coin.height);
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(coin.x + coin.width / 2, coin.y + coin.height / 2, coin.width / 2, 0, Math.PI * 2);
-                    ctx.fillStyle = '#f1c40f';
-                    ctx.fill();
-                }
-
-                // DIBUJAR TEXTO DENTRO DE LA MONEDA (GIGANTE)
-                if (coin.data.text) {
-                    ctx.save();
-                    ctx.fillStyle = 'black';
-                    // CAMBIO AQUÍ: Fuente mucho más grande
-                    ctx.font = 'bold 26px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-
-                    let txt = coin.data.text;
-                    // Recortamos a 3-4 caracteres para que quepa en tamaño gigante
-                    if (txt.length > 5) txt = txt.substring(0, 4) + '.';
-
-                    ctx.fillText(txt, coin.x + (coin.width / 2), coin.y + (coin.height / 2) + 2);
-                    ctx.restore();
-                }
-
-                // Colisiones Moneda
+            for (const coin of G.coins) {
+                if (!coin.active) continue;
+                coin.x -= G.speed * 0.5;
                 if (
                     pika.x < coin.x + coin.width &&
                     pika.x + pika.width > coin.x &&
@@ -677,24 +611,174 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                     pika.y + pika.height > coin.y
                 ) {
                     coin.active = false;
-
+                    const cx = coin.x + coin.width / 2, cy = coin.y + coin.height / 2;
                     if (coin.data.isCorrect) {
                         setScore(s => s + 1);
                         playSound('CORRECT');
+                        chispas(cx, cy, 16, ['#f1c40f', '#ffe066', '#ffffff'], 4.5);
+                        textoFlotante(cx, cy - 20, '+1', '#f1c40f');
                     } else {
                         setScore(s => Math.max(0, s - 1));
                         playSound('MON_INC');
+                        chispas(cx, cy, 14, ['#e74c3c', '#7f8c8d'], 4);
+                        textoFlotante(cx, cy - 20, '-1', '#e74c3c');
+                        fx.shake = Math.max(fx.shake, 7);
                     }
                 }
-            });
+            }
+            G.coins = G.coins.filter(c => c.x > -100 && c.active);
 
-            gameRef.current.coins = gameRef.current.coins.filter(c => c.x > -100 && c.active);
-
-            gameRef.current.frame++;
-            animationFrameId = requestAnimationFrame(loop);
+            // 4. EFECTOS
+            for (const pt of fx.parts) { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.22; pt.vida--; }
+            fx.parts = fx.parts.filter(pt => pt.vida > 0);
+            for (const t of fx.textos) { t.y -= 0.9; t.vida--; }
+            fx.textos = fx.textos.filter(t => t.vida > 0);
+            if (fx.shake > 0) fx.shake = fx.shake < 0.5 ? 0 : fx.shake * 0.86;
+            if (fx.flash && --fx.flash.vida <= 0) fx.flash = null;
         };
-        loop();
-        return () => cancelAnimationFrame(animationFrameId);
+
+        const draw = () => {
+            ctx.save();
+            ctx.clearRect(0, 0, W, H);
+            if (fx.shake > 0.5) ctx.translate((Math.random() - 0.5) * fx.shake, (Math.random() - 0.5) * fx.shake);
+
+            // FONDO (dos copias que se desplazan)
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(-20, -20, W + 40, H + 40);
+            if (bgImg.complete && bgImg.naturalWidth > 0) {
+                ctx.drawImage(bgImg, G.bgX - 2, -10, W + 4, H + 20);
+                ctx.drawImage(bgImg, G.bgX + W - 2, -10, W + 4, H + 20);
+            }
+
+            // SUELO con baldosas que corren
+            ctx.fillStyle = currentTheme.ground;
+            ctx.fillRect(-20, groundLevel, W + 40, 80);
+            ctx.fillStyle = 'rgba(0,0,0,0.16)';
+            for (let x = fx.groundX - 40; x < W + 40; x += 40) {
+                ctx.fillRect(x, groundLevel + 10, 20, 16);
+                ctx.fillRect(x + 20, groundLevel + 28, 20, 16);
+            }
+            ctx.fillStyle = 'rgba(255,255,255,0.28)';
+            ctx.fillRect(-20, groundLevel, W + 40, 4);
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(-20, groundLevel + 4, W + 40, 3);
+
+            // ENUNCIADO DE LA PREGUNTA ESPECIAL (fijo arriba, estilo videojuego)
+            const special = G.specialPool;
+            if (special && special.enunciado) {
+                ctx.save();
+                ctx.font = '900 26px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 6;
+                ctx.strokeText(special.enunciado, W / 2, 16);
+                ctx.fillStyle = '#f1c40f';
+                ctx.fillText(special.enunciado, W / 2, 16);
+                ctx.restore();
+            }
+
+            // MONEDAS
+            for (const coin of G.coins) {
+                if (!coin.active) continue;
+                const cx = coin.x + coin.width / 2, cy = coin.y + coin.height / 2;
+                const flota = Math.sin((G.frame + coin.x) * 0.08) * 4;
+                // halo
+                const halo = ctx.createRadialGradient(cx, cy + flota, 10, cx, cy + flota, coin.width * 0.75);
+                halo.addColorStop(0, coin.data.text && !coin.data.isCorrect ? 'rgba(255,255,255,0.25)' : 'rgba(255,230,80,0.35)');
+                halo.addColorStop(1, 'rgba(255,230,80,0)');
+                ctx.fillStyle = halo;
+                ctx.fillRect(cx - coin.width, cy - coin.height + flota, coin.width * 2, coin.height * 2);
+                // sin texto la moneda gira; con texto queda de frente para poder leerlo
+                const giro = coin.data.text ? 1 : Math.max(0.25, Math.abs(Math.cos((G.frame + coin.x) * 0.06)));
+                const cw = coin.width * giro;
+                if (coinSprite.complete && coinSprite.naturalWidth > 0) {
+                    ctx.drawImage(coinSprite, cx - cw / 2, coin.y + flota, cw, coin.height);
+                } else {
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy + flota, cw / 2, coin.height / 2, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.fill();
+                }
+                if (coin.data.text) {
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    // El texto se encoge para caber dentro de la moneda (hasta 2 líneas)
+                    dibujarAjustado(ctx, String(coin.data.text), cx, cy + flota + 2, coin.width - 14, coin.height - 20, { maxPx: 26, minPx: 10, maxLineas: 2 });
+                    ctx.restore();
+                }
+            }
+
+            // CAJAS DE RESPUESTA
+            for (const obs of G.obstacles) {
+                ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                rrPk(ctx, obs.x + 4, obs.y + 5, obs.width, obs.height, 8); ctx.fill();
+                ctx.fillStyle = obs.color || '#3498db';
+                rrPk(ctx, obs.x, obs.y, obs.width, obs.height, 8); ctx.fill();
+                ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                rrPk(ctx, obs.x + 3, obs.y + 3, obs.width - 6, obs.height * 0.42, 6); ctx.fill();
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 2.5;
+                rrPk(ctx, obs.x, obs.y, obs.width, obs.height, 8); ctx.stroke();
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                dibujarAjustado(ctx, String(obs.data.text ?? ''), obs.x + obs.width / 2 + 1, obs.y + obs.height / 2 + 2, obs.width - 10, obs.height - 4, { maxPx: 18, minPx: 9, maxLineas: 2 });
+                ctx.fillStyle = 'white';
+                dibujarAjustado(ctx, String(obs.data.text ?? ''), obs.x + obs.width / 2, obs.y + obs.height / 2 + 1, obs.width - 10, obs.height - 4, { maxPx: 18, minPx: 9, maxLineas: 2 });
+            }
+
+            // SOMBRA + PIKATRON (se aplasta un poco al aterrizar)
+            const alt = Math.max(0, pika.groundY - pika.y);
+            const k = Math.max(0.35, 1 - alt / 260);
+            ctx.fillStyle = `rgba(0,0,0,${0.32 * k})`;
+            ctx.beginPath();
+            ctx.ellipse(pika.x + pika.width / 2, groundLevel + 2, 34 * k, 7 * k, 0, 0, Math.PI * 2);
+            ctx.fill();
+            if (sprite.complete && sprite.naturalWidth > 0) {
+                const sW = sprite.width / 2, sH = sprite.height / 2;
+                const s = (pika.squash || 0) / 8;
+                const dw = pika.width * (1 + 0.14 * s), dh = pika.height * (1 - 0.14 * s);
+                ctx.drawImage(sprite, pika.frameX * sW, pika.frameY * sH, sW, sH, pika.x - (dw - pika.width) / 2, pika.y + (pika.height - dh), dw, dh);
+            }
+
+            // CHISPAS Y TEXTOS
+            for (const pt of fx.parts) {
+                ctx.globalAlpha = Math.max(0, pt.vida / pt.max);
+                ctx.fillStyle = pt.color;
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            for (const t of fx.textos) {
+                ctx.globalAlpha = Math.min(1, t.vida / 20);
+                ctx.font = '900 32px Arial';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+                ctx.strokeText(t.txt, t.x, t.y);
+                ctx.fillStyle = t.color;
+                ctx.fillText(t.txt, t.x, t.y);
+            }
+            ctx.globalAlpha = 1;
+            ctx.restore();
+
+            // DESTELLO (verde acierto, rojo fallo)
+            if (fx.flash) {
+                ctx.fillStyle = `rgba(${fx.flash.color},${0.35 * fx.flash.vida / fx.flash.max})`;
+                ctx.fillRect(0, 0, W, H);
+            }
+        };
+
+        let raf, last = performance.now(), acc = 0;
+        const STEP = 1000 / 60;
+        const frame = (t) => {
+            acc += Math.min(200, t - last);
+            last = t;
+            let n = 0;
+            while (acc >= STEP && n < 6) { update(); acc -= STEP; n++; }
+            if (n === 6) acc = 0;
+            draw();
+            raf = requestAnimationFrame(frame);
+        };
+        draw();
+        raf = requestAnimationFrame(frame);
+        return () => { cancelAnimationFrame(raf); G.activo = false; };
     }, [gameState]);
 
     // Mandos micro:bit: puntos de la partida al mando que jugaba (con relevos, la siguiente la juega otro)
@@ -702,29 +786,67 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
         if (gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'TIMEOUT') mandosApi.current?.finPartida([score], { ganador: gameState === 'WIN' ? 0 : null });
     }, [gameState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // CONTROLES
+    // Canvas a la medida del hueco libre (proporción 2:1)
+    const hayCanvas = gameState !== 'SETUP';
     useEffect(() => {
-        const handleInput = () => {
-            if (gameState === 'PLAYING' && !gameRef.current.pikatron.jumping) {
-                playSound('JUMP');
-                gameRef.current.pikatron.vy = -10;
-                gameRef.current.pikatron.jumping = true;
-            }
+        const el = zonaRef.current;
+        if (!el) return undefined;
+        const medir = () => {
+            const r = el.getBoundingClientRect();
+            const w = Math.max(240, Math.min(r.width, r.height * 2));
+            setTamCanvas(t => (Math.abs(t.w - w) < 1 ? t : { w: Math.floor(w), h: Math.floor(w / 2) }));
         };
-        // Usamos una referencia nombrada para poder eliminar el listener correctamente
+        medir();
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null;
+        ro?.observe(el);
+        window.addEventListener('resize', medir);
+        return () => { ro?.disconnect(); window.removeEventListener('resize', medir); };
+    }, [hayCanvas]);
+
+    // En pantalla dual: con el juego en marcha, W/A/S/D van a la mitad izquierda y las flechas a la derecha
+    useEffect(() => {
+        window.__piktModoAccion = gameState === 'PLAYING' || gameState === 'LEVEL_INTRO';
+        return () => { window.__piktModoAccion = false; };
+    }, [gameState]);
+
+    // CONTROLES: saltar con Espacio / ↑ / W, clic de ratón, toque o lápiz
+    const saltar = () => {
+        const p = gameRef.current.pikatron;
+        if (gameState === 'PLAYING' && gameRef.current.activo && !p.jumping) {
+            playSound('JUMP');
+            p.vy = -10;
+            p.jumping = true;
+        }
+    };
+    useEffect(() => {
+        if (gameState !== 'PLAYING' && gameState !== 'LEVEL_INTRO') return undefined;
+        const esSalto = (e) => e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW' || e.key === ' ' || e.key === 'ArrowUp';
         const handleKeyDown = (e) => {
-            if (e.code === 'Space' || e.code === 'ArrowUp') {
-                e.preventDefault();
-                handleInput();
-            }
+            if (e.target?.closest?.('input, textarea, select')) return;
+            const enter = e.code === 'Enter' || e.code === 'NumpadEnter';
+            if (!esSalto(e) && !(enter && gameState === 'LEVEL_INTRO')) return;
+            e.preventDefault();
+            // Que Espacio no «pulse» el último botón con foco (pantalla completa, salir…)
+            if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur();
+            if (gameState === 'LEVEL_INTRO') { if (!e.repeat) startLevelPlaying(); return; }
+            saltar();
         };
+        const handleKeyUp = (e) => { if (esSalto(e) && !e.target?.closest?.('input, textarea, select')) e.preventDefault(); };
         window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('touchstart', handleInput);
+        window.addEventListener('keyup', handleKeyUp);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('touchstart', handleInput);
+            window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [gameState]);
+    }, [gameState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Clic / toque en cualquier parte del juego (menos en botones y casillas)
+    const alPulsar = (e) => {
+        if (e.button > 0) return;
+        if (e.target?.closest?.('button, input, select, textarea, a, label')) return;
+        if (gameState === 'PLAYING') { if (e.pointerType !== 'mouse') e.preventDefault(); saltar(); }
+        else if (gameState === 'LEVEL_INTRO') startLevelPlaying();
+    };
 
     const reiniciarJuegoCompleto = () => {
         setLives(3);
@@ -746,30 +868,25 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
     if (gameState === 'SETUP') return (
         <>
             {mandosUI}
-            {/* Si se pulsó el botón, mostramos el ranking encima */}
-            {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
-
-            {/* Pantalla de menú principal con la función onRanking conectada */}
             <PantallaSetup
                 recurso={recurso}
                 onStart={iniciarPartida}
                 onExit={onExit}
                 onRanking={() => setVerRanking(true)}
+                ladoDual={ladoDual}
             />
+            {/* Si se pulsó el botón, mostramos el ranking encima */}
+            {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
         </>
     );
-    // Calculamos fondo dinámico
-    const bgImage = LEVEL_THEMES[(levelInfo.current - 1) % LEVEL_THEMES.length].img;
 
     const toggleFullScreen = () => {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
+            document.documentElement.requestFullscreen?.().catch(err => {
                 console.log(`Error al intentar pantalla completa: ${err.message}`);
             });
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+        } else if (document.exitFullscreen) {
+            document.exitFullscreen();
         }
     };
 
@@ -811,236 +928,210 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
         setGuardando(false);
     };
 
-    return (
-        <div style={{
-            width: '100%',
-            height: '100vh',
-            background: '#222',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            padding: '20px' // Un poco de margen general
-        }}>
+    const pista = ladoDual === 0 ? 'Tecla W, clic o toque = saltar'
+        : ladoDual === 1 ? 'Flecha ↑, clic o toque = saltar'
+            : 'Espacio / ↑, clic o toque = saltar';
+    const chip = { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', borderRadius: 20, fontWeight: 800, fontSize: '1rem', whiteSpace: 'nowrap', boxShadow: 'inset 0 -3px 0 rgba(0,0,0,0.18)' };
 
-            {gameState !== 'LEVEL_INTRO' && (
-                <>
-                    {/* 1. VIDAS Y NIVEL (ESQUINA IZQUIERDA SUPERIOR) */}
+    return (
+        <>
+            {mandosUI}
+            <div className="pk-root" onPointerDown={alPulsar} style={{
+                position: 'relative',
+                width: '100%',
+                background: 'radial-gradient(ellipse at 50% 20%, #34495e 0%, #1b2631 55%, #0e1318 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '8px 10px',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+                touchAction: gameState === 'PLAYING' ? 'none' : 'manipulation',
+                userSelect: 'none', WebkitUserSelect: 'none',
+                fontFamily: "'Segoe UI', system-ui, sans-serif",
+            }}>
+                <EstilosPk />
+
+                {/* 1. MARCADOR: vidas, nivel, progreso, puntos, reloj y botones */}
+                {gameState !== 'LEVEL_INTRO' && (
                     <div style={{
-                        position: 'absolute',
-                        top: 80,
-                        left: 20,
-                        zIndex: 2000,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                        alignItems: 'flex-start'
+                        width: '100%', maxWidth: tamCanvas.w, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                        // a la izquierda queda el botón 🏠 de la página (fuera de la pantalla dual)
+                        paddingLeft: ladoDual === null ? 52 : 0, boxSizing: 'border-box', marginBottom: 6, flexShrink: 0,
                     }}>
-                        {/* Corazones */}
-                        <div style={{ display: 'flex', gap: '3px' }}>
+                        <div style={{ display: 'flex', gap: 2 }}>
                             {[...Array(3)].map((_, i) => (
-                                <Heart key={i} size={32} fill={i < lives ? "#e74c3c" : "#333"} color={i < lives ? "#c0392b" : "#555"}
-                                    style={{
-                                        filter: i < lives ? 'drop-shadow(0 0 2px #e74c3c)' : 'none',
-                                        transform: i < lives ? 'scale(1)' : 'scale(0.9)',
-                                        transition: 'all 0.3s'
-                                    }} />
+                                <Heart key={i} size={28} fill={i < lives ? '#e74c3c' : '#2c3e50'} color={i < lives ? '#c0392b' : '#4a5a6a'}
+                                    style={{ filter: i < lives ? 'drop-shadow(0 0 3px #e74c3c)' : 'none', transition: 'all 0.3s', transform: i < lives ? 'scale(1)' : 'scale(0.85)' }} />
                             ))}
                         </div>
-
-                        {/* Nivel */}
                         {gameRef.current.levelsQueue.length > 1 && (
-                            <div style={{ fontSize: '1rem', background: 'rgba(0,0,0,0.6)', padding: '5px 12px', borderRadius: '8px', color: '#fff', fontWeight: 'bold', border: '1px solid #555' }}>
-                                Nivel {levelInfo.current} / {levelInfo.total}
+                            <span style={{ ...chip, background: 'rgba(0,0,0,0.45)', color: '#fff', border: '1px solid #556', fontSize: '0.85rem' }}>
+                                🗺 {levelInfo.current}/{levelInfo.total}
+                            </span>
+                        )}
+                        {progreso.total > 0 && (
+                            <div title="Preguntas" style={{ flex: '1 1 90px', minWidth: 70, maxWidth: 220, height: 12, background: 'rgba(255,255,255,0.12)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                <div style={{ width: `${((progreso.n - 1) / progreso.total) * 100}%`, height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f)', transition: 'width 0.4s' }} />
                             </div>
                         )}
-                    </div>
-
-                    {/* 2. BOTÓN PANTALLA COMPLETA (ESQUINA DERECHA SUPERIOR) — no en una mitad de la pantalla dual */}
-                    {!esMitadDual() && <button
-                        onClick={toggleFullScreen}
-                        style={{
-                            position: 'absolute',
-                            top: 20,
-                            right: 20,
-                            zIndex: 2000,
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(255,255,255,0.3)',
-                            color: 'white',
-                            padding: '10px',
-                            borderRadius: '50%',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'background 0.3s'
-                        }}
-                        title="Pantalla Completa"
-                    >
-                        <Maximize size={24} />
-                    </button>}
-                </>
-            )}
-
-            {/* 3. CANVAS (PANTALLA DE JUEGO) */}
-            <canvas ref={canvasRef} style={{
-                backgroundColor: '#87CEEB', // Un color base cielo por si tarda en cargar la imagen
-                borderRadius: 15,
-                maxWidth: '100%',
-                maxHeight: '70vh',
-                border: '4px solid #34495e',
-                boxShadow: '0 0 50px rgba(0,0,0,0.5)',
-                zIndex: 10
-            }} />
-
-            {/* 4. BARRA DE PREGUNTA (AHORA DEBAJO DE LA PANTALLA) */}
-            {gameState !== 'LEVEL_INTRO' && (
-                <div style={{
-                    marginTop: '20px', // Separación del canvas
-                    width: '100%',
-                    maxWidth: '800px', // Mismo ancho que el canvas aprox
-                    display: 'flex',
-                    justifyContent: 'center',
-                    zIndex: 2000
-                }}>
-                    <div style={{
-                        display: 'flex', gap: 15, alignItems: 'center', justifyContent: 'space-between',
-                        background: 'white', padding: '10px 20px', borderRadius: '15px',
-                        color: '#2c3e50', boxShadow: '0 5px 15px rgba(0,0,0,0.2)', fontWeight: 'bold',
-                        width: '100%', borderBottom: '4px solid #bdc3c7'
-                    }}>
-                        {/* PUNTOS */}
-                        <div style={{
-                            background: '#f1c40f', color: '#2c3e50', padding: '5px 15px',
-                            borderRadius: '20px', whiteSpace: 'nowrap', fontSize: '1.2rem',
-                            boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.1)'
-                        }}>
-                            ⭐ {score}
-                        </div>
-                        {/* RELOJ OLÍMPICO */}
-                        {modoOlimpico && (
-                            <div style={{
-                                background: '#e74c3c', color: 'white', padding: '5px 15px',
-                                borderRadius: '20px', whiteSpace: 'nowrap', fontSize: '1.2rem',
-                                boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.1)'
-                            }}>
-                                ⏱ {tiempoRestante}s
-                            </div>
+                        {progreso.total > 0 && <span style={{ color: '#bdc3c7', fontWeight: 700, fontSize: '0.85rem' }}>{progreso.n}/{progreso.total}</span>}
+                        <span style={{ flex: 1 }} />
+                        {modoOlimpico && <span style={{ ...chip, background: '#e74c3c', color: 'white' }}>⏱ {tiempoRestante}s</span>}
+                        <span key={score} style={{ ...chip, background: '#f1c40f', color: '#2c3e50', animation: 'pkLatido 0.35s ease-out' }}>⭐ {score}</span>
+                        {!esMitadDual() && (
+                            <button onClick={toggleFullScreen} title="Pantalla completa" className="pk-icono">
+                                <Maximize size={20} />
+                            </button>
                         )}
-
-                        {/* PREGUNTA TEXTO */}
-                        {preguntaActual && (
-                            <div style={{
-                                flex: 1, minWidth: 0, textAlign: 'center', lineHeight: '1.2',
-                                fontSize: letraAjustada('clamp(14px, 2.5vw, 20px)', preguntaActual, 110, 0.7), // responsivo; más pequeño si es largo
-                                whiteSpace: 'normal',
-                                color: '#333',
-                                padding: '0 10px'
-                            }}>
-                                {preguntaActual}
-                            </div>
-                        )}
-
-                        {/* SALIR (Oculto en Olimpiadas) */}
                         {!modoOlimpico && (
-                            <button onClick={onExit} style={{
-                                background: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '8px',
-                                cursor: 'pointer', display: 'flex', padding: '8px', color: '#c62828'
-                            }} title="Salir del Juego">
-                                <X size={24} />
+                            <button onClick={onExit} title="Salir del juego" className="pk-icono" style={{ background: 'rgba(231,76,60,0.2)', borderColor: 'rgba(231,76,60,0.6)' }}>
+                                <X size={20} />
                             </button>
                         )}
                     </div>
-                </div>
-            )}
+                )}
 
-            {mandosUI}
-            {/* PANTALLAS SUPERPUESTAS (INTRO, GAMEOVER, WIN) */}
-            {/* PANTALLA RANKING (ENCIMA DE TODO) */}
-            {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
-
-            {/* PANTALLAS ESTADO */}
-            {gameState === 'SETUP' && (
-                <PantallaSetup
-                    recurso={recurso}
-                    onStart={iniciarPartida}
-                    onExit={onExit}
-                    onRanking={() => setVerRanking(true)} // Pasamos la función
-                />
-            )}
-
-            {gameState === 'LEVEL_INTRO' && (
-                <div style={overlayStyle}>
-                    <h2 style={{ color: '#2ecc71', fontSize: '2rem', letterSpacing: '5px', textTransform: 'uppercase', marginBottom: 0 }}>PANTALLA {levelInfo.current}</h2>
-                    <h1 style={{ fontSize: '4rem', fontFamily: 'monospace', color: '#f1c40f', textShadow: '4px 4px #c0392b', margin: '20px 0', textAlign: 'center' }}>{levelInfo.name}</h1>
-                    <div style={{ width: '60%', height: '5px', background: '#555', margin: '20px 0', borderRadius: '5px' }}>
-                        <div style={{ width: `${(levelInfo.current / levelInfo.total) * 100}%`, height: '100%', background: '#f1c40f', borderRadius: '5px', transition: 'width 0.5s' }}></div>
+                {/* 2. PREGUNTA */}
+                {gameState !== 'LEVEL_INTRO' && preguntaActual && (
+                    <div key={preguntaActual} className="pk-pregunta" style={{
+                        width: '100%', maxWidth: tamCanvas.w, boxSizing: 'border-box', flexShrink: 0,
+                        background: 'linear-gradient(180deg,#ffffff,#eef2f5)', color: '#2c3e50', borderRadius: 14,
+                        padding: '8px 16px', marginBottom: 8, textAlign: 'center', fontWeight: 800, lineHeight: 1.2,
+                        borderBottom: '4px solid #bdc3c7', boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+                        fontSize: letraAjustada('clamp(16px, 3vw, 26px)', preguntaActual, 110, 0.7),
+                    }}>
+                        {preguntaActual}
                     </div>
-                    <button onClick={startLevelPlaying} style={btnStyle}><Play size={24} /> ¡VAMOS!</button>
+                )}
+
+                {/* 3. CANVAS: ocupa todo el hueco libre manteniendo la proporción */}
+                <div ref={zonaRef} style={{ flex: 1, minHeight: 120, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <canvas ref={canvasRef} width={800} height={400} style={{
+                        width: tamCanvas.w, height: tamCanvas.h, display: 'block',
+                        backgroundColor: '#87CEEB',
+                        borderRadius: 14,
+                        border: '3px solid #34495e',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.55)',
+                        touchAction: 'none',
+                        cursor: gameState === 'PLAYING' ? 'pointer' : 'default',
+                    }} />
                 </div>
-            )}
 
-            {(gameState === 'GAMEOVER' || gameState === 'WIN' || gameState === 'TIMEOUT') && (
-                <div style={overlayStyle}>
-                    {gameState === 'WIN' && <Trophy size={80} color="#f1c40f" style={{ marginBottom: 20 }} />}
-                    {gameState === 'GAMEOVER' && <AlertTriangle size={80} color="#e74c3c" style={{ marginBottom: 20 }} />}
-
-                    <h1 style={{ color: gameState === 'WIN' ? '#f1c40f' : '#e74c3c', fontSize: '3.5rem', fontFamily: 'monospace', textShadow: '3px 3px 0px #fff', margin: 0 }}>
-                        {gameState === 'WIN' ? '¡COMPLETADO!' : gameState === 'TIMEOUT' ? '¡TIEMPO AGOTADO!' : 'GAME OVER'}
-                    </h1>
-
-                    <div style={{ background: '#333', padding: '10px 30px', borderRadius: 10, margin: '20px 0', fontSize: '1.5rem', border: '2px solid #555' }}>
-                        Puntuación: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{score}</span>
+                {gameState === 'PLAYING' && (
+                    <div style={{ color: '#8b98a5', marginTop: 6, fontSize: 13, flexShrink: 0, textAlign: 'center' }}>
+                        🏃 Choca con la respuesta correcta y salta las demás · <b style={{ color: '#c9d4de' }}>{pista}</b>
                     </div>
+                )}
 
-                    {/* --- ZONA DE GUARDADO (SOLO MODO NORMAL) --- */}
-                    {!modoOlimpico ? (
-                        <>
-                            {!yaGuardado ? (
-                                <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px', width: '90%', maxWidth: '350px', marginBottom: '20px' }}>
-                                    {/* ... el código que ya tienes de tu input y guardado ... */}
-                                    {(!usuario || !usuario.email) ? (
-                                        <>
-                                            <p style={{ margin: '0 0 10px 0', color: '#ccc', fontSize: '0.9rem' }}>Introduce tu nombre para el ranking:</p>
-                                            <input value={nombreInvitado} onChange={e => setNombreInvitado(e.target.value)} placeholder="Tu Nombre" maxLength={15} style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '100%', marginBottom: '10px', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box' }} />
-                                        </>
-                                    ) : (
-                                            <p style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '15px' }}>Usuario: {usuario.displayName}</p>
-                                        )}
-                                    <button onClick={guardarPuntuacion} style={{ ...btnStyle, marginTop: 0, background: '#3498db', fontSize: '1rem', padding: '10px' }} disabled={guardando}>
-                                        {guardando ? 'Guardando...' : <><Save size={18} /> Guardar Puntuación</>}
-                                    </button>
-                                </div>
-                            ) : (
-                                    <div style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '20px', fontSize: '1.2rem' }}>✅ ¡Puntuación Guardada!</div>
-                                )}
+                {/* PANTALLA RANKING (ENCIMA DE TODO) */}
+                {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
 
-                            <button onClick={() => setMostrarEnvio(true)} style={{ ...btnStyle, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', marginTop: 10 }}>
-                                📤 Enviar al profesor
-                            </button>
-                            <button onClick={reiniciarJuegoCompleto} style={{ ...btnStyle, background: '#e74c3c' }}><RefreshCw size={24} /> REINICIAR</button>
-                            <button onClick={onExit} style={{ marginTop: 20, background: 'none', border: 'none', color: '#777', cursor: 'pointer' }}>Salir</button>
-                            {mostrarEnvio && (
-                                <ModalEnviarProfe
-                                    datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja: hojaJugada, aciertos: score }}
-                                    onClose={() => setMostrarEnvio(false)}
-                                />
-                            )}
-                        </>
-                    ) : (
-                            <div style={{ color: '#2ecc71', fontWeight: 'bold', marginTop: '20px', fontSize: '1.5rem', animation: 'pulse 1.5s infinite' }}>
-                                Enviando puntos al profesor... 🚀
+                {gameState === 'LEVEL_INTRO' && (
+                    <div style={overlayStyle}>
+                        <div style={centroOverlay}>
+                            <h2 style={{ color: '#2ecc71', fontSize: 'clamp(1.2rem, 3.5vw, 2rem)', letterSpacing: '5px', textTransform: 'uppercase', margin: 0 }}>PANTALLA {levelInfo.current}</h2>
+                            <h1 style={{ fontSize: 'clamp(2rem, 7vw, 4rem)', fontFamily: 'monospace', color: '#f1c40f', textShadow: '4px 4px #c0392b', margin: '16px 0', textAlign: 'center', wordBreak: 'break-word' }}>{levelInfo.name}</h1>
+                            <div style={{ width: '60%', height: '6px', background: '#555', margin: '14px 0', borderRadius: '5px' }}>
+                                <div style={{ width: `${(levelInfo.current / levelInfo.total) * 100}%`, height: '100%', background: '#f1c40f', borderRadius: '5px', transition: 'width 0.5s' }}></div>
+                            </div>
+                            <div className="pk-sprite" style={{ margin: '6px 0 0' }} />
+                            <button onClick={startLevelPlaying} className="pk-btn" style={{ ...btnStyle, maxWidth: 320, marginTop: 18 }}><Play size={24} /> ¡VAMOS!</button>
+                            <div style={{ color: '#95a5a6', marginTop: 12, fontSize: 13, textAlign: 'center' }}>
+                                o pulsa {ladoDual === 0 ? 'W' : ladoDual === 1 ? '↑' : 'Espacio'} / toca la pantalla
+                            </div>
                         </div>
-                        )}
+                    </div>
+                )}
 
-                </div>
-            )}
-           
+                {(gameState === 'GAMEOVER' || gameState === 'WIN' || gameState === 'TIMEOUT') && (
+                    <div style={overlayStyle}>
+                        <div style={centroOverlay}>
+                            {gameState === 'WIN' && <Trophy size={72} color="#f1c40f" style={{ marginBottom: 14, filter: 'drop-shadow(0 0 12px #f1c40f)' }} />}
+                            {gameState === 'GAMEOVER' && <AlertTriangle size={72} color="#e74c3c" style={{ marginBottom: 14 }} />}
 
-            {gameState === 'PLAYING' && <div style={{ color: '#777', marginTop: 10, fontFamily: 'monospace', fontSize: '12px' }}>[ ESPACIO ] o [ CLICK ] para saltar</div>}
-        </div>
+                            <h1 style={{ color: gameState === 'WIN' ? '#f1c40f' : '#e74c3c', fontSize: 'clamp(2rem, 6vw, 3.5rem)', fontFamily: 'monospace', textShadow: '3px 3px 0px #fff', margin: 0, textAlign: 'center' }}>
+                                {gameState === 'WIN' ? '¡COMPLETADO!' : gameState === 'TIMEOUT' ? '¡TIEMPO AGOTADO!' : 'GAME OVER'}
+                            </h1>
+
+                            <div style={{ background: '#333', padding: '10px 30px', borderRadius: 10, margin: '18px 0', fontSize: '1.5rem', border: '2px solid #555' }}>
+                                Puntuación: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{score}</span>
+                            </div>
+
+                            {/* --- ZONA DE GUARDADO (SOLO MODO NORMAL) --- */}
+                            {!modoOlimpico ? (
+                                <>
+                                    {!yaGuardado ? (
+                                        <div style={{ background: 'rgba(255,255,255,0.1)', padding: '18px', borderRadius: '15px', width: '100%', maxWidth: '350px', marginBottom: '14px', boxSizing: 'border-box' }}>
+                                            {(!usuario || !usuario.email) ? (
+                                                <>
+                                                    <p style={{ margin: '0 0 10px 0', color: '#ccc', fontSize: '0.9rem' }}>Introduce tu nombre para el ranking:</p>
+                                                    <input value={nombreInvitado} onChange={e => setNombreInvitado(e.target.value)} placeholder="Tu Nombre" maxLength={15} style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '100%', marginBottom: '10px', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box' }} />
+                                                </>
+                                            ) : (
+                                                <p style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '15px' }}>Usuario: {usuario.displayName}</p>
+                                            )}
+                                            <button onClick={guardarPuntuacion} style={{ ...btnStyle, marginTop: 0, background: '#3498db', boxShadow: '0 5px 0 #2471a3', fontSize: '1rem', padding: '10px' }} disabled={guardando}>
+                                                {guardando ? 'Guardando...' : <><Save size={18} /> Guardar Puntuación</>}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '16px', fontSize: '1.2rem' }}>✅ ¡Puntuación Guardada!</div>
+                                    )}
+
+                                    <div style={{ width: '100%', maxWidth: 350, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        <button onClick={() => setMostrarEnvio(true)} className="pk-btn" style={{ ...btnStyle, marginTop: 0, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>
+                                            📤 Enviar al profesor
+                                        </button>
+                                        <button onClick={reiniciarJuegoCompleto} className="pk-btn" style={{ ...btnStyle, marginTop: 0, background: '#e74c3c', boxShadow: '0 5px 0 #a93226' }}><RefreshCw size={24} /> REINICIAR</button>
+                                    </div>
+                                    <button onClick={onExit} style={{ marginTop: 16, background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '1rem' }}>Salir</button>
+                                    {mostrarEnvio && (
+                                        <ModalEnviarProfe
+                                            datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja: hojaJugada, aciertos: score }}
+                                            onClose={() => setMostrarEnvio(false)}
+                                        />
+                                    )}
+                                </>
+                            ) : (
+                                <div style={{ color: '#2ecc71', fontWeight: 'bold', marginTop: '20px', fontSize: '1.5rem', animation: 'pulse 1.5s infinite' }}>
+                                    Enviando puntos al profesor... 🚀
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
     );
+}
+
+// Estilos comunes de las pantallas de Pikatron
+function EstilosPk() {
+    return <style>{`
+        .pk-root { height: 100vh; height: 100dvh; }
+        .setup-card { background: rgba(30, 44, 58, 0.94); padding: clamp(20px, 4vw, 36px); border-radius: 22px; width: 100%; max-width: 420px; box-sizing: border-box; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.55); display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(255,255,255,0.12); margin: auto; backdrop-filter: blur(4px); }
+        .pk-pregunta { animation: pkPop 0.28s ease-out; }
+        .pk-btn { transition: transform 0.08s, filter 0.15s; }
+        .pk-btn:hover { filter: brightness(1.08); }
+        .pk-btn:active { transform: translateY(3px); }
+        .pk-icono { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+        .pk-icono:hover { background: rgba(255,255,255,0.22); }
+        .pk-sprite { width: 96px; height: 96px; background-image: url(${pikatronImg}); background-size: 200% 200%; background-position: 0 0; background-repeat: no-repeat; animation: pkBob 1.2s ease-in-out infinite; filter: drop-shadow(0 8px 6px rgba(0,0,0,0.4)); }
+        @keyframes pkPop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes pkBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes pkLatido { 0% { transform: scale(1); } 35% { transform: scale(1.25); } 100% { transform: scale(1); } }
+    `}</style>;
+}
+
+function rrPk(ctx, x, y, w, h, r = 6) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
 }
 
 // --- COMPONENTE RANKING ---
@@ -1078,7 +1169,7 @@ function PantallaRanking({ recurso, onBack }) {
     }, [recurso, hoja]); // Se recarga cuando cambias de hoja
 
     return (
-        <div style={{ ...overlayStyle, zIndex: 3000 }}>
+        <div style={{ ...overlayStyle, position: 'fixed', zIndex: 3000 }}>
             <div className="setup-card" style={{ maxWidth: '500px', width: '95%' }}>
                 <h2 style={{ color: '#f1c40f', marginBottom: '15px' }}>🏆 Ranking Top 10</h2>
 
@@ -1198,47 +1289,57 @@ function ModalEnviarProfeBase({ datos, onClose }) {
     );
 }
 
-function PantallaSetup({ recurso, onStart, onExit, onRanking }) {
+function PantallaSetup({ recurso, onStart, onExit, onRanking, ladoDual = null }) {
     const [hoja, setHoja] = useState('General');
     const hojas = recurso.hojas || [];
+    const teclas = ladoDual === 0 ? 'W' : ladoDual === 1 ? '↑' : 'Espacio o ↑';
     return (
-        <div className="setup-card">
-            <h1 style={{ color: '#f1c40f', fontFamily: 'monospace', fontSize: '2.5rem', textShadow: '2px 2px #c0392b', margin: 0 }}>PIKATRON RUN</h1>
-            <h2 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '30px', fontWeight: 'normal' }}>{recurso.titulo}</h2>
-            {hojas.length > 0 && (
-                <div style={{ marginBottom: '20px', textAlign: 'left', width: '100%' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', color: '#ccc', fontWeight: 'bold' }}>Elige Pantalla:</label>
-                    <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', fontSize: '1rem', background: 'white', color: '#333' }}>
-                        <option value="General">Mezcla General</option>
-                        {hojas.map(h => <option key={h.nombreHoja} value={h.nombreHoja}>{h.nombreHoja}</option>)}
-                    </select>
+        <div className="pk-root" style={{
+            width: '100%', display: 'flex', overflowY: 'auto', boxSizing: 'border-box', padding: 16,
+            background: `linear-gradient(rgba(10,16,28,0.55), rgba(10,16,28,0.88)), url(${bg1}) center / cover no-repeat, #1b2631`,
+            fontFamily: "'Segoe UI', system-ui, sans-serif",
+        }}>
+            <EstilosPk />
+            <div className="setup-card">
+                <div className="pk-sprite" />
+                <h1 style={{ color: '#f1c40f', fontFamily: 'monospace', fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', textShadow: '3px 3px #c0392b', margin: '8px 0 0' }}>PIKATRON RUN</h1>
+                <h2 style={{ color: 'white', fontSize: '1.1rem', margin: '6px 0 16px', fontWeight: 'normal', wordBreak: 'break-word' }}>{recurso.titulo}</h2>
+
+                <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 14px', color: '#d5dde5', fontSize: '0.88rem', lineHeight: 1.5, marginBottom: 18, width: '100%', boxSizing: 'border-box' }}>
+                    🏃 <b>Choca</b> con la caja de la respuesta correcta y <b>salta</b> las incorrectas.<br />
+                    Saltar: <b>{teclas}</b>, clic o toque en la pantalla.
                 </div>
-            )}
 
+                {hojas.length > 0 && (
+                    <div style={{ marginBottom: '18px', textAlign: 'left', width: '100%' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', color: '#ccc', fontWeight: 'bold' }}>Elige pantalla:</label>
+                        <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', fontSize: '1rem', background: 'white', color: '#333', cursor: 'pointer' }}>
+                            <option value="General">Mezcla General</option>
+                            {hojas.map(h => <option key={h.nombreHoja} value={h.nombreHoja}>{h.nombreHoja}</option>)}
+                        </select>
+                    </div>
+                )}
 
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+                    <button onClick={() => onStart('SIMPLE', hoja)} className="pk-btn" style={{ ...btnStyle, marginTop: 0, background: '#3498db', boxShadow: '0 5px 0 #2471a3' }}><Play size={20} /> JUGAR NIVEL</button>
+                    {hojas.length > 1 && (
+                        <button onClick={() => onStart('RETO')} className="pk-btn" style={{ ...btnStyle, marginTop: 0, background: '#e74c3c', boxShadow: '0 5px 0 #a93226' }}><Map size={20} /> MODO RETO (todas las pantallas)</button>
+                    )}
+                    <button onClick={onRanking} className="pk-btn" style={{ ...btnStyle, marginTop: 0, background: '#8e44ad', boxShadow: '0 5px 0 #6c3483' }}>
+                        <Trophy size={20} /> VER RANKING
+                    </button>
+                    <BotonPantallaDual recurso={recurso} modo="PIKATRON" style={{ marginBottom: 0, borderRadius: 50 }} />
+                </div>
 
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
-                <button onClick={() => onStart('SIMPLE', hoja)} style={{ ...btnStyle, marginTop: 0, background: '#3498db', boxShadow: '0 5px 0 #2980b9' }}><Play size={20} /> JUGAR NIVEL</button>
-                <button onClick={() => onStart('RETO')} style={{ ...btnStyle, marginTop: 0, background: '#e74c3c', boxShadow: '0 5px 0 #c0392b', border: '2px solid white' }}><Map size={20} /> MODO RETO (Todas)</button>
-                {/* --- BOTÓN RANKING --- */}
-                <button onClick={onRanking} style={{ ...btnStyle, marginTop: 0, background: '#8e44ad', boxShadow: '0 5px 0 #6c3483' }}>
-                    <Trophy size={20} /> VER RANKING
-                </button>
-                <BotonPantallaDual recurso={recurso} modo="PIKATRON" style={{ marginBottom: 0, borderRadius: 10 }} />
-
-
-
+                {ladoDual === null && (
+                    <button onClick={onExit} style={{ marginTop: '24px', background: 'none', border: '1px solid #667', padding: '10px 22px', color: '#aab', borderRadius: '20px', cursor: 'pointer' }}>Volver</button>
+                )}
             </div>
-
-
-
-
-            <button onClick={onExit} style={{ marginTop: '30px', background: 'none', border: '1px solid #555', padding: '10px 20px', color: '#777', borderRadius: '20px', cursor: 'pointer' }}>Volver</button>
-            <style>{`.setup-card { background: rgba(44, 62, 80, 0.95); padding: 40px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; alignItems: center; border: 1px solid rgba(255,255,255,0.1); }`}</style>
         </div>
     );
 }
 
-const overlayStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', zIndex: 2000 };
-const btnStyle = { padding: '15px 30px', fontSize: '1.2rem', background: '#2ecc71', color: 'white', border: 'none', borderRadius: 50, cursor: 'pointer', display: 'flex', gap: 10, marginTop: 30, fontWeight: 'bold', boxShadow: '0 5px 0 #27ae60', transition: 'transform 0.1s', alignItems: 'center', justifyContent: 'center', width: '100%' };
+const overlayStyle = { position: 'absolute', inset: 0, background: 'rgba(8,12,18,0.94)', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'white', zIndex: 2000, overflowY: 'auto', padding: 20, boxSizing: 'border-box' };
+// Centrado que no corta la parte de arriba cuando el contenido no cabe (se desplaza)
+const centroOverlay = { margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: 520 };
+const btnStyle = { padding: '14px 26px', fontSize: '1.15rem', background: '#2ecc71', color: 'white', border: 'none', borderRadius: 50, cursor: 'pointer', display: 'flex', gap: 10, marginTop: 30, fontWeight: 'bold', boxShadow: '0 5px 0 #27ae60', alignItems: 'center', justifyContent: 'center', width: '100%' };

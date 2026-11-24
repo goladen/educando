@@ -8,7 +8,7 @@ import ANATOMIA         from '../anatomia_avanzada_dataset.json';
 import { CompeticionCuerda } from './TironCuerdaEscena';
 import { useMandoPregunta, LetraMando } from './MandosCuerda';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
-import { leerRetoUrl } from '../utils/retoLink';
+import { leerRetoUrl, textoEnvioCompeticion } from '../utils/retoLink';
 import BotonFichas from './BotonFichas';
 import { validarNombre } from '../utils/filtroNombres';
 const VisorCuerpo = lazy(() => import('../anatomia/VisorCuerpo'));
@@ -1076,7 +1076,7 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             <button onClick={() => setModalEnviar(true)}
               style={{ background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : color, border:'none', color:'#fff', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>
-              {esRetoCompeticion ? '🏆 Enviar a la competición' : '📤 Enviar al Profesor'}
+              {esRetoCompeticion ? textoEnvioCompeticion() : '📤 Enviar al Profesor'}
             </button>
             <button onClick={iniciarTest} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#f1f5f9', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:600, fontSize:'0.95rem' }}>
               🔄 Repetir

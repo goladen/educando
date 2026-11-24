@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { crearSesionCorrector, escucharCorrector, actualizarCorrector, cerrarCorrector, textoARespuestas } from './escanerCorrector.js';
 import { puntuar } from './omr.js';
+import { estadosEscritas, textosLeidos } from './escritas.js';
 
 export default function useSesionMovil({ cfg, clave, modo, onHoja, onClave }) {
   const [codigo, setCodigo] = useState('');
@@ -21,7 +22,7 @@ export default function useSesionMovil({ cfg, clave, modo, onHoja, onClave }) {
     setCreando(true);
     setError('');
     try {
-      setCodigo(await crearSesionCorrector({ nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, modo }));
+      setCodigo(await crearSesionCorrector({ nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, nEscritas: cfg.nEscritas || 0, letras: cfg.letras || 8, modo }));
     } catch {
       setError('No se pudo crear la sesión. ¿Hay conexión a internet?');
     }
@@ -41,16 +42,17 @@ export default function useSesionMovil({ cfg, clave, modo, onHoja, onClave }) {
       for (const [id, h] of nuevas) {
         vistas.current.add(id);
         const respuestas = textoARespuestas(h.r).slice(0, c.nPreguntas);
+        const escritas = (Array.isArray(h.e) ? h.e : []).map((c) => ({ c: String(c || ''), img: null }));
         if (h.modo === 'clave') {
-          alClave(respuestas.map((x) => (x === '*' ? '' : x)));
+          alClave(respuestas.map((x) => (x === '*' ? '' : x)), escritas.length ? textosLeidos(escritas) : null);
           setRecibidas((p) => [{ id, clave: true }, ...p].slice(0, 8));
           continue;
         }
         if (!h.lista) continue;
-        const r = { lista: h.lista, respuestas, dudosas: Array.isArray(h.d) ? h.d : [] };
+        const r = { lista: h.lista, respuestas, dudosas: Array.isArray(h.d) ? h.d : [], escritas };
         alHoja(r);
-        const p = puntuar(respuestas, k, { penalizacion: c.penalizacion });
-        const resumen = { lista: h.lista, nota: p.nota, aciertos: p.aciertos, fallos: p.fallos, blancos: p.blancos };
+        const p = puntuar(respuestas, k, { penalizacion: c.penalizacion, escritas: estadosEscritas(r, c) });
+        const resumen = { lista: h.lista, nota: p.nota, aciertos: p.aciertos, fallos: p.fallos, blancos: p.blancos, pendientes: p.pendientes };
         notas[`notas.${id}`] = resumen;
         setRecibidas((prev) => [{ id, ...resumen, dudosas: r.dudosas }, ...prev].slice(0, 8));
       }
@@ -62,8 +64,8 @@ export default function useSesionMovil({ cfg, clave, modo, onHoja, onClave }) {
 
   // El móvil necesita saber cuántas preguntas/opciones leer y si está leyendo la clave
   useEffect(() => {
-    if (codigo) actualizarCorrector(codigo, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, modo });
-  }, [codigo, cfg.nPreguntas, cfg.nOpciones, modo]);
+    if (codigo) actualizarCorrector(codigo, { nPreguntas: cfg.nPreguntas, nOpciones: cfg.nOpciones, nEscritas: cfg.nEscritas || 0, letras: cfg.letras || 8, modo });
+  }, [codigo, cfg.nPreguntas, cfg.nOpciones, cfg.nEscritas, cfg.letras, modo]);
 
   // Al cerrar el Corrector se borra la sesión
   const codigoRef = useRef('');

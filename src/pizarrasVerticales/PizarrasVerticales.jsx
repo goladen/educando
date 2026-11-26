@@ -2,7 +2,7 @@
 // Banco de problemas para aulas de pensamiento, por sentidos matemáticos (marco ARCOMAT / LOMLOE),
 // con instrucciones para el profesor, modo proyector, formación de grupos aleatorios,
 // registro de sesiones y problemas propios del profesor (guardados en el dispositivo).
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { TEMAS, NIVELES, HEURISTICAS, PROBLEMAS, GUIA_METODO, SESION_TIPO } from './problemas';
 import FiguraProblema from './FigurasProblema';
 import GruposPizarras from './GruposPizarras';
@@ -11,6 +11,7 @@ import ModalSimulador from './SimuladoresProblema';
 import CanguroPizarras from './CanguroPizarras';
 import { createPortal } from 'react-dom';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
+const MensekiGame = lazy(() => import('../components/MathWorld/Menseki/MensekiGame'));
 
 const LS_MIOS = 'pv_mis_problemas_v1';
 const LS_GRUPOS = 'pv_ultimos_grupos_v1';
@@ -490,7 +491,7 @@ export default function PizarrasVerticales({ onExit, usuario = null }) {
     };
 
     const pestanas = [
-        ['lista', '📚 Problemas'], ['guia', '🧱 Guía del método'], ['juegos', '🎲 Juegos, retos y acertijos'], ['canguro', '🦘 Canguro 2026'], ['grupos', '👥 Formar grupos'],
+        ['lista', '📚 Problemas'], ['guia', '🧱 Guía del método'], ['juegos', '🎲 Juegos, retos y acertijos'], ['canguro', '🦘 Canguro 2026'], ['menseki', '📐 Menseki (áreas)'], ['grupos', '👥 Formar grupos'],
     ];
 
     return (
@@ -602,6 +603,7 @@ export default function PizarrasVerticales({ onExit, usuario = null }) {
                 {vista === 'guia' && <VistaGuia />}
                 {vista === 'juegos' && <JuegosMagia usuario={usuario} />}
                 {vista === 'canguro' && <CanguroPizarras />}
+                {vista === 'menseki' && <Suspense fallback={<div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>Cargando…</div>}><MensekiGame embebido /></Suspense>}
                 {vista === 'grupos' && <GruposPizarras grupos={grupos} setGrupos={setGrupos} />}
                 {vista === 'editor' && (
                     <EditorProblema

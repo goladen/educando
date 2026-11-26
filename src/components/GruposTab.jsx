@@ -607,6 +607,29 @@ const normalizarGrupo = (grupo) => {
 // ─── Números con coma o punto decimal ("7,5" o "7.5") ──────────────────────────
 const aNum = (v) => parseFloat(String(v ?? '').trim().replace(',', '.'));
 
+// ── Calificación del boletín (In/Suf/Bi/Not/Sob) con intervalos por grupo ──
+// Se guardan los mínimos de cada nivel; por debajo de Suf = In.
+const CALIF_DEF = { activa: true, Suf: 5, Bi: 6, Not: 7, Sob: 9 };
+const CALIF_NIVELES = [
+    { k: 'In',  color: '#c62828', bg: '#ffebee' },
+    { k: 'Suf', color: '#ef6c00', bg: '#fff3e0' },
+    { k: 'Bi',  color: '#b28704', bg: '#fffde7' },
+    { k: 'Not', color: '#2e7d32', bg: '#e8f5e9' },
+    { k: 'Sob', color: '#1565C0', bg: '#e3f2fd' },
+];
+const califDe = (nota, cfg) => {
+    const n = aNum(nota);
+    if (isNaN(n)) return null;
+    const c = { ...CALIF_DEF, ...(cfg || {}) };
+    const k = n >= c.Sob ? 'Sob' : n >= c.Not ? 'Not' : n >= c.Bi ? 'Bi' : n >= c.Suf ? 'Suf' : 'In';
+    return CALIF_NIVELES.find(x => x.k === k);
+};
+function BadgeCalif({ nota, cfg }) {
+    const c = califDe(nota, cfg);
+    if (!c) return null;
+    return <span style={{ marginLeft:6, padding:'1px 6px', borderRadius:6, fontSize:'0.72rem', fontWeight:700, color:c.color, background:c.bg, border:`1px solid ${c.color}55` }}>{c.k}</span>;
+}
+
 // ─── TablaGrupo ───────────────────────────────────────────────────────────────
 function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const gNorm = normalizarGrupo(grupo);
@@ -626,6 +649,8 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const [modalAgrupacion,   setModalAgrupacion]   = useState(false);
     const [modalInforme,      setModalInforme]      = useState(false);
     const [obsInforme,        setObsInforme]        = useState(grupo.observacionesInforme || {});
+    const [calif,             setCalif]             = useState({ ...CALIF_DEF, ...(grupo.calificacion || {}) });
+    const [editCalif,         setEditCalif]         = useState(null); // borrador {Suf,Bi,Not,Sob} como texto
 
     const hoja     = hojas[hojaIdx] || hojas[0];
     const columnas = hoja?.columnas || [];
@@ -641,6 +666,68 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
         setHojas(prev => prev.map((h, i) => i === hojaIdx
             ? { ...h, celdas: { ...h.celdas, [celdaKey(aId, cId)]: val } } : h));
         setIsDirty(true);
+    };
+
+    // ── Rellenar arrastrando (como en las hojas de cálculo) ───────────────────
+    // Celda activa = última celda enfocada; su tirador (cuadradito) se arrastra
+    // hacia arriba/abajo en la misma columna y copia el valor en las demás.
+    const [celdaActiva, setCeldaActiva] = useState(null);   // { fila, colId }
+    const [arrastre,    setArrastre]    = useState(null);   // { colId, desde, hasta }
+    const arrastreRef = useRef(null);
+
+    const rellenarColumna = (colId, desde, hasta) => {
+        const origen = alumnos[desde];
+        if (!origen || desde === hasta) return;
+        const val = getCelda(origen.id, colId);
+        const [a, b] = desde < hasta ? [desde, hasta] : [hasta, desde];
+        setHojas(prev => prev.map((h, i) => {
+            if (i !== hojaIdx) return h;
+            const celdas = { ...h.celdas };
+            for (let f = a; f <= b; f++) {
+                if (f !== desde && alumnos[f]) celdas[celdaKey(alumnos[f].id, colId)] = val;
+            }
+            return { ...h, celdas };
+        }));
+        setIsDirty(true);
+    };
+
+    const empezarArrastre = (e, fila, colId) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const st = { colId, desde: fila, hasta: fila };
+        arrastreRef.current = st;
+        setArrastre(st);
+        const mover = (ev) => {
+            const td = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('td[data-fila]');
+            const cur = arrastreRef.current;
+            if (!td || !cur || td.dataset.col !== cur.colId) return;
+            const f = Number(td.dataset.fila);
+            if (f !== cur.hasta) {
+                arrastreRef.current = { ...cur, hasta: f };
+                setArrastre(arrastreRef.current);
+            }
+        };
+        const soltar = () => {
+            window.removeEventListener('pointermove', mover);
+            window.removeEventListener('pointerup', soltar);
+            window.removeEventListener('pointercancel', soltar);
+            const cur = arrastreRef.current;
+            arrastreRef.current = null;
+            setArrastre(null);
+            if (cur) {
+                rellenarColumna(cur.colId, cur.desde, cur.hasta);
+                setCeldaActiva({ fila: cur.hasta, colId: cur.colId });
+            }
+        };
+        window.addEventListener('pointermove', mover);
+        window.addEventListener('pointerup', soltar);
+        window.addEventListener('pointercancel', soltar);
+    };
+
+    const enRangoArrastre = (fila, colId) => {
+        if (!arrastre || arrastre.colId !== colId) return false;
+        const [a, b] = arrastre.desde < arrastre.hasta ? [arrastre.desde, arrastre.hasta] : [arrastre.hasta, arrastre.desde];
+        return fila >= a && fila <= b;
     };
 
     // Encuentra la columna con num dado en cualquier hoja
@@ -765,6 +852,22 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
         } catch (e) { console.error('Error al guardar visibilidad:', e); }
     }, [grupo.id]);
 
+    // ── Calificación (In/Suf/Bi/Not/Sob): se guarda al momento en el grupo ──
+    const guardarCalif = async (nuevo) => {
+        setCalif(nuevo);
+        grupo.calificacion = nuevo; // la lista del padre no se recarga: así se conserva al cambiar de grupo y volver
+        try { await updateDoc(doc(db, 'grupos_profesor', grupo.id), { calificacion: nuevo }); }
+        catch (e) { console.error('Error al guardar la calificación:', e); }
+    };
+    const aplicarEditCalif = () => {
+        const v = {};
+        for (const k of ['Suf', 'Bi', 'Not', 'Sob']) v[k] = aNum(editCalif[k]);
+        if (Object.values(v).some(x => isNaN(x))) { alert('Escribe un número en cada nivel.'); return; }
+        if (!(v.Suf < v.Bi && v.Bi < v.Not && v.Not < v.Sob)) { alert('Los mínimos deben ir de menor a mayor: Suf < Bi < Not < Sob.'); return; }
+        guardarCalif({ ...calif, ...v });
+        setEditCalif(null);
+    };
+
     // ── Operaciones de columna ────────────────────────────────────────────────
     const updateColumnas = (fn, autoSave = false) => {
         setHojas(prev => {
@@ -881,13 +984,14 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const exportar = () => {
         const wb = XLSX.utils.book_new();
         hojas.forEach(h => {
-            const cab = ['Nombre', 'Grupo', ...h.columnas.map(c => `[${c.num}] ${c.header}`), 'Nota Final'];
+            const cab = ['Nombre', 'Grupo', ...h.columnas.map(c => `[${c.num}] ${c.header}`), 'Nota Final', ...(calif.activa ? ['Calificación'] : [])];
             const filas = alumnos.map(a => [
                 a.nombre, a.grupo,
                 ...h.columnas.map(c => c.esFormula
                     ? evaluarFormula(c.formula || '', a.id)
                     : getCeldaEnHoja(h, a.id, c.id)),
-                notaFinalEnHoja(h, a.id)
+                notaFinalEnHoja(h, a.id),
+                ...(calif.activa ? [califDe(notaFinalEnHoja(h, a.id), calif)?.k || ''] : [])
             ]);
             const mediaH = (vals) => {
                 const v = vals.map(aNum).filter(x => !isNaN(x));
@@ -1153,6 +1257,37 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                 </div>
             </div>
 
+            {editCalif && (
+                <div style={{ background:'#f5f9ff', border:'1px solid #bbdefb', borderRadius:12, padding:'12px 14px', marginBottom:12 }}>
+                    <div style={{ fontWeight:700, color:'#1565C0', marginBottom:4 }}>Calificación del boletín · {grupo.nombre}</div>
+                    <div style={{ fontSize:'0.78rem', color:'#555', marginBottom:10 }}>Nota mínima de cada nivel (por debajo de Suf es <b>In</b>). Se aplica solo a este grupo.</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:12, alignItems:'center' }}>
+                        <span style={{ fontSize:'0.8rem', fontWeight:700, color:'#c62828' }}>In &lt; Suf</span>
+                        {['Suf', 'Bi', 'Not', 'Sob'].map(k => {
+                            const n = CALIF_NIVELES.find(x => x.k === k);
+                            return (
+                                <label key={k} style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.8rem', fontWeight:700, color:n.color }}>
+                                    {k} ≥
+                                    <input value={editCalif[k]} inputMode="decimal"
+                                        onChange={e => { const val = e.target.value; setEditCalif(p => ({ ...p, [k]: val })); }}
+                                        onKeyDown={e => { if (e.key === 'Enter') aplicarEditCalif(); }}
+                                        style={{ width:52, padding:'4px 6px', borderRadius:6, border:`1px solid ${n.color}88`, textAlign:'center', fontFamily:'inherit' }}/>
+                                </label>
+                            );
+                        })}
+                        <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.8rem', color:'#555' }}>
+                            <input type="checkbox" checked={calif.activa !== false} onChange={e => guardarCalif({ ...calif, activa: e.target.checked })}/>
+                            Mostrar junto a la nota final
+                        </label>
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:10 }}>
+                        <button onClick={aplicarEditCalif} style={bt.primary}>Guardar intervalos</button>
+                        <button onClick={() => setEditCalif({ Suf:'5', Bi:'6', Not:'7', Sob:'9' })} style={bt.secondary}>Por defecto (5 · 6 · 7 · 9)</button>
+                        <button onClick={() => setEditCalif(null)} style={bt.secondary}>Cerrar</button>
+                    </div>
+                </div>
+            )}
+
             {/* Tabla */}
             <div style={{ overflowX:'auto', borderRadius:12, boxShadow:'0 2px 10px rgba(0,0,0,0.08)' }}>
                 <table style={{ borderCollapse:'collapse', fontSize:'0.83rem', minWidth:300 }}>
@@ -1183,6 +1318,11 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                                 {hayPorcentajes && (
                                     <div style={{ fontSize:'0.62rem', opacity:0.8, fontWeight:400 }}>ponderada</div>
                                 )}
+                                <button onClick={() => setEditCalif(editCalif ? null : { Suf: String(calif.Suf), Bi: String(calif.Bi), Not: String(calif.Not), Sob: String(calif.Sob) })}
+                                    title="Configurar In / Suf / Bi / Not / Sob de este grupo"
+                                    style={{ display:'block', margin:'4px auto 0', border:'none', borderRadius:5, cursor:'pointer', color:'white', background:'rgba(255,255,255,0.2)', fontSize:'0.6rem', padding:'2px 6px', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                                    ⚙ In·Suf·Bi·Not·Sob
+                                </button>
                             </th>
                         </tr>
                     </thead>
@@ -1230,22 +1370,38 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                                             );
                                         }
                                         const mejora = col.recuperaDe && recupMejora(a.id, col);
+                                        const activa = !arrastre && celdaActiva?.fila === i && celdaActiva?.colId === col.id;
+                                        const enRango = enRangoArrastre(i, col.id);
                                         return (
-                                            <td key={col.id} style={tt.tdEdit}>
+                                            <td key={col.id} data-fila={i} data-col={col.id}
+                                                style={{ ...tt.tdEdit, position:'relative',
+                                                    ...(enRango ? { background:'#e3f2fd', outline:'2px dashed #1565C0', outlineOffset:-2 } : {}) }}>
                                                 <input
                                                     value={getCelda(a.id, col.id)}
                                                     onChange={e => setCelda(a.id, col.id, e.target.value)}
+                                                    onFocus={() => setCeldaActiva({ fila: i, colId: col.id })}
                                                     inputMode="decimal"
                                                     title={mejora ? 'Esta recuperación mejora la nota del examen: es la que cuenta' : undefined}
                                                     style={mejora ? { ...tt.cellInput, background:'#e8f5e9', color:'#2e7d32', fontWeight:700 } : tt.cellInput}
                                                 />
+                                                {activa && (
+                                                    <div
+                                                        onPointerDown={e => empezarArrastre(e, i, col.id)}
+                                                        onDoubleClick={() => rellenarColumna(col.id, i, alumnos.length - 1)}
+                                                        title="Arrastra para copiar este valor en otras filas (doble clic: hasta el final)"
+                                                        style={tt.tirador}
+                                                    />
+                                                )}
                                             </td>
                                         );
                                     })}
                                     <td style={tt.tdMedia}>
                                         {nf === '' ? '—' : (
-                                            <span style={{ fontWeight:700, color: parseFloat(nf)>=5 ? '#27ae60' : '#e74c3c' }}>
-                                                {nf}
+                                            <span style={{ whiteSpace:'nowrap' }}>
+                                                <span style={{ fontWeight:700, color: parseFloat(nf)>=calif.Suf ? '#27ae60' : '#e74c3c' }}>
+                                                    {nf}
+                                                </span>
+                                                {calif.activa && <BadgeCalif nota={nf} cfg={calif}/>}
                                             </span>
                                         )}
                                     </td>
@@ -1272,6 +1428,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                             )}
                             <td style={{ ...tt.tdMedia, color:'#1565C0', fontWeight:700 }}>
                                 {notaFinalMedia() || '—'}
+                                {calif.activa && <BadgeCalif nota={notaFinalMedia()} cfg={calif}/>}
                             </td>
                         </tr>
 
@@ -1587,6 +1744,7 @@ const tt = {
     formulaInput:{ width:'90%', fontSize:'0.68rem', padding:'3px 5px', borderRadius:4, border:'1px solid rgba(243,156,18,0.7)', background:'rgba(0,0,0,0.25)', color:'white', outline:'none', textAlign:'center', marginBottom:2, display:'block', margin:'0 auto 4px' },
     tdFijo:      { padding:'7px 12px', borderBottom:'1px solid #f0f0f0', color:'#2c3e50', fontWeight:500, whiteSpace:'nowrap' },
     tdEdit:      { padding:'3px 4px', borderBottom:'1px solid #f0f0f0' },
+    tirador:     { position:'absolute', right:1, bottom:1, width:9, height:9, background:'#1565C0', border:'1.5px solid white', borderRadius:2, cursor:'crosshair', touchAction:'none', zIndex:2, boxShadow:'0 0 0 1px #1565C0' },
     tdMedia:     { padding:'7px 8px', borderBottom:'1px solid #f0f0f0', textAlign:'center', fontSize:'0.85rem', color:'#555' },
     tdOculto:    { minWidth:24, maxWidth:24, width:24, padding:0, borderBottom:'1px solid #f0f0f0', background:'#f4f6f8' },
     cellInput:   { width:'100%', border:'none', borderRadius:4, padding:'5px 7px', fontSize:'0.83rem', textAlign:'center', background:'transparent', outline:'none', boxSizing:'border-box', color:'#2c3e50', fontFamily:'inherit' },

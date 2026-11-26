@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <defs>
+    <radialGradient id="cito" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#fff3e6"/>
+      <stop offset="1" stop-color="#fbd9c0"/>
+    </radialGradient>
+    <radialGradient id="nucleo" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#d7c6f2"/>
+      <stop offset="1" stop-color="#a98bd9"/>
+    </radialGradient>
+    <g id="mito">
+      <ellipse rx="46" ry="23" fill="#f0896b" stroke="#a93a26" stroke-width="3"/>
+      <path d="M-34 0 L-26 -13 L-18 12 L-10 -13 L-2 12 L6 -13 L14 12 L22 -13 L30 0" fill="none" stroke="#a93a26" stroke-width="2.5" stroke-linejoin="round"/>
+    </g>
+  </defs>
+  <rect width="1000" height="700" fill="#f6f9fc"/>
+
+  <!-- Membrana plasmática + citoplasma -->
+  <path d="M500 130 C640 125 750 220 752 350 C754 480 650 590 500 592 C350 594 250 490 248 355 C246 220 360 135 500 130 Z" fill="url(#cito)" stroke="#c0546b" stroke-width="7"/>
+
+  <!-- Retículo endoplasmático (rugoso) alrededor del núcleo -->
+  <g fill="none" stroke="#5dade2" stroke-width="7" stroke-linecap="round">
+    <path d="M402.5 259.6 A105 105 0 0 0 402.5 420.4"/>
+    <path d="M390.9 245.8 A123 123 0 0 0 390.9 434.2"/>
+    <path d="M379.4 232 A141 141 0 0 0 379.4 448"/>
+  </g>
+  <g fill="#2c3e50">
+    <circle cx="366" cy="300" r="2.6"/><circle cx="362" cy="330" r="2.6"/><circle cx="363" cy="360" r="2.6"/><circle cx="368" cy="390" r="2.6"/>
+    <circle cx="348" cy="290" r="2.6"/><circle cx="342" cy="320" r="2.6"/><circle cx="341" cy="352" r="2.6"/><circle cx="345" cy="385" r="2.6"/><circle cx="355" cy="412" r="2.6"/>
+    <circle cx="336" cy="270" r="2.6"/><circle cx="326" cy="305" r="2.6"/><circle cx="322" cy="340" r="2.6"/><circle cx="325" cy="378" r="2.6"/><circle cx="335" cy="414" r="2.6"/>
+  </g>
+
+  <!-- Núcleo con envoltura y nucléolo -->
+  <circle cx="470" cy="340" r="85" fill="url(#nucleo)" stroke="#5b3f8c" stroke-width="5"/>
+  <circle cx="470" cy="340" r="78" fill="none" stroke="#5b3f8c" stroke-width="1.5" stroke-dasharray="10 8"/>
+  <g fill="#7d5fb2" opacity="0.55">
+    <path d="M430 300 q10 -8 20 0 t20 0" fill="none" stroke="#7d5fb2" stroke-width="3"/>
+    <path d="M440 380 q10 -8 20 0 t20 0 t20 0" fill="none" stroke="#7d5fb2" stroke-width="3"/>
+    <path d="M520 360 q6 -8 12 0 t12 0" fill="none" stroke="#7d5fb2" stroke-width="3"/>
+  </g>
+  <circle cx="490" cy="325" r="28" fill="#4a2d86"/>
+
+  <!-- Aparato de Golgi (sacos apilados) -->
+  <g fill="none" stroke="#e3a21a" stroke-width="10" stroke-linecap="round">
+    <path d="M600 405 Q640 385 680 405"/>
+    <path d="M596 425 Q640 403 684 425"/>
+    <path d="M598 445 Q640 423 682 445"/>
+    <path d="M604 465 Q640 445 676 465"/>
+  </g>
+  <g fill="#f5c55a" stroke="#c98a10" stroke-width="2">
+    <circle cx="696" cy="420" r="7"/><circle cx="692" cy="452" r="6"/><circle cx="586" cy="438" r="6"/>
+  </g>
+
+  <!-- Mitocondrias -->
+  <use href="#mito" transform="translate(650 255) rotate(35)"/>
+  <use href="#mito" transform="translate(360 200) rotate(-25)"/>
+  <use href="#mito" transform="translate(560 520) rotate(-15)"/>
+
+  <!-- Centriolos (dos cilindros perpendiculares) -->
+  <g stroke="#34495e" stroke-width="2">
+    <rect x="522" y="182" width="40" height="16" rx="4" fill="#7f8c8d"/>
+    <line x1="530" y1="182" x2="530" y2="198"/><line x1="538" y1="182" x2="538" y2="198"/><line x1="546" y1="182" x2="546" y2="198"/><line x1="554" y1="182" x2="554" y2="198"/>
+    <rect x="566" y="168" width="16" height="40" rx="4" fill="#95a5a6"/>
+    <line x1="566" y1="176" x2="582" y2="176"/><line x1="566" y1="184" x2="582" y2="184"/><line x1="566" y1="192" x2="582" y2="192"/><line x1="566" y1="200" x2="582" y2="200"/>
+  </g>
+
+  <!-- Lisosoma -->
+  <circle cx="705" cy="350" r="19" fill="#8fdba6" stroke="#239b56" stroke-width="3"/>
+  <g fill="#1e8449"><circle cx="699" cy="345" r="2.5"/><circle cx="710" cy="347" r="2.5"/><circle cx="703" cy="357" r="2.5"/><circle cx="712" cy="356" r="2"/></g>
+
+  <!-- Vacuola pequeña -->
+  <circle cx="612" cy="350" r="14" fill="#d6eaf8" stroke="#5d8fb5" stroke-width="2"/>
+
+  <!-- Ribosomas libres -->
+  <g fill="#2c3e50">
+    <circle cx="440" cy="530" r="4"/><circle cx="452" cy="522" r="3.5"/><circle cx="428" cy="522" r="3.5"/><circle cx="446" cy="542" r="3.5"/><circle cx="432" cy="540" r="3.5"/>
+    <circle cx="300" cy="400" r="3"/><circle cx="620" cy="300" r="3"/><circle cx="680" cy="500" r="3"/><circle cx="520" cy="560" r="3"/><circle cx="420" cy="170" r="3"/><circle cx="700" cy="300" r="3"/>
+  </g>
+</svg>

@@ -1,0 +1,340 @@
+// Laboratorio 3D de Física y Química: experimentos sencillos y llamativos
+// adaptados del libro «100 experimentos sencillos de Física y Química»
+// (aula virtual del CEIP Pinéirino). Cada experimento tiene su escena 3D en
+// escenas.js con la misma clave `id`; los `pasos` se animan uno a uno en la
+// escena (el paso 0 es el montaje inicial) y salen en la ficha PDF.
+//
+// Campos: id, titulo, area ('Química' | 'Física'), emoji, color, concepto,
+// nivel, duracion, objetivo, materiales[], seguridad (opcional), pasos[{ t }],
+// prediccion { pregunta, opciones[], ok, porQue }, explicacion[] (párrafos),
+// preguntas[] (para la ficha), pagina (del libro), controles[] (deslizadores
+// opcionales que la escena lee: { k, label, min, max, paso, defecto, unidad, desdePaso }).
+
+export const FUENTE_LIBRO = '«100 experimentos sencillos de Física y Química» (aula virtual CEIP Pinéirino)';
+export const URL_LIBRO = 'https://centros.edu.xunta.gal/ceippineirino/aulavirtual/file.php/41/LIBRO_Experimentos_sencillos_de_fisica_y_quimica.pdf';
+
+export const EXPERIMENTOS = [
+    // ───────────────────────────── QUÍMICA ─────────────────────────────
+    {
+        id: 'extintor', titulo: '¿Cómo funciona un extintor?', area: 'Química', emoji: '🧯', color: '#ef4444',
+        concepto: 'Reacción ácido-base y combustión', nivel: '1.º-2.º ESO', duracion: '15 min', pagina: 5,
+        objetivo: 'Fabricar dióxido de carbono con bicarbonato y vinagre y usarlo para apagar una vela, como hace un extintor.',
+        materiales: ['Botella pequeña de agua (seca)', '4 cucharaditas de bicarbonato de sodio', 'Una servilleta de papel e hilo de coser', '5 cucharadas de vinagre', 'Tapón de corcho perforado o plastilina', 'Una pajita', 'Una vela y cerillas (con un adulto)'],
+        seguridad: 'Enciende la vela con ayuda de un adulto y mantén el pelo y el papel lejos de la llama.',
+        pasos: [
+            { t: 'Pon el bicarbonato en la servilleta y átala con hilo formando una bolsita. Echa el vinagre en la botella y cuelga la bolsita dentro sin que toque el vinagre (deja el hilo por fuera). Tapa con el corcho o la plastilina atravesados por la pajita.' },
+            { t: 'Tapa la pajita con el dedo y agita la botella para que la bolsita caiga en el vinagre. Verás muchas burbujas: se está formando un gas.' },
+            { t: 'Quita el dedo y dirige la pajita hacia la llama de la vela encendida, un poco por encima.' },
+            { t: 'Observa la llama: el gas que sale de la botella la rodea y la vela se apaga.' },
+        ],
+        prediccion: { pregunta: '¿Qué crees que le pasará a la llama cuando le llegue el gas?', opciones: ['Se hará más grande', 'Se apagará', 'Cambiará de color', 'No pasará nada'], ok: 1, porQue: 'El gas es dióxido de carbono (CO₂): no deja que la vela reciba oxígeno.' },
+        explicacion: [
+            'El bicarbonato (una base) reacciona con el vinagre (un ácido débil) y forma dióxido de carbono, CO₂, que llena la botella y sale por la pajita.',
+            'El CO₂ es más pesado que el aire, así que baja y rodea la llama desplazando el oxígeno. Sin oxígeno no hay combustión y la vela se apaga. Los extintores de CO₂ funcionan igual.',
+            'Reacción: NaHCO₃ + CH₃COOH → CH₃COONa + H₂O + CO₂↑',
+        ],
+        preguntas: ['¿Qué gas se forma en la reacción?', '¿Por qué el gas «cae» sobre la vela en vez de subir?', '¿Qué tres cosas necesita un fuego para mantenerse (triángulo del fuego)?'],
+    },
+    {
+        id: 'cohete', titulo: 'Lanzacohetes de vinagre', area: 'Química', emoji: '🚀', color: '#f97316',
+        concepto: 'Gases y presión producidos por una reacción', nivel: '1.º-2.º ESO', duracion: '15 min', pagina: 10,
+        objetivo: 'Comprobar que el gas que produce una reacción química puede aumentar tanto la presión que lance un corcho por los aires.',
+        materiales: ['Una botella y un corcho que la tape bien', 'Cintas de papel de colores y chinchetas', '½ taza de agua y ½ taza de vinagre', '1 cucharadita de bicarbonato de sodio', 'Un trozo de papel absorbente de 10 × 10 cm'],
+        seguridad: 'Hazlo en un sitio con el techo alto y nunca apuntes la botella hacia nadie. Ponte gafas.',
+        pasos: [
+            { t: 'Decora el corcho con las cintas sujetas con chinchetas. Echa el agua y el vinagre en la botella y déjala en el suelo.' },
+            { t: 'Pon el bicarbonato en el papel absorbente y enróllalo bien para que quede dentro. Déjalo caer al fondo de la botella.' },
+            { t: 'Coloca el corcho tan fuerte como puedas y apártate.' },
+            { t: 'El papel se moja y el bicarbonato reacciona con el vinagre: se forman burbujas de gas y la presión dentro de la botella aumenta.' },
+            { t: '¡Despegue! Cuando la presión es suficiente, el corcho sale disparado hacia arriba.' },
+        ],
+        prediccion: { pregunta: 'Si pusieras el doble de bicarbonato y de vinagre, ¿qué pasaría?', opciones: ['El corcho no saldría', 'Saldría antes y con más fuerza', 'Saldría igual', 'La botella se congelaría'], ok: 1, porQue: 'Más reactivos producen más gas: la presión sube antes y más.' },
+        explicacion: [
+            'El vinagre (ácido acético) y el bicarbonato reaccionan y producen dióxido de carbono. El gas ocupa mucho más volumen que los reactivos.',
+            'Como la botella está cerrada, el gas se va acumulando y la presión aumenta. Cuando la fuerza del gas sobre el corcho supera el rozamiento que lo sujeta, el corcho sale despedido.',
+            'Es el mismo principio de acción y reacción de los cohetes: el gas empuja el corcho hacia arriba y la botella hacia abajo.',
+        ],
+        preguntas: ['¿Por qué tiene que estar bien cerrada la botella?', '¿Qué fuerza sujeta el corcho antes de salir?', 'Propón un cambio para que el corcho llegue más alto.'],
+    },
+    {
+        id: 'capas', titulo: 'Líquidos en capas', area: 'Química', emoji: '🌈', color: '#eab308',
+        concepto: 'Densidad y líquidos inmiscibles', nivel: '1.º-2.º ESO', duracion: '10 min', pagina: 9,
+        objetivo: 'Ordenar varios líquidos por su densidad y ver que algunos no se mezclan aunque los agitemos.',
+        materiales: ['Una botella de plástico transparente con tapa', 'Agua', 'Aceite', 'Glicerina (opcional, de farmacia)', 'Colorante alimentario líquido'],
+        pasos: [
+            { t: 'Vierte el agua en la botella y observa dónde se queda.' },
+            { t: 'Añade el aceite despacio: se queda flotando encima del agua.' },
+            { t: 'Añade la glicerina: atraviesa el aceite y el agua y se queda en el fondo.' },
+            { t: 'Echa unas gotas de colorante: bajan por el aceite sin teñirlo y se disuelven en el agua.' },
+            { t: 'Cierra la botella, agítala con fuerza y déjala reposar: poco a poco las capas vuelven a separarse.' },
+        ],
+        prediccion: { pregunta: '¿Qué líquido quedará arriba del todo?', opciones: ['El agua', 'El aceite', 'La glicerina', 'Se mezclan todos'], ok: 1, porQue: 'El aceite es el menos denso (≈ 0,92 g/cm³).' },
+        explicacion: [
+            'Cada líquido tiene una densidad distinta: glicerina ≈ 1,26 g/cm³, agua 1,00 g/cm³ y aceite ≈ 0,92 g/cm³. El más denso se va al fondo y el menos denso queda arriba.',
+            'El aceite no se mezcla con el agua porque sus moléculas no se atraen entre sí (el agua es polar y el aceite no). Por eso, aunque agitemos, acaban separándose.',
+            'El colorante es soluble en agua y no en grasa: por eso atraviesa el aceite y tiñe solo el agua.',
+        ],
+        preguntas: ['Ordena los tres líquidos de más a menos denso.', '¿Por qué el colorante no tiñe el aceite?', 'Si echas un trozo de uva, ¿dónde crees que se quedará? Compruébalo.'],
+    },
+    {
+        id: 'lombarda', titulo: 'Indicador de col lombarda', area: 'Química', emoji: '🥬', color: '#a855f7',
+        concepto: 'Ácidos, bases e indicadores de pH', nivel: '2.º-4.º ESO', duracion: '1 h (con la cocción)', pagina: 41,
+        objetivo: 'Fabricar un indicador casero que cambia de color según la sustancia sea ácida, neutra o básica.',
+        materiales: ['Col lombarda y agua', 'Cazuela y fuego (con un adulto)', 'Colador, embudo y papel de filtro', 'Frasco y cuentagotas', 'Vasos con sustancias de prueba: vinagre, zumo de limón, agua, bicarbonato disuelto, detergente…'],
+        seguridad: 'No pruebes las sustancias. La lejía y el amoniaco solo los manipula el profesor, con guantes y gafas.',
+        pasos: [
+            { t: 'Cuece la col lombarda en agua unos 45 minutos (como cualquier verdura). El agua se vuelve morada.' },
+            { t: 'Separa la verdura con el colador y filtra el caldo morado al frasco con el embudo y el papel de filtro.' },
+            { t: 'Echa unas gotas del caldo en el vinagre y en el zumo de limón: se vuelven rojos o rosas.' },
+            { t: 'Echa caldo en el agua: se queda morado.' },
+            { t: 'Echa caldo en el bicarbonato y en el detergente: se vuelven azul verdoso o verdes.' },
+        ],
+        prediccion: { pregunta: '¿De qué color crees que se pondrá el caldo al echarlo en vinagre?', opciones: ['Rojo o rosa', 'Verde', 'Seguirá morado', 'Transparente'], ok: 0, porQue: 'El vinagre es ácido y en medio ácido la lombarda se vuelve roja.' },
+        explicacion: [
+            'La lombarda contiene unos pigmentos (antocianinas) que actúan como indicadores ácido-base: cambian de color según el pH del medio.',
+            'En medio ácido (pH < 7) se vuelve roja, en medio neutro (pH ≈ 7) es morada y en medio básico (pH > 7) se vuelve azul verdosa, verde y hasta amarilla si es muy básico.',
+            'El pH va de 0 (muy ácido) a 14 (muy básico). El cambio es reversible: si añades vinagre a un vaso verde, vuelve a ponerse rojo.',
+        ],
+        preguntas: ['Clasifica las sustancias en ácidas, neutras y básicas según el color.', '¿Qué es el pH?', '¿Qué pasará si añades vinagre al vaso que se ha puesto verde?'],
+    },
+    {
+        id: 'huevoTransparente', titulo: 'Un huevo transparente', area: 'Química', emoji: '🥚', color: '#f59e0b',
+        concepto: 'Reacción de un ácido con un carbonato', nivel: '1.º-3.º ESO', duracion: '2-3 días', pagina: 58,
+        objetivo: 'Ver el interior de un huevo sin romperlo, disolviendo su cáscara con vinagre.',
+        materiales: ['Un vaso grande', 'Un huevo crudo', 'Vinagre (mejor de vino blanco)'],
+        pasos: [
+            { t: 'Mete el huevo con cuidado en el vaso.' },
+            { t: 'Cúbrelo de vinagre. Enseguida aparecen burbujas pegadas a la cáscara.' },
+            { t: 'Espera unos días. Cambia el vinagre cuando se enturbie. La cáscara va desapareciendo.' },
+            { t: 'Saca el huevo: ya no tiene cáscara, es blando y translúcido y se ven la clara y la yema a través de la membrana.' },
+        ],
+        prediccion: { pregunta: '¿Qué gas forman las burbujas que salen de la cáscara?', opciones: ['Oxígeno', 'Hidrógeno', 'Dióxido de carbono', 'Vapor de agua'], ok: 2, porQue: 'El carbonato de calcio de la cáscara reacciona con el ácido y desprende CO₂.' },
+        explicacion: [
+            'La cáscara está hecha sobre todo de carbonato de calcio (CaCO₃). El ácido acético del vinagre reacciona con él: se forma una sal de calcio que se disuelve, agua y dióxido de carbono (las burbujas).',
+            'La fina membrana que hay bajo la cáscara resiste el ácido, así que el huevo queda entero, blando y translúcido.',
+            'Lo mismo pasa con un hueso de pollo: en vinagre pierde el calcio y se vuelve flexible.',
+        ],
+        preguntas: ['¿De qué sustancia está hecha la cáscara del huevo?', '¿Por qué hay que cambiar el vinagre?', '¿Qué le pasaría a un hueso de pollo en vinagre?'],
+    },
+    {
+        id: 'tintaLimon', titulo: 'Tinta invisible de limón', area: 'Química', emoji: '🍋', color: '#ca8a04',
+        concepto: 'Cambio químico por el calor', nivel: '5.º Primaria-2.º ESO', duracion: '20 min', pagina: 34,
+        objetivo: 'Escribir un mensaje secreto con zumo de limón y hacerlo aparecer con calor.',
+        materiales: ['Un folio', 'Zumo de limón', 'Un pincel o bastoncillo', 'Una fuente de calor: bombilla de incandescencia, plancha o vela (con un adulto)'],
+        seguridad: 'Acerca el papel al calor a una distancia prudente para que no arda. Mejor una plancha o una bombilla que una llama.',
+        pasos: [
+            { t: 'Exprime el limón en un vaso.' },
+            { t: 'Moja el pincel en el zumo y escribe tu mensaje en el papel.' },
+            { t: 'Deja secar el papel: las letras se vuelven invisibles.' },
+            { t: 'Acerca el papel al calor, sin que llegue a quemarse, y muévelo despacio: las letras aparecen de color marrón.' },
+        ],
+        prediccion: { pregunta: '¿Qué crees que pasará al calentar el papel?', opciones: ['Se borrará el papel', 'Las letras aparecerán en marrón', 'Las letras se volverán azules', 'No pasará nada'], ok: 1, porQue: 'El zumo seco se quema antes que el papel y deja marcas oscuras.' },
+        explicacion: [
+            'El zumo de limón contiene ácido cítrico y azúcares que, al secarse, son casi invisibles sobre el papel.',
+            'Con el calor, esas sustancias se descomponen y se carbonizan a menor temperatura que el papel, así que las letras se oscurecen antes de que el papel arda. Es un cambio químico: no se puede deshacer.',
+            'Otra forma de revelar el mensaje es pasar un algodón con caldo de lombarda: las letras ácidas salen de otro color.',
+        ],
+        preguntas: ['¿Es un cambio físico o químico? Justifícalo.', '¿Por qué no se quema el papel?', '¿Qué otros líquidos podrían servir como tinta invisible?'],
+    },
+    {
+        id: 'cromatografia', titulo: '¿Qué hay en una tinta? (cromatografía)', area: 'Química', emoji: '🖍️', color: '#0ea5e9',
+        concepto: 'Separación de mezclas: cromatografía', nivel: '1.º-3.º ESO', duracion: '20 min', pagina: 120,
+        objetivo: 'Separar los pigmentos que forman una tinta negra usando papel y alcohol.',
+        materiales: ['Una tira de papel de filtro de cafetera (4 cm de ancho)', 'Rotuladores de distintos colores (sobre todo negro)', 'Un vaso', 'Un poco de alcohol', 'Un bolígrafo y cinta adhesiva'],
+        seguridad: 'El alcohol es inflamable: lejos de cualquier llama.',
+        pasos: [
+            { t: 'Recorta una tira de papel algo más larga que el vaso y dibuja una mancha intensa de rotulador negro a unos 2 cm de un extremo.' },
+            { t: 'Echa alcohol en el vaso hasta 1 cm de altura. Enrolla el otro extremo de la tira en un bolígrafo y cuélgala de modo que la punta toque el alcohol pero la mancha quede por encima.' },
+            { t: 'Observa cómo el alcohol sube por el papel.' },
+            { t: 'Al llegar a la mancha, arrastra los pigmentos: cada color sube a distinta velocidad y aparecen franjas de colores.' },
+        ],
+        prediccion: { pregunta: '¿Qué crees que pasará con la mancha negra?', opciones: ['Se quedará igual', 'Se separará en varios colores', 'Desaparecerá', 'Se volverá blanca'], ok: 1, porQue: 'La tinta negra es una mezcla de pigmentos de varios colores.' },
+        explicacion: [
+            'La tinta negra es una mezcla de varios pigmentos. La cromatografía separa los componentes de una mezcla porque cada uno se mueve a distinta velocidad por un medio poroso (el papel) arrastrado por un disolvente (el alcohol).',
+            'Los pigmentos que se disuelven mejor en el alcohol y se pegan menos al papel suben más; los otros se quedan más abajo.',
+            'Biólogos, médicos y químicos usan esta técnica para separar e identificar sustancias.',
+        ],
+        preguntas: ['¿Qué pigmentos has encontrado en la tinta negra?', '¿Por qué la mancha no debe tocar el alcohol?', 'Repite con otro rotulador y compara.'],
+    },
+    {
+        id: 'huevoFrito', titulo: 'Un huevo frito en frío', area: 'Química', emoji: '🍳', color: '#facc15',
+        concepto: 'Desnaturalización de proteínas', nivel: '3.º-4.º ESO', duracion: '1 h', pagina: 22,
+        objetivo: 'Ver cómo un huevo se «fríe» sin fuego, aceite ni sartén.',
+        materiales: ['Un plato', 'Un huevo crudo', 'Alcohol de farmacia'],
+        seguridad: 'El alcohol es inflamable: lejos de cualquier llama. No se come.',
+        pasos: [
+            { t: 'Casca el huevo sobre el plato.' },
+            { t: 'Rocíalo con alcohol hasta cubrir la clara.' },
+            { t: 'Espera: casi enseguida la clara empieza a ponerse blanca alrededor de la yema.' },
+            { t: 'Al cabo de una hora la clara está blanca y sólida, como un huevo frito. La yema sigue líquida debajo.' },
+        ],
+        prediccion: { pregunta: '¿Qué le pasará a la clara al echarle alcohol?', opciones: ['Se disolverá', 'Se volverá blanca y sólida', 'Se pondrá verde', 'Nada'], ok: 1, porQue: 'El alcohol cambia la forma de las proteínas igual que el calor.' },
+        explicacion: [
+            'La clara es agua con proteínas (sobre todo ovoalbúmina) enrolladas de una forma concreta. Al freír un huevo, el calor cambia esa estructura: es la desnaturalización.',
+            'El alcohol (etanol) también desnaturaliza las proteínas: las desenrolla y las une entre sí, y la clara pasa de transparente y líquida a blanca y sólida.',
+            'Si primero batimos el huevo, obtenemos algo parecido a un huevo revuelto con la forma del recipiente.',
+        ],
+        preguntas: ['¿Qué es la desnaturalización de una proteína?', 'Nombra dos cosas que pueden desnaturalizar las proteínas.', '¿Es un cambio reversible?'],
+    },
+
+    // ───────────────────────────── FÍSICA ─────────────────────────────
+    {
+        id: 'huevoBotella', titulo: 'El huevo y la botella', area: 'Física', emoji: '🍾', color: '#22c55e',
+        concepto: 'Presión atmosférica', nivel: '2.º-4.º ESO', duracion: '10 min', pagina: 82,
+        objetivo: 'Conseguir que un huevo cocido entre en una botella cuya boca es más estrecha que el huevo.',
+        materiales: ['Un frasco o botella de vidrio con la boca un poco más estrecha que el huevo', 'Un huevo duro sin cáscara', 'Algodón (con un poco de alcohol)', 'Pinzas metálicas y cerillas (con un adulto)'],
+        seguridad: 'Lo enciende un adulto. Usa pinzas y no acerques la cara a la boca de la botella.',
+        pasos: [
+            { t: 'Comprueba que el huevo no cabe por la boca del frasco: se queda apoyado encima.' },
+            { t: 'Con las pinzas, enciende el algodón y mételo rápidamente en el frasco.' },
+            { t: 'Coloca enseguida el huevo en la boca, bien ajustado. La llama se apaga al poco tiempo.' },
+            { t: 'El aire de dentro se enfría y su presión baja: la presión atmosférica de fuera empuja el huevo.' },
+            { t: 'El huevo se estira, pasa por el cuello y cae dentro del frasco.' },
+        ],
+        prediccion: { pregunta: '¿Qué crees que hará el huevo cuando se apague la llama?', opciones: ['Saltará hacia arriba', 'Se quedará quieto', 'Entrará en la botella', 'Se romperá en dos'], ok: 2, porQue: 'Dentro la presión es menor que fuera, y el aire de fuera lo empuja hacia dentro.' },
+        explicacion: [
+            'La combustión calienta el aire del frasco y parte de él sale. Al tapar con el huevo y apagarse la llama, el aire de dentro se enfría y su presión baja.',
+            'Fuera, la presión atmosférica sigue siendo la misma (unos 101 300 Pa). La diferencia de presiones produce una fuerza que empuja el huevo hacia dentro; como el huevo cocido es elástico, se estrecha y pasa.',
+            'Para sacarlo, pon el frasco boca abajo y sopla dentro: así aumenta la presión interior.',
+        ],
+        preguntas: ['¿Dónde es mayor la presión al final, dentro o fuera del frasco?', '¿Por qué es necesario que el borde del frasco no tenga grietas?', '¿Cómo sacarías el huevo sin romperlo?'],
+    },
+    {
+        id: 'botellaAplasta', titulo: 'La botella se autoaplasta', area: 'Física', emoji: '🧴', color: '#14b8a6',
+        concepto: 'Presión atmosférica y temperatura de los gases', nivel: '2.º-4.º ESO', duracion: '10 min', pagina: 84,
+        objetivo: 'Hacer que una botella de plástico se aplaste sola gracias a la presión del aire.',
+        materiales: ['Una botella de plástico con su tapón (sin agujeros)', 'Agua caliente (casi hirviendo, la calienta un adulto)', 'Un cazo y un fuego', 'Agua fría o hielo (opcional, para acelerar)'],
+        seguridad: 'El agua caliente quema: la vierte un adulto y se usa embudo y guantes.',
+        pasos: [
+            { t: 'Calienta agua en el cazo hasta casi hervir.' },
+            { t: 'Vierte el agua caliente en la botella y déjala dentro un par de minutos.' },
+            { t: 'Vacía el agua y cierra la botella enseguida con su tapón.' },
+            { t: 'Espera (o enfríala bajo el grifo): el aire de dentro se enfría y la botella se va aplastando sola.' },
+        ],
+        prediccion: { pregunta: '¿Qué le pasará a la botella cerrada al enfriarse?', opciones: ['Se hinchará', 'Se aplastará', 'Explotará', 'Nada'], ok: 1, porQue: 'Al enfriarse, la presión del aire de dentro baja y la de fuera la aplasta.' },
+        explicacion: [
+            'El agua caliente calienta el plástico y el aire de la botella. Al cerrarla, dentro queda aire caliente.',
+            'Cuando ese aire se enfría, su presión disminuye (a volumen constante, la presión de un gas es proporcional a su temperatura: ley de Gay-Lussac). La presión atmosférica de fuera es mayor y aplasta la botella.',
+            'Con una botella de vidrio no se aplastaría, pero costaría abrir el tapón: habríamos hecho un envase «al vacío».',
+        ],
+        preguntas: ['¿Qué ley relaciona la presión y la temperatura de un gas?', '¿Por qué hay que cerrar la botella enseguida?', '¿Qué pasaría con una botella de vidrio?'],
+    },
+    {
+        id: 'ludion', titulo: 'El ludión o diablillo de Descartes', area: 'Física', emoji: '🧪', color: '#3b82f6',
+        concepto: 'Principio de Pascal y flotación', nivel: '2.º-4.º ESO', duracion: '15 min', pagina: 123,
+        objetivo: 'Construir un «buzo» que baja y sube dentro de una botella con solo apretarla.',
+        materiales: ['Una botella de plástico transparente de 1,5 L con tapón', 'La carcasa transparente de un bolígrafo', 'Lastre: trozos de alambre o plastilina', 'Cinta adhesiva y agua'],
+        controles: [{ k: 'apretar', label: '✋ Aprieta la botella', min: 0, max: 100, paso: 1, defecto: 0, unidad: '%', desdePaso: 2 }],
+        pasos: [
+            { t: 'Tapa el agujero lateral de la carcasa con cinta y mete el lastre dentro. Debe flotar casi sumergida, con aire dentro.' },
+            { t: 'Llena la botella de agua hasta arriba, mete el ludión y cierra el tapón: el ludión flota arriba.' },
+            { t: 'Aprieta la botella: el aire de dentro del ludión se comprime, entra agua y el ludión baja hasta el fondo.' },
+            { t: 'Deja de apretar: el aire recupera su volumen, sale el agua y el ludión vuelve a subir. Prueba con el deslizador.' },
+        ],
+        prediccion: { pregunta: '¿Qué hará el ludión al apretar la botella?', opciones: ['Subirá', 'Bajará', 'Girará', 'Saldrá por el tapón'], ok: 1, porQue: 'La presión comprime el aire del ludión, entra agua y pesa más que el empuje.' },
+        explicacion: [
+            'Al apretar la botella aumentamos la presión del agua, y esa presión se transmite por igual a todo el líquido (principio de Pascal), también al aire atrapado en el ludión.',
+            'El aire se comprime, entra un poco de agua en la carcasa y el ludión se vuelve más denso que el agua: su peso supera al empuje y se hunde.',
+            'Al dejar de apretar, el aire se expande, expulsa el agua y el empuje vuelve a ser mayor que el peso. Así funcionan los submarinos con sus tanques de lastre.',
+        ],
+        preguntas: ['Enuncia el principio de Pascal.', '¿Por qué baja el ludión al apretar?', '¿Qué hacen los submarinos para subir y bajar?'],
+    },
+    {
+        id: 'flota', titulo: '¿Flota o se hunde?', area: 'Física', emoji: '🧂', color: '#06b6d4',
+        concepto: 'Densidad y principio de Arquímedes', nivel: '1.º-3.º ESO', duracion: '15 min', pagina: 121,
+        objetivo: 'Conseguir que un huevo se hunda, flote o quede «entre dos aguas» cambiando la cantidad de sal del agua.',
+        materiales: ['3 vasos grandes', 'Un huevo', 'Agua', 'Sal (unos 70 g por cada 200 cm³) y una cuchara'],
+        controles: [{ k: 'sal', label: '🧂 Sal en el tercer vaso', min: 0, max: 350, paso: 5, defecto: 45, unidad: 'g/L', desdePaso: 4 }],
+        pasos: [
+            { t: 'Llena dos vasos con agua.' },
+            { t: 'Añade sal poco a poco a uno de ellos y remueve hasta disolver todo lo que puedas.' },
+            { t: 'Pon el huevo en el vaso que solo tiene agua: se va al fondo.' },
+            { t: 'Ponlo ahora en el vaso con sal: queda flotando.' },
+            { t: 'En el tercer vaso, con el huevo cubierto de agua, añade agua salada hasta que quede entre dos aguas. Añade agua o agua salada con el deslizador y mira qué pasa.' },
+        ],
+        prediccion: { pregunta: '¿Qué pasará con el huevo en el agua con mucha sal?', opciones: ['Se hundirá más rápido', 'Flotará', 'Se disolverá', 'Se quedará en el fondo igual'], ok: 1, porQue: 'El agua salada es más densa y empuja más hacia arriba.' },
+        explicacion: [
+            'Sobre el huevo actúan dos fuerzas: su peso, hacia abajo, y el empuje del agua, hacia arriba. Si el peso es mayor, se hunde; si es menor, flota; si son iguales, queda entre dos aguas.',
+            'El empuje depende de la densidad del líquido, del volumen sumergido y de la gravedad (E = ρ · V · g). Al disolver sal, el agua se vuelve más densa que el huevo (≈ 1,03 g/cm³) y el empuje supera al peso.',
+            'Por eso es más fácil flotar en el mar que en una piscina o un río.',
+        ],
+        preguntas: ['Escribe la fórmula del empuje y explica cada letra.', '¿Por qué flotamos mejor en el mar?', '¿Qué densidad tiene el agua cuando el huevo queda entre dos aguas?'],
+    },
+    {
+        id: 'moneda', titulo: 'Una moneda que aparece', area: 'Física', emoji: '🪙', color: '#d97706',
+        concepto: 'Refracción de la luz', nivel: '2.º-4.º ESO', duracion: '5 min', pagina: 122,
+        objetivo: 'Hacer aparecer una moneda escondida tras el borde de un recipiente solo con echar agua.',
+        materiales: ['Una moneda', 'Una taza o vaso opaco', 'Agua'],
+        pasos: [
+            { t: 'Pon la moneda en el fondo de la taza vacía. Mírala: la luz que sale de la moneda llega en línea recta a tu ojo.' },
+            { t: 'Baja la cabeza despacio hasta que el borde de la taza tape la moneda y ya no la veas. No muevas la cabeza.' },
+            { t: 'Pide a alguien que llene la taza de agua despacio, sin mover la moneda.' },
+            { t: '¡La moneda vuelve a aparecer! Parece que está más arriba de donde realmente está.' },
+        ],
+        prediccion: { pregunta: 'Sin mover la cabeza, ¿qué pasará al llenar la taza de agua?', opciones: ['Seguirás sin verla', 'Volverás a ver la moneda', 'La moneda flotará', 'La moneda cambiará de color'], ok: 1, porQue: 'La luz se desvía al pasar del agua al aire y llega a tu ojo por encima del borde.' },
+        explicacion: [
+            'La luz viaja más despacio en el agua que en el aire. Cuando un rayo pasa de un medio a otro con un ángulo, cambia de dirección: es la refracción.',
+            'Al salir del agua, el rayo que viene de la moneda se aleja de la vertical y consigue pasar por encima del borde hasta tu ojo. El cerebro interpreta que la luz viene en línea recta, por eso ves la moneda más arriba (imagen virtual).',
+            'Por eso un lápiz en un vaso de agua parece roto y las piscinas parecen menos profundas.',
+        ],
+        preguntas: ['¿Qué es la refracción?', '¿Por qué la piscina parece menos profunda de lo que es?', 'Dibuja el rayo que va de la moneda a tu ojo con y sin agua.'],
+    },
+    {
+        id: 'peine', titulo: 'El agua y el peine', area: 'Física', emoji: '⚡', color: '#8b5cf6',
+        concepto: 'Electricidad estática e inducción', nivel: '2.º-4.º ESO', duracion: '5 min', pagina: 73,
+        objetivo: 'Desviar un chorro de agua sin tocarlo, con un peine cargado.',
+        materiales: ['Un peine de plástico', 'Una prenda de lana (o tu pelo limpio y seco)', 'Un grifo'],
+        pasos: [
+            { t: 'Abre el grifo para que salga un chorrito fino pero continuo.' },
+            { t: 'Frota el peine con fuerza y rapidez en la prenda de lana.' },
+            { t: 'Acerca el peine al chorro sin tocarlo: el chorro se curva hacia el peine.' },
+        ],
+        prediccion: { pregunta: '¿Qué hará el chorro al acercarle el peine frotado?', opciones: ['Se alejará', 'Se acercará al peine', 'Se cortará', 'Nada'], ok: 1, porQue: 'El peine cargado atrae las cargas de signo contrario del agua.' },
+        explicacion: [
+            'Al frotar, pasan electrones de la lana al peine: el peine queda cargado negativamente y la lana positivamente (electrización por frotamiento).',
+            'El agua es neutra, pero sus moléculas tienen un lado algo positivo y otro algo negativo. Al acercar el peine, se orientan y el lado positivo queda más cerca del peine (inducción): por eso el chorro es atraído.',
+            'Del mismo modo, un globo frotado atrae trocitos de papel o se pega a la pared.',
+        ],
+        preguntas: ['¿Qué carga adquiere el peine al frotarlo con lana?', '¿Por qué se atrae el agua si es neutra?', 'Pon otros ejemplos de electricidad estática.'],
+    },
+    {
+        id: 'aguja', titulo: 'El acero macizo flota', area: 'Física', emoji: '📍', color: '#64748b',
+        concepto: 'Tensión superficial', nivel: '1.º-3.º ESO', duracion: '10 min', pagina: 72,
+        objetivo: 'Conseguir que una aguja de acero, ocho veces más densa que el agua, flote.',
+        materiales: ['Un recipiente con agua', 'Un trocito de papel de filtro o de cocina', 'Un alfiler o aguja de acero', 'Un palillo', 'Unas gotas de jabón (para el final)'],
+        pasos: [
+            { t: 'Pon un trocito de papel de filtro sobre el agua.' },
+            { t: 'Deja el alfiler encima del papel con cuidado.' },
+            { t: 'Con el palillo, hunde poco a poco los bordes del papel hasta que se moje y se separe del alfiler.' },
+            { t: 'El alfiler queda flotando sobre la «piel» del agua. Fíjate en el pequeño hundimiento de la superficie.' },
+            { t: 'Echa una gota de jabón en el agua: la tensión superficial disminuye y el alfiler se hunde.' },
+        ],
+        prediccion: { pregunta: '¿Qué pasará con el alfiler cuando el papel se hunda?', opciones: ['Se hundirá con el papel', 'Se quedará flotando', 'Se disolverá', 'Saltará fuera'], ok: 1, porQue: 'La tensión superficial del agua lo sostiene como una cama elástica.' },
+        explicacion: [
+            'Las moléculas de agua de la superficie se atraen mucho entre sí y forman una especie de película elástica: es la tensión superficial.',
+            'Aunque el acero es casi ocho veces más denso que el agua, el alfiler no rompe esa «piel» si se coloca con cuidado. No es el empuje de Arquímedes lo que lo sostiene, sino la tensión superficial.',
+            'El jabón rompe la tensión superficial y el alfiler se hunde. Gracias a ella, los zapateros (insectos) caminan sobre el agua.',
+        ],
+        preguntas: ['¿Qué es la tensión superficial?', '¿Por qué se hunde el alfiler al echar jabón?', 'Nombra un animal que aprovecha la tensión superficial.'],
+    },
+    {
+        id: 'huevoCrudo', titulo: '¿Huevo crudo o cocido?', area: 'Física', emoji: '🌀', color: '#ec4899',
+        concepto: 'Inercia y rotación', nivel: '2.º-4.º ESO', duracion: '5 min', pagina: 94,
+        objetivo: 'Descubrir sin romperlos cuál de dos huevos está crudo y cuál cocido.',
+        materiales: ['Una mesa lisa', 'Dos huevos: uno crudo y otro cocido'],
+        pasos: [
+            { t: 'Pon los dos huevos tumbados sobre la mesa.' },
+            { t: 'Hazlos girar con las manos. Uno gira de forma rápida y uniforme; el otro gira lento y bailando.' },
+            { t: 'Mientras giran, tócalos un instante con el dedo y suéltalos: uno se para del todo y el otro vuelve a girar un poco.' },
+        ],
+        prediccion: { pregunta: '¿Cuál crees que gira de forma más rápida y uniforme?', opciones: ['El crudo', 'El cocido', 'Los dos igual', 'Ninguno gira'], ok: 1, porQue: 'El cocido es un sólido rígido; en el crudo el líquido de dentro frena el giro.' },
+        explicacion: [
+            'El huevo cocido es un sólido rígido: todo él gira a la vez, de forma rápida y uniforme.',
+            'En el huevo crudo, la clara y la yema son líquidas. Por inercia, el líquido tarda en empezar a girar y frena la cáscara, así que el giro es lento e irregular.',
+            'Al pararlo con el dedo, el cocido se detiene, pero en el crudo el líquido sigue girando por inercia y vuelve a poner en marcha la cáscara al soltarla.',
+        ],
+        preguntas: ['¿Qué es la inercia?', 'Explica por qué el crudo vuelve a girar al soltarlo.', '¿Qué sentiste en un autobús que frena de golpe? Relaciónalo con la inercia.'],
+    },
+];
+
+export const experimentoPorId = (id) => EXPERIMENTOS.find((e) => e.id === id) || null;

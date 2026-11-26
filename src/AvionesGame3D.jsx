@@ -12,6 +12,8 @@ import { categoriasDeRecurso, conOpcionesParaElegir, barajar } from './utils/nor
 import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
 import { crearVuelo, COLORES_OPCION } from './aviones/motorVuelo';
 import HojasRecurso, { filtrarHojas, textoHojas } from './components/HojasRecurso';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 
 // ─── Pilota el avión (three.js) ──────────────────────────────────────────────
 // Despega, sigue el circuito de aros, responde pasando por el aro de la respuesta
@@ -41,6 +43,7 @@ function PantallaPrevia({ onIniciar, onSalir }) {
     const [cargando, setCargando] = useState(true);
     const [sel, setSel] = useState(null);
     const [filtro, setFiltro] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     useEffect(() => {
         (async () => {
             try {
@@ -52,7 +55,9 @@ function PantallaPrevia({ onIniciar, onSalir }) {
         })();
     }, []);
     const hojas = sel?.hojas?.map(h => h.nombreHoja).filter(Boolean) || [];
-    const lista = recursos.filter(r => !filtro || `${r.titulo} ${r.temas || ''} ${r.ciclo || ''}`.toLowerCase().includes(filtro.toLowerCase()));
+    const filtrados = recursos.filter(r => !filtro || `${r.titulo} ${r.temas || ''} ${r.ciclo || ''}`.toLowerCase().includes(filtro.toLowerCase()));
+    // La opción especial del juego siempre la primera; el resto, en el orden elegido
+    const lista = [...filtrados.filter(r => r.soloAros), ...ordenarRecursos(filtrados.filter(r => !(r.soloAros)), orden)];
     return (
         <div style={{ ...fondo, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px' }}>
             <div style={{ width: '100%', maxWidth: 900, display: 'flex' }}><button onClick={onSalir} style={{ ...boton('rgba(255,255,255,0.12)'), padding: '8px 14px', fontSize: '0.85rem' }}>← Salir</button></div>
@@ -60,6 +65,7 @@ function PantallaPrevia({ onIniciar, onSalir }) {
             <h1 style={titulo}>Pilota el avión</h1>
             <p style={{ color: '#cfe3f7', margin: '0 0 18px', textAlign: 'center', maxWidth: 620, lineHeight: 1.5 }}>Despega, vuela por los aros y en cada puerta de pregunta <b>pasa por el aro de la respuesta correcta</b>. Al final, ¡aterriza en la pista!</p>
             <input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="🔎 Buscar recurso, tema o curso…" style={{ width: '100%', maxWidth: 900, padding: '11px 14px', borderRadius: 12, border: '1.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '0.95rem', marginBottom: 14, boxSizing: 'border-box' }} />
+            <OrdenRecursos valor={orden} onChange={setOrden} oscuro color={CIAN} style={{ width: '100%', maxWidth: 900, marginBottom: 14 }} />
             {cargando ? <p style={{ color: '#cfe3f7' }}>Cargando recursos…</p> : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 12, width: '100%', maxWidth: 900 }}>
                     {lista.map(r => (
@@ -67,13 +73,14 @@ function PantallaPrevia({ onIniciar, onSalir }) {
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{r.soloAros ? '' : r.esPikt ? 'π ' : '📚 '}{r.titulo}</div>
                             <div style={{ color: '#cfe3f7', fontSize: '0.78rem' }}>{r.temas || r.profesorNombre || ''}{r.ciclo ? ` · ${r.ciclo}` : ''}</div>
                             {!r.soloAros && <div style={{ color: '#cfe3f7', fontSize: '0.78rem' }}>{r.hojas?.length || 1} hoja(s)</div>}
+                            <ValoracionRecurso r={r} oscuro style={{ marginTop: 6 }} />
                         </div>
                     ))}
                 </div>
             )}
             {sel && (
                 <div style={{ width: '100%', maxWidth: 900, marginTop: 18, marginBottom: 30 }}>
-                    <HojasRecurso key={sel.id} recurso={sel} color={CIAN} colores={COLORES_OPCION} textoContinuar="✈️ Continuar" onElegir={(h) => onIniciar(sel, h)} />
+                    <HojasRecurso key={sel.id} recurso={sel} color={CIAN} colores={COLORES_OPCION} textoContinuar="✈️ Continuar" onElegir={(h) => { contarJugada(sel); onIniciar(sel, h); }} />
                 </div>
             )}
         </div>

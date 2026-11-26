@@ -1,4 +1,6 @@
 import { validarNombre } from './utils/filtroNombres';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 import React, { useState, useEffect, useRef } from 'react';
 import MandosEnJuego, { esperarMandos } from './mandos/RelevosMandos.jsx';
 import * as THREE from 'three';
@@ -2013,6 +2015,7 @@ function ConfigRecurso({ recurso, onBack, onJugar }) {
 // Buscador de recursos públicos de selección múltiple
 function BuscadorRecursos({ onBack, onPick }) {
     const [busqueda, setBusqueda] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     const [todos, setTodos] = useState([]);
     const [cargando, setCargando] = useState(true);
 
@@ -2035,11 +2038,12 @@ function BuscadorRecursos({ onBack, onPick }) {
 
     const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const q = norm(busqueda);
-    const resultados = !q ? todos : todos.filter(r =>
+    const resultados0 = !q ? todos : todos.filter(r =>
         norm(r.titulo).includes(q) ||
         norm(r.temas).includes(q) ||
         (r.hojas || []).some(h => norm(h.nombreHoja).includes(q))
     );
+    const resultados = ordenarRecursos(resultados0, orden);
 
     return (
         <div className="bunker-menu-card" style={{ maxWidth: 520 }}>
@@ -2048,12 +2052,13 @@ function BuscadorRecursos({ onBack, onPick }) {
             <BuscarFichaCodigo oscuro style={{ marginBottom: 10 }} />
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Título, tema, hoja..."
                 style={{ width: '100%', padding: 11, borderRadius: 8, border: '1px solid #263238', background: '#0a0e11', color: '#e7f3ec', fontFamily: 'monospace', marginBottom: 14, boxSizing: 'border-box' }} />
+                <OrdenRecursos valor={orden} onChange={setOrden} oscuro color={'#7fffb0'} style={{ marginBottom: 12 }} />
 
             <div style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {cargando ? <p style={{ color: '#8a9aa0', fontFamily: 'monospace', textAlign: 'center' }}>Cargando biblioteca...</p>
                     : resultados.length === 0 ? <p style={{ color: '#8a9aa0', fontFamily: 'monospace', textAlign: 'center' }}>Sin recursos compatibles.</p>
                         : resultados.map(r => (
-                            <button key={r.id} onClick={() => onPick(r)}
+                            <button key={r.id} onClick={() => { contarJugada(r); onPick(r); }}
                                 style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 10, border: '1px solid #263238', background: 'transparent', color: '#e7f3ec', cursor: 'pointer', fontFamily: 'monospace' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                                     <div style={{ fontWeight: 'bold' }}>{r.titulo}</div>
@@ -2062,6 +2067,7 @@ function BuscadorRecursos({ onBack, onPick }) {
                                 <div style={{ fontSize: 11, color: '#8a9aa0', marginTop: 3 }}>
                                     {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {(r.hojas?.length || 1)} hoja(s)
                                 </div>
+                                    <ValoracionRecurso r={r} oscuro tam={11} style={{ marginTop: 6 }} />
                             </button>
                         ))}
             </div>

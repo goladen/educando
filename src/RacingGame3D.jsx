@@ -10,6 +10,8 @@ import { senalDataURL } from './conduccion/senales';
 import { CIRCUITOS } from './carreras/circuitos';
 import { crearCarrera } from './carreras/motorCarreras';
 import HojasRecurso, { filtrarHojas, textoHojas } from './components/HojasRecurso';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 import { useMandosOvni, ElegirPiloto, PilotoEnJuego } from './ovniMandos.jsx';
 import ChipAntena from './mandos/ChipAntena.jsx';
 import { BotonTutorialMandos } from './mandos/TutorialMandos.jsx';
@@ -43,6 +45,7 @@ function PantallaPrevia({ onIniciar, onSalir }) {
     const [cargando, setCargando] = useState(true);
     const [sel, setSel] = useState(null);
     const [filtro, setFiltro] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     useEffect(() => {
         (async () => {
             try {
@@ -57,7 +60,9 @@ function PantallaPrevia({ onIniciar, onSalir }) {
         })();
     }, []);
     const hojas = sel?.hojas?.map(h => h.nombreHoja).filter(Boolean) || [];
-    const lista = recursos.filter(r => !filtro || `${r.titulo} ${r.temas || ''} ${r.ciclo || ''}`.toLowerCase().includes(filtro.toLowerCase()));
+    const filtrados = recursos.filter(r => !filtro || `${r.titulo} ${r.temas || ''} ${r.ciclo || ''}`.toLowerCase().includes(filtro.toLowerCase()));
+    // La opción especial del juego siempre la primera; el resto, en el orden elegido
+    const lista = [...filtrados.filter(r => r.esVial), ...ordenarRecursos(filtrados.filter(r => !(r.esVial)), orden)];
     const COLORES = ['#00C6FF,#0072FF', '#7B2FFF,#4A00E0', '#00F260,#0575E6', '#f7971e,#ffd200', '#ee0979,#ff6a00', '#56ab2f,#a8e063'];
     return (
         <div style={{ ...fondo, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px' }}>
@@ -66,6 +71,7 @@ function PantallaPrevia({ onIniciar, onSalir }) {
             <h1 style={titulo}>Racing 3D</h1>
             <p style={{ color: '#aaa', margin: '0 0 18px', textAlign: 'center' }}>Elige las preguntas de los checkpoints</p>
             <input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="🔎 Buscar recurso, tema o curso…" style={{ width: '100%', maxWidth: 900, padding: '11px 14px', borderRadius: 12, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: 'white', fontSize: '0.95rem', marginBottom: 14, boxSizing: 'border-box' }} />
+            <OrdenRecursos valor={orden} onChange={setOrden} oscuro color={AZUL} style={{ width: '100%', maxWidth: 900, marginBottom: 14 }} />
             {cargando ? <p style={{ color: '#aaa' }}>Cargando recursos…</p> : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 12, width: '100%', maxWidth: 900 }}>
                     {lista.map(r => (
@@ -73,13 +79,14 @@ function PantallaPrevia({ onIniciar, onSalir }) {
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{r.esVial ? '' : r.esPikt ? 'π ' : '🏎️ '}{r.titulo}</div>
                             <div style={{ color: '#aaa', fontSize: '0.78rem' }}>{r.temas || r.profesorNombre || ''}{r.ciclo ? ` · ${r.ciclo}` : ''}</div>
                             {!r.esVial && <div style={{ color: '#aaa', fontSize: '0.78rem' }}>{r.hojas?.length || 1} hoja(s)</div>}
+                            <ValoracionRecurso r={r} oscuro style={{ marginTop: 6 }} />
                         </div>
                     ))}
                 </div>
             )}
             {sel && (
                 <div style={{ width: '100%', maxWidth: 900, marginTop: 18, marginBottom: 30 }}>
-                    <HojasRecurso key={sel.id} recurso={sel} color={AZUL} colores={['#0072FF', '#7B2FFF', '#00a86b', '#f7971e', '#ee0979', '#56ab2f']} textoContinuar="🏁 Elegir circuito" onElegir={(h) => onIniciar(sel, h)} />
+                    <HojasRecurso key={sel.id} recurso={sel} color={AZUL} colores={['#0072FF', '#7B2FFF', '#00a86b', '#f7971e', '#ee0979', '#56ab2f']} textoContinuar="🏁 Elegir circuito" onElegir={(h) => { contarJugada(sel); onIniciar(sel, h); }} />
                 </div>
             )}
         </div>

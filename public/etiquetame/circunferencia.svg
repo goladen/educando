@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <defs>
+    <pattern id="cuad" width="25" height="25" patternUnits="userSpaceOnUse">
+      <path d="M25 0H0V25" fill="none" stroke="#dfe8f1" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1000" height="700" fill="#ffffff"/>
+  <rect width="1000" height="700" fill="url(#cuad)"/>
+
+  <!-- Fondo del círculo -->
+  <circle cx="500" cy="350" r="220" fill="#f7fbff"/>
+
+  <!-- Recta secante (corta en 2 puntos) -->
+  <line x1="471.9" y1="627.5" x2="756.7" y2="366.3" stroke="#0e7c86" stroke-width="5" stroke-linecap="round"/>
+  <!-- Recta tangente (toca en 1 punto) -->
+  <line x1="511.2" y1="72.2" x2="771.6" y2="290.8" stroke="#8e44ad" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Circunferencia -->
+  <circle cx="500" cy="350" r="220" fill="none" stroke="#2c3e50" stroke-width="5"/>
+
+  <!-- Arco (porción de la circunferencia) -->
+  <path d="M373.8 169.8 A220 220 0 0 0 287.5 293.1" fill="none" stroke="#f39c12" stroke-width="11" stroke-linecap="round"/>
+
+  <!-- Diámetro -->
+  <line x1="283.3" y1="388.2" x2="716.7" y2="311.8" stroke="#2980b9" stroke-width="5" stroke-linecap="round"/>
+  <!-- Radio -->
+  <line x1="500" y1="350" x2="461.8" y2="133.3" stroke="#e74c3c" stroke-width="5" stroke-linecap="round"/>
+  <!-- Cuerda -->
+  <line x1="300.6" y1="443" x2="443.1" y2="562.5" stroke="#27ae60" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Puntos de corte y de tangencia -->
+  <g fill="#2c3e50">
+    <circle cx="641.4" cy="181.5" r="6"/>
+    <circle cx="538.2" cy="566.7" r="6"/>
+    <circle cx="712.5" cy="406.9" r="6"/>
+    <circle cx="461.8" cy="133.3" r="5"/>
+    <circle cx="283.3" cy="388.2" r="5"/>
+    <circle cx="716.7" cy="311.8" r="5"/>
+    <circle cx="300.6" cy="443" r="5"/>
+    <circle cx="443.1" cy="562.5" r="5"/>
+    <circle cx="373.8" cy="169.8" r="5"/>
+    <circle cx="287.5" cy="293.1" r="5"/>
+  </g>
+  <!-- Centro -->
+  <circle cx="500" cy="350" r="8" fill="#000"/>
+</svg>

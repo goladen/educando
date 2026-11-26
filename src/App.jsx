@@ -14,6 +14,7 @@ const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
 import { SolarSystemViewer, APPS } from './components/LandingGames3';
 const ImperiosGame = lazy(() => import('./components/ImperiosGame'));
 const Orientacion = lazy(() => import('./orientacion/Orientacion'));
+const PhishingQuiz = lazy(() => import('./phishing/PhishingQuiz.jsx'));
 const CorrectorExamenes = lazy(() => import('./corrector/CorrectorExamenes.jsx'));
 const RetoSemana = lazy(() => import('./retoSemana/RetoSemana.jsx'));
 const DinamicasAula = lazy(() => import('./dinamicasAula/DinamicasAula'));
@@ -41,6 +42,7 @@ const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const OvniAbduccion = lazy(() => import('./OvniAbduccion'));
 const RacingGame3D = lazy(() => import('./RacingGame3D'));
 const AvionesGame3D = lazy(() => import('./AvionesGame3D'));
+const ArcoGame3D = lazy(() => import('./ArcoGame3D'));
 const MansionPitagoricaGame = lazy(() => import('./MansionPitagoricaGame'));
 const SimuladorConduccion = lazy(() => import('./conduccion/SimuladorConduccion'));
 const InvasoresArcade = lazy(() => import('./invasores/InvasoresArcade'));
@@ -95,7 +97,7 @@ const RUTAS_RESERVADAS = new Set([
   'irregular_verbs','sistema_solar',
   'retos','conectapuntos','sudoku',
   'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','mansion','invasores','manos','avatar','orientacion','dinamicas','corrector','retosemana',
+  'visor3d','esculpir','comic','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','conducir','carreras','aviones','arco','mansion','invasores','manos','avatar','orientacion','dinamicas','corrector','retosemana','phishing',
   'comunidades','comunidad','competicion','banco','pdf','imprimir',
   'fisica',
   'math_world','primaria','feria','patio',
@@ -125,7 +127,7 @@ function esEnlaceDeJuego() {
         const slug = window.location.pathname.replace(/^\/+|\/+$/g, '').trim().toLowerCase();
         if (!slug || NO_SON_JUEGO.has(slug) || slug.startsWith('alumno/')) return false;
         return RUTAS_RESERVADAS.has(slug)
-            || ['fisica/', 'primaria/', 'fichas/', 'calculadora/', 'patio/'].some(p => slug.startsWith(p))
+            || ['fisica/', 'primaria/', 'fichas/', 'calculadora/', 'patio/', 'phishing/'].some(p => slug.startsWith(p))
             || APPS.some(a => String(a.id).toLowerCase() === slug);
     } catch { return false; }
 }
@@ -225,8 +227,8 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'comic' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'conducir' || slug === 'carreras' || slug === 'aviones' || slug === 'mansion' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas' || slug === 'canguro') {
-        setRutaPublica(slug);
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'conducir' || slug === 'carreras' || slug === 'aviones' || slug === 'arco' || slug === 'mansion' || slug === 'invasores' || slug === 'manos' || slug === 'avatar' || slug === 'orientacion' || slug === 'dinamicas' || slug === 'canguro' || slug === 'phishing' || slug.startsWith('phishing/')) {
+        setRutaPublica(slug.startsWith('phishing/') ? 'phishing' : slug);
         return;
       }
       // Hub de escalada y sus subrutas (/escalada, /escalada/whoknows, …)
@@ -435,6 +437,7 @@ function App() {
     if (rutaPublica === 'dinamicas') return <><DinamicasAula onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'retosemana') return <><RetoSemana onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'corrector') return <><CorrectorExamenes onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'phishing') return <><PhishingQuiz onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'orientacion') return <><Orientacion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'avatar') return <><AvatarCuerpo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
@@ -445,6 +448,7 @@ function App() {
     if (rutaPublica === 'conducir') return <><SimuladorConduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'carreras') return <><RacingGame3D usuario={usuario} alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'mansion') return <><MansionPitagoricaGame alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'arco') return <><ArcoGame3D alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'aviones') return <><AvionesGame3D alTerminar={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'ovni') return <><OvniAbduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'invasores') return <><InvasoresArcade onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

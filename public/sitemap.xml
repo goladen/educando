@@ -31,12 +31,17 @@
   <url><loc>https://www.pikt.es/pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/carreras</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/aviones</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/arco</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/mansion</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/conducir</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/retosemana</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://www.pikt.es/corrector</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/phishing</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/phishing/profes</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://www.pikt.es/invasores</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/fisica/laboratorio</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/fisica/unidades</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/primaria/menseki</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/primaria/geometria/unidades</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/vanila</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 

@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firesto
 import { limpiar } from '../utils/normalizarPreguntas';
 import { hojasDeRecurso, pruebaDeRecurso, MIN_PREGUNTAS_RECURSO, MODOS_CANDADO_RECURSO, codigoLimpio } from './recursosEscape';
 import { tr } from './i18n';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from '../components/ValoracionRecurso';
 
 /**
  *  Editor de pruebas con recursos de profes:
@@ -28,6 +29,7 @@ export function BuscadorRecursosEscape({ usuario, onElegir, onCerrar }) {
     const [lista, setLista] = useState(null);
     const [busqueda, setBusqueda] = useState('');
     const [error, setError] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
 
     useEffect(() => {
         let vivo = true;
@@ -52,7 +54,8 @@ export function BuscadorRecursosEscape({ usuario, onElegir, onCerrar }) {
     const q = limpiar(busqueda);
     const filtrados = useMemo(() => (lista || []).filter(({ r, hojas }) => !q
         || limpiar(r.titulo).includes(q) || limpiar(r.temas).includes(q) || limpiar(r.profesorNombre).includes(q)
-        || hojas.some(h => limpiar(h.nombre).includes(q))).slice(0, 120), [lista, q]);
+        || hojas.some(h => limpiar(h.nombre).includes(q))), [lista, q]);
+    const ordenados = useMemo(() => ordenarRecursos(filtrados, orden, (x) => x.r).slice(0, 120), [filtrados, orden]);
 
     return (
         <div onClick={onCerrar} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(5,0,12,.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }}>
@@ -64,17 +67,19 @@ export function BuscadorRecursosEscape({ usuario, onElegir, onCerrar }) {
                     <button className="eh-btn2" onClick={onCerrar}>✕</button>
                 </div>
                 <input style={{ ...campo, marginTop: 10 }} value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={tr("Buscar por título, tema, hoja o autor…")} autoFocus />
+                <OrdenRecursos valor={orden} onChange={setOrden} oscuro color="#f97316" style={{ marginTop: 8 }} />
                 <div style={{ fontSize: '.78rem', opacity: .65, margin: '6px 0' }}>{tr("Valen las preguntas de opción múltiple, respuesta corta y rellenar hueco (las de ordenar no).")}</div>
                 <div style={{ overflowY: 'auto', display: 'grid', gap: 8, paddingRight: 4 }}>
                     {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
                     {lista === null && <div>{tr("🕯️ Cargando recursos…")}</div>}
                     {lista && filtrados.length === 0 && <div style={{ opacity: .7 }}>{tr("No hay recursos compatibles")}{q ? tr(" con esa búsqueda") : ''}.</div>}
-                    {filtrados.map(({ r, hojas, n }) => (
+                    {ordenados.map(({ r, hojas, n }) => (
                         <button key={r.id} onClick={() => onElegir(r)} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.05)', color: '#f5e9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
                             <div style={{ fontWeight: 800 }}>{r.titulo || tr("Sin título")}</div>
                             <div style={{ fontSize: '.78rem', opacity: .75, marginTop: 2 }}>
                                 {r.profesorNombre ? `👤 ${r.profesorNombre} · ` : ''}{n} {tr("preguntas ·")} {hojas.length} {tr("hoja")}{hojas.length === 1 ? '' : 's'}{r.temas ? ` · ${r.temas}` : ''}
                             </div>
+                            <ValoracionRecurso r={r} oscuro tam={11} style={{ marginTop: 4 }} />
                         </button>
                     ))}
                 </div>

@@ -282,7 +282,7 @@ function Preparar({ cfg, set, nClave, nombre, setNombres, onEscanearClave, onLis
         {verRecurso && (
           <div style={st.cajaOscura}>
             <Suspense fallback={<p>Cargando recursos…</p>}>
-              <SelectorRecursoMandos seleccionado={recurso} onPick={(r) => { setRecurso(r); setHojaSel(-1); }} />
+              <SelectorRecursoMandos seleccionado={recurso} contar={false} onPick={(r) => { setRecurso(r); setHojaSel(-1); }} />
             </Suspense>
             {recurso && (
               <div style={{ ...st.fila, marginTop: 10, color: '#e2e8f0' }}>

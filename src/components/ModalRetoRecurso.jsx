@@ -3,6 +3,7 @@ import { X, Search, RefreshCw, ChevronLeft, Key } from 'lucide-react';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import ModalCompartirReto from './ModalCompartirReto';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './ValoracionRecurso';
 import { preguntasDeRecurso, categoriasDeRecurso } from '../utils/normalizarPreguntas';
 import { BIBLIOTECA_LINEAS_TIEMPO } from '../BibliotecaLineasTiempo';
 
@@ -78,6 +79,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose, onElegido
     const [mios, setMios] = useState(null);
     const [publicos, setPublicos] = useState(null);
     const [texto, setTexto] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     const [codigo, setCodigo] = useState('');
     const [errorCodigo, setErrorCodigo] = useState('');
 
@@ -116,8 +118,8 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose, onElegido
         const base = (pestana === 'BIBLIOTECA' ? juego.biblioteca() : pestana === 'MIOS' ? mios : publicos) || [];
         const q = limpiar(texto.trim());
         const filtrada = q ? base.filter(r => limpiar(`${r.titulo} ${r.temas} ${r.profesorNombre} ${r.creadorNombre || ''}`).includes(q)) : base;
-        return [...filtrada].sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 80);
-    }, [pestana, mios, publicos, texto]);
+        return ordenarRecursos(filtrada, orden).slice(0, 80);
+    }, [pestana, mios, publicos, texto, orden]);
 
     const buscarCodigo = async () => {
         const code = codigo.trim().toUpperCase();
@@ -191,6 +193,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose, onElegido
                             <Search size={15} style={{ position: 'absolute', left: 11, top: 11, color: '#94a3b8' }} />
                             <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Buscar por título, tema o autor…" style={{ ...st.input, paddingLeft: 32 }} />
                         </div>
+                        {coleccion === 'resources' && <OrdenRecursos valor={orden} onChange={setOrden} color={AZUL} style={{ marginBottom: 10 }} />}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: '46vh', overflowY: 'auto' }}>
                             {cargando && <div style={{ textAlign: 'center', color: '#7f8c8d', padding: 20 }}><RefreshCw size={20} style={{ animation: 'spinRR 1s linear infinite' }} /></div>}
                             {!cargando && lista.length === 0 && <div style={{ textAlign: 'center', color: '#95a5a6', padding: 20, fontSize: '0.88rem' }}>
@@ -203,6 +206,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose, onElegido
                                         <div style={{ color: '#888', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {[r.temas, r.profesorNombre || r.creadorNombre, (r.hojas?.length > 1 ? `${r.hojas.length} hojas` : null)].filter(Boolean).join(' · ')}
                                         </div>
+                                        {coleccion === 'resources' && <ValoracionRecurso r={r} tam={11} style={{ marginTop: 3 }} />}
                                     </div>
                                     <span style={{ color: AZUL, fontSize: '1.3rem' }}>›</span>
                                 </button>

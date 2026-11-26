@@ -13,6 +13,7 @@ import PartesPlantaGame from './PartesPlanta';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import { PLANTILLAS_PIKT } from './etiquetame/plantillasPikt';
 
 // ─────────────────────────────────────────────
 // HELPERS (mismos que LandingGames3)
@@ -102,7 +103,11 @@ export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
     });
 
     const volverBusqueda = () => { setPantalla('BUSQUEDA'); setRecursoActivo(null); setHojaActiva(null); };
-    const volverEleccion = () => { setPantalla('ELECCION'); setHojaActiva(null); };
+    // Con una sola hoja la pantalla de elección no aporta nada: volvemos al buscador
+    const volverEleccion = () => {
+        if ((recursoActivo?.hojas?.length || 0) <= 1) { volverBusqueda(); return; }
+        setPantalla('ELECCION'); setHojaActiva(null);
+    };
 
     if (pantalla === 'PARTESPLANTA') {
         return <PartesPlantaGame onExit={volverBusqueda} />;
@@ -298,6 +303,29 @@ function PantallaBusqueda({ onElegir, onExit, onPartesPlanta }) {
                     <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 12, padding: '8px 16px', color: 'white', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         ▶ Jugar
                     </div>
+                </div>
+            </div>
+
+            {/* Diagramas PiKT: plantillas listas para jugar */}
+            <div style={{ maxWidth: 860, margin: '20px auto 0', width: 'calc(100% - 32px)' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>
+                    📚 Diagramas PiKT · listos para jugar
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px,1fr))', gap: 12 }}>
+                    {PLANTILLAS_PIKT.map(p => (
+                        <div key={p.id} onClick={() => onElegir(p)} style={{
+                            background: 'white', borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
+                            boxShadow: '0 6px 20px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column',
+                        }}>
+                            <div style={{ background: '#f4f7fb', height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img src={p.hojas[0].imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable="false" />
+                            </div>
+                            <div style={{ padding: '9px 12px 11px' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#2c3e50', lineHeight: 1.25 }}>{p.emoji} {p.titulo}</div>
+                                <div style={{ fontSize: '0.72rem', color: '#888', marginTop: 4 }}>{p.nivel} · {p.hojas[0].markers.length} etiquetas</div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -798,10 +826,10 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                                                 value={respuestas[m.id] || ''}
                                                 onChange={e => setRespuestas({ ...respuestas, [m.id]: e.target.value })}
                                                 onKeyDown={e => e.key === 'Enter' && comprobar()}
-                                                style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 'bold', background: 'transparent', color: '#2c3e50', width: `${Math.max(6, (respuestas[m.id]?.length || 0) + 3)}ch`, minWidth: 55, maxWidth: 160 }}
+                                                style={{ border: 'none', outline: 'none', fontSize: 16, fontWeight: 'bold', background: 'transparent', color: '#2c3e50', width: `${Math.max(8, (respuestas[m.id]?.length || 0) + 3)}ch`, minWidth: 90, maxWidth: 220, padding: '4px 2px' }}
                                             />
                                         ) : (
-                                            <span style={{ fontSize: 13, fontWeight: 'bold', color: estado === true ? '#1a7a4a' : '#c0392b', padding: '1px 2px', minWidth: 40 }}>
+                                            <span style={{ fontSize: 16, fontWeight: 'bold', color: estado === true ? '#1a7a4a' : '#c0392b', padding: '4px 2px', minWidth: 60 }}>
                                                 {displayVal}
                                             </span>
                                         )}
@@ -815,7 +843,7 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                             const texto    = respuestas[m.id] || null;
                             const isFilled = Boolean(texto);
                             const borderColor = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : isFilled ? '#3498db' : '#bbb';
-                            const bgColor     = estado === true ? '#e8f8f0' : estado === false ? '#fef0ef' : isFilled ? '#eaf4fd' : 'rgba(255,255,255,0.92)';
+                            const bgColor     = estado === true ? '#e8f8f0' : estado === false ? '#fef0ef' : isFilled ? '#eaf4fd' : '#ffffff';
                             return (
                                 <div key={`zone-${m.id}`}
                                     style={{
@@ -823,19 +851,23 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                                         left: `${m.labelX}%`, top: `${m.labelY}%`,
                                         transform: 'translate(-50%, -50%)',
                                         zIndex: 10,
-                                        minWidth: 80, padding: '5px 10px',
-                                        background: bgColor,
-                                        border: `2px ${isFilled ? 'solid' : 'dashed'} ${borderColor}`,
-                                        borderRadius: 8, boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
-                                        display: 'flex', alignItems: 'center', gap: 4,
+                                        minWidth: 130, minHeight: 40, padding: '8px 14px', boxSizing: 'border-box',
+                                        justifyContent: 'center',
+                                        background: !isFilled && arrastrando && !evaluacion ? '#fff8e1' : bgColor,
+                                        border: `${isFilled ? 2 : 3}px ${isFilled ? 'solid' : 'dashed'} ${!isFilled && arrastrando && !evaluacion ? '#f39c12' : borderColor}`,
+                                        borderRadius: 10, boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
+                                        display: 'flex', alignItems: 'center', gap: 5,
                                         whiteSpace: 'nowrap', userSelect: 'none',
-                                        cursor: !evaluacion && isFilled ? 'pointer' : 'default',
+                                        cursor: !evaluacion && (isFilled || arrastrando) ? 'pointer' : 'default',
                                         transition: 'all 0.2s',
                                     }}
                                     onDragOver={e => e.preventDefault()}
                                     onDrop={() => handleDrop(m.id)}
                                     onClick={() => {
-                                        if (!evaluacion && isFilled) {
+                                        if (evaluacion) return;
+                                        // Tocar etiqueta y luego casilla (móvil, PDI): coloca la elegida
+                                        if (arrastrando) { handleDrop(m.id); return; }
+                                        if (isFilled) {
                                             const updated = { ...respuestas };
                                             delete updated[m.id];
                                             setRespuestas(updated);
@@ -844,14 +876,14 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                                 >
                                     {isFilled ? (
                                         <>
-                                            <span style={{ fontSize: 13, fontWeight: 'bold', color: estado === false ? '#c0392b' : '#2c3e50' }}>
+                                            <span style={{ fontSize: 16, fontWeight: 'bold', color: estado === false ? '#c0392b' : '#2c3e50' }}>
                                                 {estado === false ? m.text : texto}
                                             </span>
-                                            {estado === true  && <CheckCircle size={13} color="#27ae60" />}
-                                            {estado === false && <XCircle     size={13} color="#e74c3c" />}
+                                            {estado === true  && <CheckCircle size={16} color="#27ae60" />}
+                                            {estado === false && <XCircle     size={16} color="#e74c3c" />}
                                         </>
                                     ) : (
-                                        <span style={{ fontSize: 12, color: '#ccc', letterSpacing: 2 }}>···</span>
+                                        <span style={{ fontSize: 16, color: '#bbb', letterSpacing: 3 }}>···</span>
                                     )}
                                 </div>
                             );
@@ -868,7 +900,7 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                             border: '2px dashed rgba(255,255,255,0.25)',
                         }}>
                             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-                                Arrastra cada etiqueta a su casilla
+                                Arrastra cada etiqueta a su casilla · o tócala y luego toca la casilla
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                                 {etiquetasDisponibles.map((text, idx) => (
@@ -877,14 +909,16 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                                         draggable
                                         onDragStart={() => setArrastrando(text)}
                                         onDragEnd={() => setArrastrando(null)}
+                                        onClick={() => setArrastrando(a => (a === text ? null : text))}
                                         style={{
-                                            background: 'white', border: '3px solid #e2e8f0', borderBottomWidth: 5,
-                                            padding: '6px 16px', borderRadius: 12,
-                                            fontWeight: 800, fontSize: '0.95rem', color: '#475569',
+                                            background: arrastrando === text ? '#fff3cd' : 'white',
+                                            border: `3px solid ${arrastrando === text ? '#f39c12' : '#e2e8f0'}`, borderBottomWidth: 5,
+                                            padding: '8px 18px', borderRadius: 12,
+                                            fontWeight: 800, fontSize: '1.05rem', color: '#475569',
                                             cursor: 'grab', userSelect: 'none',
-                                            boxShadow: '0 3px 6px rgba(0,0,0,0.1)',
-                                            opacity: arrastrando === text ? 0.45 : 1,
-                                            transition: 'opacity 0.1s',
+                                            boxShadow: arrastrando === text ? '0 0 0 3px rgba(243,156,18,0.35)' : '0 3px 6px rgba(0,0,0,0.1)',
+                                            transform: arrastrando === text ? 'translateY(-2px)' : 'none',
+                                            transition: 'all 0.12s',
                                         }}
                                     >
                                         {text}

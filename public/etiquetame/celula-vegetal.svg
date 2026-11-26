@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <defs>
+    <radialGradient id="vac" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#d9eefc"/>
+      <stop offset="1" stop-color="#9fcdee"/>
+    </radialGradient>
+    <g id="cloro">
+      <ellipse rx="34" ry="17" fill="#58b847" stroke="#2e7d32" stroke-width="3"/>
+      <g fill="#2e7d32">
+        <rect x="-22" y="-8" width="7" height="16" rx="2"/>
+        <rect x="-10" y="-9" width="7" height="18" rx="2"/>
+        <rect x="2" y="-9" width="7" height="18" rx="2"/>
+        <rect x="14" y="-8" width="7" height="16" rx="2"/>
+      </g>
+      <line x1="-26" y1="0" x2="24" y2="0" stroke="#2e7d32" stroke-width="1.5"/>
+    </g>
+    <g id="mitoV">
+      <ellipse rx="26" ry="13" fill="#f0896b" stroke="#a93a26" stroke-width="2.5"/>
+      <path d="M-18 0 L-12 -7 L-6 6 L0 -7 L6 6 L12 -7 L18 0" fill="none" stroke="#a93a26" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+  </defs>
+  <rect width="1000" height="700" fill="#f6f9fc"/>
+
+  <!-- Pared celular (doble borde grueso) -->
+  <polygon points="300,140 700,140 780,350 700,580 300,580 220,350" fill="#9ccc65" stroke="#4e7d23" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="309,153 691,153 765,350 691,567 309,567 235,350" fill="none" stroke="#6b9b37" stroke-width="2" stroke-dasharray="14 9"/>
+
+  <!-- Membrana plasmática + citoplasma -->
+  <polygon points="312,160 688,160 758,350 688,560 312,560 242,350" fill="#f3f9e8" stroke="#b5485d" stroke-width="3.5" stroke-linejoin="round"/>
+
+  <!-- Gran vacuola central -->
+  <ellipse cx="545" cy="370" rx="165" ry="150" fill="url(#vac)" stroke="#2e86c1" stroke-width="4"/>
+
+  <!-- Núcleo desplazado al lateral -->
+  <circle cx="320" cy="290" r="45" fill="#c9b3ec" stroke="#5b3f8c" stroke-width="4"/>
+  <circle cx="332" cy="300" r="13" fill="#4a2d86"/>
+
+  <!-- Cloroplastos -->
+  <use href="#cloro" transform="translate(400 192) rotate(10)"/>
+  <use href="#cloro" transform="translate(620 195) rotate(-10)"/>
+  <use href="#cloro" transform="translate(700 255) rotate(65)"/>
+  <use href="#cloro" transform="translate(650 538)"/>
+  <use href="#cloro" transform="translate(470 540) rotate(-5)"/>
+  <use href="#cloro" transform="translate(275 365) rotate(75)"/>
+
+  <!-- Mitocondria -->
+  <use href="#mitoV" transform="translate(330 400) rotate(30)"/>
+
+  <!-- Aparato de Golgi -->
+  <g fill="none" stroke="#e3a21a" stroke-width="7" stroke-linecap="round">
+    <path d="M335 445 Q362 432 389 445"/>
+    <path d="M333 460 Q362 446 391 460"/>
+    <path d="M336 475 Q362 461 388 475"/>
+  </g>
+  <circle cx="398" cy="452" r="4.5" fill="#f5c55a" stroke="#c98a10" stroke-width="1.5"/>
+
+  <!-- Gránulos del citoplasma -->
+  <g fill="#7f8c8d">
+    <circle cx="510" cy="185" r="2.5"/><circle cx="350" cy="520" r="2.5"/><circle cx="560" cy="545" r="2.5"/><circle cx="720" cy="420" r="2.5"/><circle cx="380" cy="240" r="2.5"/>
+  </g>
+</svg>

@@ -3,18 +3,19 @@
 //  ordenados por lo que necesita el profe (no por herramienta):
 //    · 📝 Fichas de ejercicios   → FichasPikt (motores de Math World, materias, Enigmic)
 //    · 🎮 Un recurso en papel    → buscador de recursos + estética (clásica / arcade)
+//    · 🧩 Ficha mezclada         → partes de varios recursos (con nº de preguntas) + ejercicios generados (FichaMix.jsx)
 //    · 🎲 Juegos y apps          → cada juego con su estética propia (abre el juego)
 //    · 🏫 Aula y profesor        → plano de clase, documentos, mapas, informes…
 //  Los destinos que viven en LandingGames3 se abren con onIr(destino); los
-//  autónomos (Documentos, Mapas INE, Cuerpo humano, Banco de Física) se montan aquí.
+//  autónomos (Documentos, Mapas INE, Cuerpo humano, Banco de Física, EtiquetaMe) se montan aquí.
 // ─────────────────────────────────────────────────────────────────────────────
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { auth, db } from '../firebase';
 import { formatosDisponibles, hojasDe } from '../utils/pdfRecurso';
+import SelectorRecursoPdf, { ETIQUETA_JUEGO, sinTildes } from './SelectorRecursoPdf';
 import { normalizarPregunta } from '../utils/normalizarPreguntas';
 
 const FichasPikt = lazy(() => import('../bancoRecursos/FichasPikt'));
+const FichaMix = lazy(() => import('./FichaMix'));
 const ModalPdfRecurso = lazy(() => import('../components/ModalPdfRecurso'));
 const DocumentosPersonalizados = lazy(() => import('../components/DocumentosPersonalizados'));
 const ExploradorINE = lazy(() => import('../estadistica/ExploradorINE'));
@@ -31,6 +32,8 @@ const BLOQUES = [
         desc: 'Ejercicios nuevos cada vez, con hoja de soluciones y corrección en la pizarra. Matemáticas, Lengua, Biología, Geografía, Música y Lógica.' },
     { id: 'RECURSO', emoji: '🎮', nombre: 'Mis preguntas en papel', color: '#0e7490',
         desc: 'Elige uno de tus recursos (o uno público) y la estética: test, rosco, sopa de letras, unir con flechas… o estilo arcade.' },
+    { id: 'MIX', emoji: '🧩', nombre: 'Ficha mezclada', color: '#be185d',
+        desc: 'Junta en un solo PDF preguntas de varios recursos (eliges cuántas de cada uno) y ejercicios generados de cualquier tema, con todas las soluciones al final.' },
     { id: 'JUEGOS', emoji: '🎲', nombre: 'Fichas de juegos y apps', color: '#c2410c',
         desc: 'Cada juego con su propia estética: arcade, ovni, escape room de terror, puzzle recortable, orientación…' },
     { id: 'AULA', emoji: '🏫', nombre: 'Aula y profesorado', color: '#15803d',
@@ -71,10 +74,18 @@ const ITEMS = [
         desc: 'Problemas para aulas de pensamiento, con las instrucciones para el profesor, y juegos de magia matemática.',
         donde: 'Elige los problemas → botón de imprimir (en el diálogo de impresión elige «Guardar como PDF»).', etapas: ['Primaria', 'ESO'], materias: 'Matemáticas', accion: { ir: 'pizarras' },
         claves: 'ingenio arcomat magia pensamiento' },
+    { id: 'menseki', bloque: 'JUEGOS', emoji: '📐', nombre: 'Menseki: laberintos de áreas', estetica: 'Figuras con cotas (no a escala)', color: '#0d9488',
+        desc: 'Varios retos por página (1, 2, 4 o 6): los 30 de Primaria y Secundaria, tus retos generados o retos nuevos al azar. Con pista opcional y hoja de soluciones paso a paso.',
+        donde: 'Menseki → «🖨️ Fichas PDF», marca los retos (o añade nuevos al azar) → «Descargar PDF».', etapas: ['Primaria', 'ESO'], materias: 'Matemáticas', accion: { ir: 'menseki' },
+        claves: 'menseki area maze laberinto areas rectangulos cotas geometria medidas' },
     { id: 'calculadora', bloque: 'JUEGOS', emoji: '🧮', nombre: 'Uso de la calculadora', estetica: 'Teclas de la calculadora', color: '#0f766e',
         desc: 'Una ficha por bloque (operaciones, memoria, fracciones, potencias…) con las teclas dibujadas y sus soluciones.',
         donde: 'Botón «📄» de cada bloque o «📄 Ficha PDF» dentro del bloque.', etapas: ['Primaria', 'ESO'], materias: 'Matemáticas', accion: { ir: 'calculadora' },
         claves: 'casio teclas' },
+    { id: 'laboratorio', bloque: 'JUEGOS', emoji: '🧪', nombre: 'Laboratorio 3D: experimentos', estetica: 'Ficha de laboratorio con imagen 3D de cada paso', color: '#0891b2',
+        desc: 'Objetivo, materiales, seguridad, hipótesis, pasos con imagen y espacio para observar, explicación y preguntas. Uno o varios experimentos (cuaderno).',
+        donde: 'Abre un experimento → «🖨️ Imprimir pasos», o marca varios en la lista → «Cuaderno de laboratorio».', etapas: ['Primaria', 'ESO'], materias: 'Física y Química, Ciencias', accion: { ir: 'laboratorio' },
+        claves: 'experimentos laboratorio practicas caseros quimica fisica densidad presion ph' },
     { id: 'fisica', bloque: 'JUEGOS', emoji: '⚛️', nombre: 'Simuladores de Física y Química', estetica: 'Ficha con capturas del simulador', color: '#2563eb',
         desc: 'Ficha de cada simulador con capturas, preguntas y problemas con ecuaciones. Se puede editar antes de generar.',
         donde: 'Abre un simulador → «🖨️ Ficha PDF».', etapas: ['ESO', 'Bachillerato'], materias: 'Física y Química', accion: { ir: 'fisica' },
@@ -87,6 +98,10 @@ const ITEMS = [
         desc: 'Lámina del aparato o sistema elegido con los órganos numerados para escribir su nombre.',
         donde: 'Elige el sistema → «🖨️ Ficha PDF».', etapas: ['Primaria', 'ESO', 'Bachillerato'], materias: 'Biología', accion: { vista: 'CUERPO' },
         claves: 'anatomia organos esqueleto musculos' },
+    { id: 'etiquetame', bloque: 'JUEGOS', emoji: '🏷️', nombre: 'EtiquetaMe: diagramas para etiquetar', estetica: 'Lámina con puntos numerados', color: '#e74c3c',
+        desc: 'Diagramas listos de PiKT (célula animal y vegetal, flor, microscopio, aparato digestivo y respiratorio, ciclo del agua, circunferencia, capas de la Tierra, volcán) o los tuyos de EtiquetaMe, con huecos para escribir el nombre de cada parte.',
+        donde: 'Se abre aquí mismo: elige el diagrama → «Elegir formato y descargar».', etapas: ['Primaria', 'ESO'], materias: 'Biología, Geología, Geografía, Matemáticas', accion: { vista: 'ETIQUETAME' },
+        claves: 'etiquetas etiquetar etiquetame diagrama lamina partes celula flor microscopio digestivo respiratorio ciclo agua circunferencia tierra volcan' },
     { id: 'patio', bloque: 'JUEGOS', emoji: '🎠', nombre: 'Patio de Juegos (Primaria)', estetica: 'Infantil y colorida', color: '#16a34a',
         desc: 'Fichas en papel de matemáticas y lengua de 1.º a 6.º de Primaria.',
         donde: 'Elige curso y actividad → «🖨️ Imprimir / Guardar PDF».', etapas: ['Primaria'], materias: 'Matemáticas, Lengua', accion: { ir: 'patio' },
@@ -104,11 +119,11 @@ const ITEMS = [
         desc: 'Situación de aprendizaje «Mi empresa de placas solares»: cada alumno o equipo imprime la propuesta para su cliente con el logo, el diseño del tejado, la producción mes a mes, el presupuesto y la amortización.',
         donde: 'Situaciones de Aprendizaje → Mi empresa de placas solares → fase 9 «Propuesta al cliente» → «🖨️ Imprimir / PDF».', etapas: ['ESO', 'Bachillerato'], materias: 'Matemáticas, Tecnología, Economía', accion: { ir: 'empresasolar' },
         claves: 'placas paneles solares fotovoltaica energia presupuesto empresa emprendimiento amortizacion logo' },
-    { id: 'corrector', bloque: 'AULA', emoji: '📝', nombre: 'Hoja de respuestas para corregir con el móvil', estetica: 'Hoja de círculos A-E', color: '#0f766e',
+    { id: 'corrector', bloque: 'AULA', emoji: '📝', nombre: 'Corrector de exámenes (hoja de respuestas)', estetica: 'Hoja de círculos A-E', color: '#0f766e',
         desc: 'Hasta 50 preguntas: los alumnos rellenan su nº de lista y los círculos, y el Corrector saca la nota al enfocar cada hoja con la cámara. También el examen con las preguntas de un recurso, hojas con el nombre de cada alumno y la clave.',
         donde: 'Corrector de exámenes → «1 · Preparar» → «🖨️ Imprimir».', etapas: ['Primaria', 'ESO', 'Bachillerato'], materias: 'Todas', accion: { ir: 'corrector' },
         claves: 'examen test corregir corrector hoja de respuestas plantilla circulos zipgrade camara movil nota evaluacion tipo test' },
-    { id: 'tarjetas', bloque: 'AULA', emoji: '🃏', nombre: 'Tarjetas de respuesta (sin móviles)', estetica: 'Tarjetas con código', color: '#0f766e',
+    { id: 'tarjetas', bloque: 'AULA', emoji: '🃏', nombre: 'Tarjetas de respuesta para PiLive (sin móviles)', estetica: 'Tarjetas con código', color: '#0f766e',
         desc: 'Una tarjeta por alumno con un código y las letras A-D. En PiLive, los alumnos la levantan con su respuesta arriba y la cámara del ordenador las lee todas a la vez.',
         donde: 'Se abre aquí mismo (también en PiLive → «🃏 Con tarjetas»).', etapas: ['Infantil', 'Primaria', 'ESO', 'Bachillerato'], materias: 'Todas', accion: { vista: 'TARJETAS' },
         claves: 'plickers tarjetas respuesta camara codigo qr aruco votar test sin moviles pilive' },
@@ -154,16 +169,10 @@ const ATAJOS = [
     { id: 'aRecurso', bloque: 'RECURSO', emoji: '🎮', nombre: 'Un recurso mío en papel', color: '#0e7490', accion: { bloque: 'RECURSO' },
         desc: 'Pasapalabra (rosco), test, preguntas abiertas, unir con flechas, sopa de letras, letras desordenadas, ruleta, línea del tiempo, etiquetas, listening… o estilo arcade.',
         claves: 'pasapalabra rosco test sopa letras unir flechas anagrama ruleta linea tiempo etiquetas listening burbujas aparejados preguntas recurso arcade' },
+    { id: 'aMix', bloque: 'MIX', emoji: '🧩', nombre: 'Ficha mezclada (mix)', color: '#be185d', accion: { bloque: 'MIX' },
+        desc: 'Varias partes en un PDF: preguntas de distintos recursos (eligiendo cuántas) y ejercicios generados de matemáticas, lengua, biología…',
+        claves: 'mix mezcla mezclada combinar varios recursos examen repaso partes juntar elegir numero preguntas ejercicios' },
 ];
-
-const ETIQUETA_JUEGO = {
-    PASAPALABRA: '🔤 Pasapalabra', CAZABURBUJAS: '🫧 Burbujas', PIKATRON: '🏃 Pikatron', PIKATRON_2: '🏃 Pikatron 2', APAREJADOS: '🃏 AparejaDOS',
-    RULETA: '🎡 Ruleta', WORDLE: '🟩 Wordle', SOPA: '🔎 Sopa de letras', THINKHOOT: '⚡ PiLive', LINEA_TIEMPO: '🕰️ Línea del tiempo',
-    ETIQUETAS: '🏷️ EtiquetaMe', LISTENING_RECURSO: '🎧 Listening', MONEYBOARD: '💰 Money Board', JEOPARDY: '💰 Money Board',
-};
-
-const sinTildes = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-const tieneOpciones = (r) => r && (r.tipoJuego === 'LISTENING_RECURSO' || formatosDisponibles(r).length > 0);
 
 // Preguntas del recurso → formato de la ficha arcade de Invasión Pi
 function preguntasArcade(recurso) {
@@ -237,6 +246,15 @@ export default function CentroPdf({ onExit, onIr }) {
                     </div>
                 )}
                 {vista === 'TARJETAS' && <ImprimirTarjetas onClose={volverVista} />}
+                {vista === 'ETIQUETAME' && (
+                    <div style={S.pagina}>
+                        <div style={S.barra}>
+                            <button onClick={volverVista} style={S.btnBarra}>← Generar en PDF</button>
+                            <span style={{ fontWeight: 900, color: '#1e1b4b' }}>🏷️ Diagramas para etiquetar</span>
+                        </div>
+                        <div style={S.contenido}><PdfDeRecurso pestanaInicial="PIKT" /></div>
+                    </div>
+                )}
                 {vista === 'BANCO_FISICA' && (
                     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f8fafc', overflowY: 'auto' }}>
                         <BancoProblemasFisica onVolver={volverVista} />
@@ -329,6 +347,12 @@ export default function CentroPdf({ onExit, onIr }) {
 
                 {bloque === 'RECURSO' && <PdfDeRecurso />}
 
+                {bloque === 'MIX' && (
+                    <Suspense fallback={<Cargando />}>
+                        <FichaMix />
+                    </Suspense>
+                )}
+
                 {(bloque === 'JUEGOS' || bloque === 'AULA') && (
                     <Rejilla items={ITEMS.filter((i) => i.bloque === bloque)} onAbrir={abrir} />
                 )}
@@ -377,106 +401,10 @@ function Rejilla({ items, onAbrir }) {
 }
 
 // ── 🎮 PDF de un recurso: buscador + estética ────────────────────────────────
-function PdfDeRecurso() {
-    const uid = auth.currentUser?.uid || null;
-    const [pestana, setPestana] = useState(uid ? 'MIOS' : 'PUBLICOS');
-    const [listas, setListas] = useState({ MIOS: null, PUBLICOS: null });
-    const [error, setError] = useState('');
-    const [texto, setTexto] = useState('');
-    const [codigo, setCodigo] = useState('');
-    const [buscandoCodigo, setBuscandoCodigo] = useState(false);
+function PdfDeRecurso({ pestanaInicial = null }) {
     const [recurso, setRecurso] = useState(null);
-
-    useEffect(() => {
-        if (pestana === 'CODIGO' || listas[pestana] !== null) return undefined;
-        let vivo = true;
-        const q = pestana === 'MIOS'
-            ? query(collection(db, 'resources'), where('profesorUid', '==', uid))
-            : query(collection(db, 'resources'), where('isPrivate', '==', false));
-        getDocs(q)
-            .then((snap) => {
-                if (!vivo) return;
-                const docs = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter(tieneOpciones);
-                if (pestana === 'PUBLICOS') docs.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
-                setListas((p) => ({ ...p, [pestana]: docs }));
-            })
-            .catch((e) => { if (vivo) setError('No se han podido cargar los recursos: ' + e.message); });
-        return () => { vivo = false; };
-    }, [pestana, listas, uid]);
-
-    const lista = useMemo(() => {
-        const t = sinTildes(texto.trim());
-        const base = listas[pestana] || [];
-        return (t ? base.filter((r) => sinTildes(`${r.titulo} ${r.profesorNombre || ''} ${ETIQUETA_JUEGO[r.tipoJuego] || r.tipoJuego}`).includes(t)) : base).slice(0, 120);
-    }, [listas, pestana, texto]);
-
-    const buscarCodigo = async () => {
-        const c = codigo.trim().toUpperCase();
-        if (!c) return;
-        setBuscandoCodigo(true); setError('');
-        try {
-            const snap = await getDocs(query(collection(db, 'resources'), where('accessCode', '==', c)));
-            const r = snap.docs.map((d) => ({ ...d.data(), id: d.id }))[0];
-            if (!r) setError('No hay ningún recurso con ese código.');
-            else if (!tieneOpciones(r)) setError('Ese recurso no tiene preguntas que se puedan pasar a papel.');
-            else setRecurso(r);
-        } catch (e) { setError('No se ha podido buscar: ' + e.message); }
-        setBuscandoCodigo(false);
-    };
-
     if (recurso) return <EsteticasRecurso recurso={recurso} onCambiar={() => setRecurso(null)} />;
-
-    const pestanas = [uid && ['MIOS', '👤 Mis recursos'], ['PUBLICOS', '🌍 Públicos'], ['CODIGO', '🔑 Tengo un código']].filter(Boolean);
-    return (
-        <div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 12 }}>
-                {pestanas.map(([k, l]) => (
-                    <button key={k} onClick={() => { setPestana(k); setError(''); }}
-                        style={{ ...S.pestana, ...(pestana === k ? { background: '#0e7490', color: 'white', borderColor: '#0e7490' } : {}) }}>{l}</button>
-                ))}
-            </div>
-            {!uid && <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.85rem', marginBottom: 10 }}>Inicia sesión para ver también tus propios recursos.</div>}
-
-            {pestana === 'CODIGO' ? (
-                <div style={{ ...S.tarjeta, maxWidth: 460, margin: '0 auto', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 800, color: '#0f172a' }}>Escribe el código del recurso</div>
-                    <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Es el código de acceso que aparece en la tarjeta del recurso.</div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === 'Enter' && buscarCodigo()} placeholder="Ej.: AB12CD"
-                            style={{ flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 10, border: '2px solid #cbd5e1', fontSize: '1.1rem', fontWeight: 800, letterSpacing: 2, textAlign: 'center', fontFamily: 'inherit' }} />
-                        <button onClick={buscarCodigo} disabled={buscandoCodigo || !codigo.trim()} style={{ ...S.btn, background: '#0e7490', width: 'auto', padding: '10px 16px' }}>{buscandoCodigo ? '…' : 'Buscar'}</button>
-                    </div>
-                </div>
-            ) : (
-                <>
-                    <div style={S.buscador}>
-                        <span>🔎</span>
-                        <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar por título, juego o profesor…"
-                            style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', fontSize: '0.98rem', background: 'transparent', fontFamily: 'inherit' }} />
-                    </div>
-                    {listas[pestana] === null && !error && <Cargando texto="Cargando recursos…" />}
-                    {listas[pestana] && lista.length === 0 && (
-                        <div style={{ textAlign: 'center', color: '#64748b', margin: 24 }}>
-                            {pestana === 'MIOS' ? 'Todavía no tienes recursos con preguntas. Créalos en tu panel de profesor o usa uno público.' : 'No hay recursos con esa búsqueda.'}
-                        </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 250px), 1fr))', gap: 10 }}>
-                        {lista.map((r) => (
-                            <button key={r.id} onClick={() => setRecurso(r)} style={{ ...S.tarjeta, cursor: 'pointer', textAlign: 'left', border: '2px solid #e2e8f0', fontFamily: 'inherit' }}>
-                                <span style={{ fontWeight: 900, color: '#0f172a' }}>{r.titulo || 'Sin título'}</span>
-                                <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                    <span style={{ ...S.chip, background: '#cffafe', color: '#155e75' }}>{ETIQUETA_JUEGO[r.tipoJuego] || r.tipoJuego || 'Recurso'}</span>
-                                    {pestana === 'PUBLICOS' && r.profesorNombre && <span style={S.chip}>👤 {r.profesorNombre}</span>}
-                                </span>
-                                <span style={{ color: '#0e7490', fontWeight: 800, fontSize: '0.85rem' }}>Pasar a papel ›</span>
-                            </button>
-                        ))}
-                    </div>
-                </>
-            )}
-            {error && <div style={{ color: '#b91c1c', fontWeight: 700, textAlign: 'center', margin: 14 }}>{error}</div>}
-        </div>
-    );
+    return <SelectorRecursoPdf onElegir={setRecurso} pestanaInicial={pestanaInicial} />;
 }
 
 function EsteticasRecurso({ recurso, onCambiar }) {
@@ -537,8 +465,8 @@ function EsteticasRecurso({ recurso, onCambiar }) {
                     <button onClick={() => setClasica(true)} style={{ ...S.btn, background: '#6D28D9', marginTop: 'auto' }}>Elegir formato y descargar ›</button>
                 </div>
 
-                {/* Arcade */}
-                {!esListening && (
+                {/* Arcade (un diagrama de EtiquetaMe no tiene preguntas para este estilo) */}
+                {!esListening && (arcade.length > 0 || recurso.tipoJuego !== 'ETIQUETAS') && (
                     <div style={{ ...S.tarjeta, borderTop: '6px solid #0891b2', background: oscuro ? '#020617' : 'white', color: oscuro ? '#e2e8f0' : undefined, transition: 'background .2s' }}>
                         <div style={{ fontSize: '1.15rem', fontWeight: 900, color: oscuro ? '#22d3ee' : '#0f172a', fontFamily: 'monospace' }}>👾 ARCADE · Invasión Pi</div>
                         <div style={{ color: oscuro ? '#94a3b8' : '#475569', fontSize: '0.86rem' }}>

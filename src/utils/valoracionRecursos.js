@@ -12,7 +12,9 @@ const leerLikes = () => { try { return new Set(JSON.parse(localStorage.getItem(L
 const guardarLikes = (s) => { try { localStorage.setItem(LS_LIKES, JSON.stringify([...s])); } catch { /* sin almacenamiento */ } };
 
 // Recursos que no están en Firestore (preguntas de PiKT, Mathle de ejemplo…)
-const esReal = (r) => !!r?.id && !r.esPikt && !String(r.id).startsWith('fake') && !String(r.id).startsWith('pikt');
+const esReal = (r) => !!r?.id && !r.esPikt && !String(r.id).startsWith('fake') && !String(r.id).startsWith('pikt')
+  // opciones internas de algunos juegos (Racing 3D: educación vial; Aviones: solo pilotar; Mansión: sin recurso)
+  && !r.esVial && !r.soloAros && !r.libre;
 
 /**
  * Suma una partida al recurso (una vez por recurso y sesión del navegador, para que recargar o

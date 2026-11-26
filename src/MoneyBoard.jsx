@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 import {
     ArrowLeft, Search, Play, Users, Trophy, Volume2, VolumeX, Settings, LogOut,
     Star, Maximize, Minimize, Pause, RotateCcw, Check, X, Eye, Plus, Minus, Edit3, Smartphone, Trash2,
@@ -128,6 +130,7 @@ function elegirPreguntaFinal(categorias, usadas = new Set()) {
 // Exportado también para Dinámicas de aula (importar preguntas al Tablero sorpresa, etc.).
 export function BuscadorRecursos({ onBack, onPick, minCats = 2, ayuda }) {
     const [busqueda, setBusqueda] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     const [todos, setTodos] = useState([]);
     const [cargando, setCargando] = useState(true);
 
@@ -156,11 +159,12 @@ export function BuscadorRecursos({ onBack, onPick, minCats = 2, ayuda }) {
     }, [minCats]);
 
     const q = busqueda.toLowerCase().trim();
-    const resultados = !q ? todos : todos.filter(({ r, cats }) =>
+    const resultados0 = !q ? todos : todos.filter(({ r, cats }) =>
         String(r.titulo || '').toLowerCase().includes(q) ||
         String(r.temas || '').toLowerCase().includes(q) ||
         cats.some(c => c.nombre.toLowerCase().includes(q))
     );
+    const resultados = ordenarRecursos(resultados0, orden, (x) => x.r);
 
     return (
         <div style={menuWrap}>
@@ -175,6 +179,7 @@ export function BuscadorRecursos({ onBack, onPick, minCats = 2, ayuda }) {
                 <BuscarFichaCodigo oscuro style={{ marginBottom: 10 }} />
                 <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Título, tema, categoría…"
                     style={{ ...inputEstilo, marginBottom: 12 }} />
+                <OrdenRecursos valor={orden} onChange={setOrden} oscuro color={'#f5c518'} style={{ marginBottom: 12 }} />
 
                 {locales.length > 0 && (
                     <div style={{ marginBottom: 12 }}>
@@ -214,7 +219,7 @@ export function BuscadorRecursos({ onBack, onPick, minCats = 2, ayuda }) {
                     {cargando ? <p style={{ color: '#90a4c8', textAlign: 'center' }}>Cargando biblioteca…</p>
                         : resultados.length === 0 ? <p style={{ color: '#90a4c8', textAlign: 'center' }}>{minCats > 1 ? 'Sin recursos con 2 o más hojas.' : 'Sin recursos.'}</p>
                             : resultados.map(({ r, cats }) => (
-                                <button key={r.id} onClick={() => onPick(r, cats)} style={{
+                                <button key={r.id} onClick={() => { contarJugada(r); onPick(r, cats); }} style={{
                                     textAlign: 'left', padding: '12px 14px', borderRadius: 12,
                                     border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
                                     color: '#eaf1ff', cursor: 'pointer', fontFamily: 'inherit',
@@ -226,6 +231,7 @@ export function BuscadorRecursos({ onBack, onPick, minCats = 2, ayuda }) {
                                     <div style={{ fontSize: 11, color: '#90a4c8', marginTop: 3 }}>
                                         {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {cats.length} categorías · {cats.reduce((s, c) => s + c.preguntas.length, 0)} preguntas
                                     </div>
+                                    <ValoracionRecurso r={r} oscuro tam={11} style={{ marginTop: 6 }} />
                                     <div style={{ fontSize: 11, color: '#5f7599', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {cats.map(c => c.nombre).join(' · ')}
                                     </div>

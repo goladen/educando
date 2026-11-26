@@ -5,6 +5,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { conRecursosPikt } from '../bancoPreguntas/recursosPikt';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from '../components/ValoracionRecurso';
+import { contarJugada } from '../utils/valoracionRecursos';
 import { categoriasDeRecurso, limpiar } from '../utils/normalizarPreguntas';
 import { aNumeroMando } from './mandosMicrobit.js';
 import BotonPdfRecurso from '../components/BotonPdfRecurso';
@@ -57,12 +59,14 @@ const conPreguntas = (docs, numerico) =>
     .filter((x) => x.n > 0)
     .sort((a, b) => (b.r.playCount || 0) - (a.r.playCount || 0));
 
-export default function SelectorRecursoMandos({ seleccionado, onPick, numerico = false }) {
+// contar=false: elegir el recurso no es una partida (p. ej. el Corrector de exámenes saca de él las preguntas)
+export default function SelectorRecursoMandos({ seleccionado, onPick, numerico = false, contar = true }) {
   const uid = auth.currentUser?.uid || null;
   const [pestana, setPestana] = useState(uid ? 'MIOS' : 'PUBLICOS');
   const [listas, setListas] = useState({ MIOS: null, PUBLICOS: null });
   const [error, setError] = useState('');
   const [busqueda, setBusqueda] = useState('');
+  const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
 
   useEffect(() => {
     if (listas[pestana] !== null) return;
@@ -95,14 +99,15 @@ export default function SelectorRecursoMandos({ seleccionado, onPick, numerico =
   const lista = useMemo(() => (docs ? conPreguntas(docs, numerico) : null), [docs, numerico]);
   const resultados = useMemo(() => {
     const q = limpiar(busqueda);
-    if (!lista || !q) return lista || [];
-    return lista.filter(
+    if (!lista) return [];
+    if (!q) return ordenarRecursos(lista, orden, (x) => x.r);
+    return ordenarRecursos(lista.filter(
       ({ r }) =>
         limpiar(r.titulo).includes(q) ||
         limpiar(r.temas).includes(q) ||
         (r.hojas || []).some((h) => limpiar(h.nombreHoja).includes(q))
-    );
-  }, [lista, busqueda]);
+    ), orden, (x) => x.r);
+  }, [lista, busqueda, orden]);
 
   return (
     <div style={st.caja}>
@@ -122,6 +127,7 @@ export default function SelectorRecursoMandos({ seleccionado, onPick, numerico =
           style={st.input}
         />
       </div>
+      <OrdenRecursos valor={orden} onChange={setOrden} oscuro color="#ca8a04" style={{ marginTop: 8 }} />
       {error && <p style={st.error}>{error}</p>}
       <div style={st.lista}>
         {lista === null ? (
@@ -134,7 +140,7 @@ export default function SelectorRecursoMandos({ seleccionado, onPick, numerico =
           </p>
         ) : (
           resultados.map(({ r, n }) => (
-            <button key={r.id} onClick={() => onPick(r)} style={st.item(seleccionado?.id === r.id)}>
+            <button key={r.id} onClick={() => { if (contar) contarJugada(r); onPick(r); }} style={st.item(seleccionado?.id === r.id)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
                 <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
@@ -143,6 +149,7 @@ export default function SelectorRecursoMandos({ seleccionado, onPick, numerico =
                 {r.profesorNombre ? `${r.profesorNombre} · ` : ''}
                 {n} pregunta{n === 1 ? '' : 's'} {numerico ? 'con respuesta numérica' : 'de opción múltiple'}
               </div>
+              <ValoracionRecurso r={r} oscuro tam={11} style={{ marginTop: 4 }} />
             </button>
           ))
         )}

@@ -4,6 +4,8 @@ import { db } from './firebase';
 import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
 import { MATERIAS_PLATAFORMAS as MATERIAS } from './bancoPreguntas/datos/plataformas';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 import { collection, getDocs, query, where, limit, addDoc, doc, getDoc } from 'firebase/firestore';
 
 import pikatronImgSrc  from './assets/pikatron-sprite.png';
@@ -465,6 +467,7 @@ function BuscadorRecursos({ onSelect }) {
   const [cargando,    setCargando]    = useState(false);
   const [error,       setError]       = useState('');
   const [buscado,     setBuscado]     = useState(false);
+  const [orden,       setOrden]       = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
 
   const buscar = async () => {
     setCargando(true); setError(''); setResultados([]); setBuscado(true);
@@ -485,8 +488,8 @@ function BuscadorRecursos({ onSelect }) {
           setError('Código no encontrado.');
         }
       } else {
-        // Búsqueda general: limit(150) sin índices compuestos, filtrado client-side
-        const snap = await getDocs(query(ref, limit(150)));
+        // Búsqueda general: solo Burbujas y Pikatron (sin el antiguo tope de 150), filtrado client-side
+        const snap = await getDocs(query(ref, where('tipoJuego', 'in', ['CAZABURBUJAS', 'PIKATRON'])));
         filtrados = snap.docs
           .map(d => ({ ...d.data(), id: d.id }))
           .filter(r => {
@@ -570,6 +573,7 @@ function BuscadorRecursos({ onSelect }) {
             opacity:cargando?0.6:1 }}>
           {cargando ? 'Buscando…' : 'Buscar en Burbujas / Pikatron'}
         </button>
+        <OrdenRecursos valor={orden} onChange={setOrden} oscuro color="#2980b9" style={{ marginTop: 8 }} />
 
         {error && <div style={{ fontSize:'0.73rem', color:'#e74c3c', marginTop:6 }}>{error}</div>}
         {!error && buscado && !cargando &&
@@ -581,8 +585,8 @@ function BuscadorRecursos({ onSelect }) {
         {/* Tarjetas de resultados */}
         {resultados.length > 0 && (
           <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6, maxHeight:230, overflowY:'auto' }}>
-            {resultados.map(r => (
-              <button key={r.id} onClick={()=>onSelect(r)}
+            {ordenarRecursos(resultados, orden).map(r => (
+              <button key={r.id} onClick={()=>{ contarJugada(r); onSelect(r); }}
                 style={{ padding:'9px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.14)',
                   background:'rgba(255,255,255,0.06)', color:'white', cursor:'pointer', textAlign:'left',
                   fontFamily:'inherit', width:'100%' }}>
@@ -600,6 +604,7 @@ function BuscadorRecursos({ onSelect }) {
                   <span>🎓 {r.ciclo||r.config?.ciclo||'Todos'}</span>
                   {r.accessCode && <span style={{ color:'rgba(255,255,255,0.25)' }}>🔑 {r.accessCode}</span>}
                 </div>
+                <ValoracionRecurso r={r} oscuro tam={11} style={{ marginTop: 4 }} />
                 {(r.hojas||[]).length>0 && (
                   <div style={{ fontSize:'0.68rem', color:'rgba(255,255,255,0.3)', marginTop:2 }}>
                     {r.hojas.map(h=>h.nombreHoja||'Hoja').join(' · ')}

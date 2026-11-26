@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <defs>
+    <linearGradient id="petalo" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#c2185b"/>
+      <stop offset="1" stop-color="#f48fb1"/>
+    </linearGradient>
+    <linearGradient id="tallo" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4caf50"/>
+      <stop offset="1" stop-color="#2e7d32"/>
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="700" fill="#f4faf4"/>
+  <g transform="translate(500 430) scale(1.25) translate(-500 -430)">
+
+  <!-- Tallo (pedúnculo) y hoja -->
+  <path d="M488 700 L488 480 L512 480 L512 700 Z" fill="url(#tallo)"/>
+  <path d="M512 630 C560 590 620 590 660 610 C620 640 560 650 512 640 Z" fill="#66bb6a" stroke="#2e7d32" stroke-width="2.5"/>
+  <path d="M512 636 C570 620 610 615 650 612" fill="none" stroke="#2e7d32" stroke-width="1.5"/>
+
+  <!-- Pétalos de fondo (más claros) -->
+  <path d="M480 455 C430 380 420 260 470 170 C500 230 505 330 500 440 Z" fill="#f8bbd0" stroke="#d81b60" stroke-width="2"/>
+  <path d="M520 455 C570 380 580 260 530 170 C500 230 495 330 500 440 Z" fill="#f8bbd0" stroke="#d81b60" stroke-width="2"/>
+
+  <!-- Pétalos en corte (corola) -->
+  <path d="M458 468 C360 440 270 330 280 190 C350 220 430 310 470 430 Z" fill="url(#petalo)" stroke="#ad1457" stroke-width="3"/>
+  <path d="M542 468 C640 440 730 330 720 190 C650 220 570 310 530 430 Z" fill="url(#petalo)" stroke="#ad1457" stroke-width="3"/>
+
+  <!-- Sépalos (cáliz) -->
+  <path d="M465 482 C420 470 360 478 315 528 C370 525 430 510 470 498 Z" fill="#7cb342" stroke="#33691e" stroke-width="3"/>
+  <path d="M535 482 C580 470 640 478 685 528 C630 525 570 510 530 498 Z" fill="#7cb342" stroke="#33691e" stroke-width="3"/>
+
+  <!-- Receptáculo -->
+  <path d="M455 470 C460 500 540 500 545 470 Z" fill="#8bc34a" stroke="#33691e" stroke-width="3"/>
+
+  <!-- Estambres: filamento + antera -->
+  <g stroke="#c0ca33" stroke-width="5" stroke-linecap="round" fill="none">
+    <line x1="480" y1="455" x2="400" y2="260"/>
+    <line x1="520" y1="455" x2="600" y2="260"/>
+    <line x1="474" y1="458" x2="438" y2="318"/>
+    <line x1="526" y1="458" x2="562" y2="318"/>
+  </g>
+  <g fill="#f9a825" stroke="#e65100" stroke-width="2.5">
+    <ellipse cx="400" cy="255" rx="13" ry="22" transform="rotate(-22 400 255)"/>
+    <ellipse cx="600" cy="255" rx="13" ry="22" transform="rotate(22 600 255)"/>
+    <ellipse cx="437" cy="312" rx="10" ry="17" transform="rotate(-15 437 312)"/>
+    <ellipse cx="563" cy="312" rx="10" ry="17" transform="rotate(15 563 312)"/>
+  </g>
+  <g fill="#ffd54f">
+    <circle cx="385" cy="232" r="3"/><circle cx="378" cy="245" r="2.5"/><circle cx="615" cy="232" r="3"/><circle cx="622" cy="245" r="2.5"/>
+  </g>
+
+  <!-- Pistilo: ovario + estilo + estigma -->
+  <path d="M488 372 L488 230 L512 230 L512 372 Z" fill="#9ccc65" stroke="#558b2f" stroke-width="3"/>
+  <path d="M470 222 C470 196 488 192 500 204 C512 192 530 196 530 222 C520 230 480 230 470 222 Z" fill="#cddc39" stroke="#827717" stroke-width="3"/>
+  <circle cx="500" cy="420" r="55" fill="#9ccc65" stroke="#558b2f" stroke-width="3"/>
+  <circle cx="500" cy="420" r="37" fill="#eef7e1" stroke="#7cb342" stroke-width="2"/>
+  <!-- Óvulos -->
+  <g fill="#ffffff" stroke="#8d6e63" stroke-width="2.5">
+    <ellipse cx="488" cy="408" rx="8" ry="10"/>
+    <ellipse cx="512" cy="408" rx="8" ry="10"/>
+    <ellipse cx="488" cy="432" rx="8" ry="10"/>
+    <ellipse cx="512" cy="432" rx="8" ry="10"/>
+  </g>
+  <g fill="#8d6e63"><circle cx="488" cy="408" r="3"/><circle cx="512" cy="408" r="3"/><circle cx="488" cy="432" r="3"/><circle cx="512" cy="432" r="3"/></g>
+  </g>
+</svg>

@@ -7,6 +7,7 @@ import {
     Paintbrush, Eraser, Slash
 } from 'lucide-react';
 import PublicarModal from './PublicarModal';
+import ModalIAEtiquetas from '../etiquetame/ModalIAEtiquetas';
 
 // ──────────────────────────────────────────────────────────
 // HELPERS
@@ -40,6 +41,8 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
 
     // Drag de etiquetas
     const [draggingId, setDraggingId]           = useState(null);
+    const [dragCampo, setDragCampo]             = useState('label'); // 'label' (casilla) | 'anchor' (punto)
+    const [modalIA, setModalIA]                 = useState(false);
     const containerRef                          = useRef(null);
 
     // Lienzo de pintura
@@ -214,13 +217,15 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
         const handleMove = (e) => {
             if (!containerRef.current) return;
             const rect = containerRef.current.getBoundingClientRect();
-            const newX = Math.max(1, Math.min(99, ((e.clientX - rect.left)  / rect.width)  * 100));
-            const newY = Math.max(1, Math.min(99, ((e.clientY - rect.top)   / rect.height) * 100));
+            const lim  = dragCampo === 'anchor' ? [0, 100] : [1, 99];
+            const newX = Math.max(lim[0], Math.min(lim[1], ((e.clientX - rect.left)  / rect.width)  * 100));
+            const newY = Math.max(lim[0], Math.min(lim[1], ((e.clientY - rect.top)   / rect.height) * 100));
             setDatos(prev => {
                 const hojas = [...prev.hojas];
                 const hoja  = { ...hojas[hojaActiva] };
                 hoja.markers = hoja.markers.map(m =>
-                    m.id === draggingId ? { ...m, labelX: newX, labelY: newY } : m
+                    m.id !== draggingId ? m
+                        : dragCampo === 'anchor' ? { ...m, anchorX: newX, anchorY: newY } : { ...m, labelX: newX, labelY: newY }
                 );
                 hojas[hojaActiva] = hoja;
                 return { ...prev, hojas };
@@ -233,7 +238,7 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
             window.removeEventListener('pointermove', handleMove);
             window.removeEventListener('pointerup',   handleUp);
         };
-    }, [draggingId, hojaActiva]);
+    }, [draggingId, dragCampo, hojaActiva]);
 
     const updateTexto = (id, texto) =>
         updateHoja({ markers: markers.map(m => m.id === id ? { ...m, text: texto } : m) });
@@ -356,6 +361,13 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                             >
                                 <Search size={16} /> {modoBuscador ? 'Ocultar' : 'Buscar imagen'}
                             </button>
+                            <button
+                                onClick={() => setModalIA(true)}
+                                style={{ ...st.btnSecondary, background: 'linear-gradient(135deg,#7c3aed,#db2777)', color: 'white' }}
+                                title="Que tu IA dibuje el diagrama o coloque las etiquetas en tu imagen"
+                            >
+                                🤖 Con tu IA
+                            </button>
                             {hojaActual.imageUrl && (
                                 <button
                                     onClick={() => updateHoja({ imageUrl: '', markers: [] })}
@@ -432,7 +444,7 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                                         </button>
                                         {!modoLienzo && (
                                             <span style={{ fontSize: '0.8rem', color: '#e67e22', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <Plus size={14} /> Clic en imagen para añadir etiquetas
+                                                <Plus size={14} /> Clic en la imagen para añadir · arrastra los puntos para moverlos
                                             </span>
                                         )}
                                     </div>
@@ -505,8 +517,10 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                                     {markers.map((m, index) => (
                                         <div
                                             key={`anchor-${m.id}`}
-                                            style={{ ...st.anchorDot, left: `${m.anchorX}%`, top: `${m.anchorY}%` }}
-                                            title={`Punto ${index + 1}: ${m.text || '(sin texto)'}`}
+                                            style={{ ...st.anchorDot, left: `${m.anchorX}%`, top: `${m.anchorY}%`, cursor: draggingId === m.id && dragCampo === 'anchor' ? 'grabbing' : 'grab', touchAction: 'none', zIndex: draggingId === m.id ? 101 : 5 }}
+                                            title={`Punto ${index + 1}: ${m.text || '(sin texto)'} · arrástralo para moverlo`}
+                                            data-drag-handle="true"
+                                            onPointerDown={(e) => { if (modoLienzo) return; e.stopPropagation(); e.preventDefault(); setDragCampo('anchor'); setDraggingId(m.id); }}
                                         >
                                             <span style={st.anchorNum}>{index + 1}</span>
                                             <div style={st.anchorPulse} />
@@ -528,7 +542,7 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                                             {/* Handle de arrastre */}
                                             <div
                                                 data-drag-handle="true"
-                                                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setDraggingId(m.id); }}
+                                                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setDragCampo('label'); setDraggingId(m.id); }}
                                                 style={st.dragHandle}
                                                 title="Arrastrar etiqueta"
                                             >
@@ -594,6 +608,21 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                     )}
 
                 </div>{/* end body */}
+
+                {modalIA && (
+                    <ModalIAEtiquetas
+                        hoja={hojaActual}
+                        onClose={() => setModalIA(false)}
+                        onAplicar={({ imageUrl, nombreHoja, markers: nuevos }) => {
+                            const cambios = { markers: nuevos };
+                            if (imageUrl) { cambios.imageUrl = imageUrl; cambios.paintData = null; }
+                            if (nombreHoja && /^Diagrama \d+$/.test(hojaActual.nombreHoja || '')) cambios.nombreHoja = nombreHoja;
+                            updateHoja(cambios);
+                            setModoBuscador(false);
+                            setModalIA(false);
+                        }}
+                    />
+                )}
 
                 {/* ── MODAL CONFIGURACIÓN ── */}
                 {modalPublicar && (

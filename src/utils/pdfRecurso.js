@@ -1,7 +1,9 @@
 // Ficha imprimible de CUALQUIER recurso del profesor (resources): versión en papel
 // para trabajar en clase o en casa y después terminar jugando con el mismo recurso.
 //   formatosDisponibles(recurso) → [{ id, label, desc }]
-//   generarPdfRecurso(recurso, { formato, hojas, barajar, soluciones, juego, qr, descargar })
+//   generarPdfRecurso(recurso, { formato, hojas, barajar, soluciones, juego, qr, descargar, max, aleatorio })
+//   generarPdfMix({ titulo, partes, soluciones }): ficha mezclada (centroPdf/FichaMix.jsx)
+//   contarElementos(recurso, formato, hojas): cuántas preguntas/palabras entran con ese formato
 //   · hojas: índices de las hojas incluidas (por defecto todas)
 //   · juego: { label, url } del juego con el que se jugará después (QR + enlace en la cabecera)
 // Texto real de jsPDF (no captura): nítido y ligero. Mismo estilo que utils/pdfListening.js.
@@ -492,69 +494,124 @@ async function cargarQR(url) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Generador principal
+// Elementos de cada formato (lo que se cuenta y se puede recortar)
 // ─────────────────────────────────────────────────────────────
-export async function generarPdfRecurso(recurso, {
-    formato, hojas: indices = null, barajar = false, soluciones = true, juego = null, qr = true, dificil = false, descargar = true,
-} = {}) {
-    const { jsPDF } = await import('jspdf');
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-    const D = crearMaquetador(pdf);
+function elementosHoja(h, formato, t) {
+    if (formato === 'TEST' || formato === 'RESPUESTA' || formato === 'RULETA') return preguntasDeHoja(h);
+    if (formato === 'ROSCO') return roscoDeHoja(h);
+    if (formato === 'UNIR') return paresDeHoja(h, t);
+    if (formato === 'SOPA' || formato === 'ANAGRAMA') {
+        const vistas = new Set();
+        const items = palabrasDeHoja(h, t).filter(x => !vistas.has(x.palabra) && vistas.add(x.palabra));
+        return formato === 'SOPA' ? items.slice(0, 20) : items.slice(0, 40);
+    }
+    if (formato === 'LINEA') return (h.eventos || []).filter(e => e.titulo);
+    if (formato === 'ETIQUETAS') return h.imageUrl ? (h.markers || []).filter(m => m.text) : [];
+    return [];
+}
+
+/** Cuántas preguntas/palabras/parejas… entran en la ficha con ese formato y esas hojas. */
+export function contarElementos(recurso, formato, indices = null) {
+    const porHoja = hojasDe(recurso).map((h, i) => ({ i, n: elementosHoja(h, formato, recurso.tipoJuego).length }))
+        .filter(x => !indices || indices.includes(x.i));
+    return { total: porHoja.reduce((s, x) => s + x.n, 0), porHoja };
+}
+
+// Reparte «max» elementos entre las hojas en proporción a lo que tiene cada una (restos mayores)
+function repartirCupos(porHoja, max) {
+    const total = porHoja.reduce((s, x) => s + x.n, 0);
+    if (max == null || max >= total) return null;
+    const base = porHoja.map(x => ({ i: x.i, n: x.n, c: Math.floor((x.n * max) / total), r: ((x.n * max) / total) % 1 }));
+    let quedan = max - base.reduce((s, x) => s + x.c, 0);
+    [...base].sort((a, b) => b.r - a.r).forEach(x => { if (quedan > 0 && x.c < x.n) { x.c++; quedan--; } });
+    return Object.fromEntries(base.map(x => [x.i, x.c]));
+}
+
+// Subconjunto de una lista: las primeras o unas al azar (respetando su orden original)
+function subconjunto(arr, n, aleatorio) {
+    if (n == null || n >= arr.length) return arr;
+    if (!aleatorio) return arr.slice(0, n);
+    const elegidos = new Set(mezclar(arr.map((_, i) => i)).slice(0, n));
+    return arr.filter((_, i) => elegidos.has(i));
+}
+
+// ─────────────────────────────────────────────────────────────
+// Cuerpo de la ficha de un recurso (sin cabecera ni soluciones):
+// se usa en la ficha normal y como «parte» de la ficha mezclada.
+// Devuelve las soluciones: [{ titulo, lineas, sopa?, paneles? }]
+// ─────────────────────────────────────────────────────────────
+async function dibujarFormato(D, recurso, { formato, indices = null, barajar = false, dificil = false, max = null, aleatorio = true }) {
+    const { pdf } = D;
     const t = recurso.tipoJuego;
-    const todas = hojasDe(recurso);
-    const elegidas = todas.map((h, i) => ({ h, i, nombre: nombreHoja(h, i) }))
+    const elegidas = hojasDe(recurso).map((h, i) => ({ h, i, nombre: nombreHoja(h, i) }))
         .filter(x => !indices || indices.includes(x.i));
     const varias = elegidas.length > 1;
     const orden = (arr) => (barajar ? mezclar(arr) : arr);
-    const subtitulo = elegidas.length === 1 && todas.length > 1 ? elegidas[0].nombre : '';
-    const qrImg = juego?.url && qr ? await cargarQR(juego.url) : null;
-
-    cabecera(D, recurso, formato, subtitulo, juego, qrImg);
-
+    const cupos = repartirCupos(elegidas.map(({ h, i }) => ({ i, n: elementosHoja(h, formato, t).length })), max);
+    const tomar = (i, arr) => subconjunto(arr, cupos ? cupos[i] : null, aleatorio);
     const instruccion = (txt) => { D.parrafo(txt, { tam: 10.5, estilo: 'italic', color: [71, 85, 105] }); D.y += 2; };
     const seccion = (nombre) => { if (varias) D.titulo(nombre); };
-    const sol = [];                                         // [{ titulo, lineas, sopa? }]
+    // Página nueva entre hojas de formatos grandes (rosco, sopa…) solo si ya hay algo escrito en esta
+    const yInicio = D.y;
+    let dibujadas = 0;
+    const nuevaHoja = () => { if (dibujadas++ > 0 && D.y > yInicio) { pdf.addPage(); D.y = MM.margen; } };
+    const sol = [];
 
     if (formato === 'TEST' || formato === 'RESPUESTA') {
         instruccion(formato === 'TEST' ? 'Rodea la opción correcta. Si no hay opciones, escribe la respuesta en la línea.' : 'Contesta a cada pregunta en la línea.');
         let n = 0;
-        elegidas.forEach(({ h, nombre }) => {
-            const qs = orden(preguntasDeHoja(h));
+        elegidas.forEach(({ h, i, nombre }) => {
+            const qs = orden(tomar(i, preguntasDeHoja(h)));
             if (!qs.length) return;
             seccion(nombre);
             sol.push({ titulo: nombre, lineas: bloquePreguntas(D, qs, formato === 'RESPUESTA', n) });
             n += qs.length;
         });
     } else if (formato === 'ROSCO') {
-        elegidas.forEach(({ h, nombre }, k) => {
-            const items = roscoDeHoja(h);
+        elegidas.forEach(({ h, i, nombre }) => {
+            const items = tomar(i, roscoDeHoja(h));
             if (!items.length) return;
-            if (k > 0) { pdf.addPage(); D.y = MM.margen; }
+            nuevaHoja();
             seccion(nombre);
             instruccion('Escribe la palabra que corresponde a cada definición. Empieza por la letra indicada (o la contiene).');
             sol.push({ titulo: nombre, lineas: bloqueRosco(D, items) });
         });
     } else if (formato === 'UNIR') {
         instruccion('Une con una flecha cada elemento de la izquierda con su pareja de la derecha y anota la letra abajo.');
-        elegidas.forEach(({ h, nombre }) => {
-            const pares = orden(paresDeHoja(h, t));
+        elegidas.forEach(({ h, i, nombre }) => {
+            const pares = orden(tomar(i, paresDeHoja(h, t)));
             if (!pares.length) return;
             seccion(nombre);
             sol.push({ titulo: nombre, lineas: bloqueUnir(D, pares) });
         });
+    } else if (formato === 'SOPA' && max != null) {
+        // Con número de palabras (ficha mezclada): UNA sola sopa con las palabras de todas las hojas
+        const vistas = new Set();
+        let items = elegidas.flatMap(({ h, i }) => tomar(i, elementosHoja(h, formato, t)))
+            .filter(x => !vistas.has(x.palabra) && vistas.add(x.palabra)).slice(0, 20);
+        const sopa = items.length ? crearSopa(items.map(x => x.palabra), dificil) : null;
+        if (sopa) {
+            const puestas = new Set(sopa.puestas.map(p => p.w));
+            items = items.filter(x => puestas.has(x.palabra));
+            const conPistas = items.some(x => x.pista);
+            instruccion(conPistas
+                ? 'Resuelve cada pista y busca la palabra en la sopa de letras.'
+                : `Encuentra estas ${items.length} palabras en la sopa de letras${dificil ? ' (también hacia atrás)' : ''}.`);
+            dibujarSopa(D, sopa, false);
+            if (conPistas) items.forEach((x, j) => { D.parrafo(`${j + 1}. ${x.pista} (${x.palabra.length} letras)`, { tam: 10, interlinea: 1.3 }); D.y += 1.2; });
+            else columnas(D, items.map(x => x.palabra), 4);
+            sol.push({ titulo: 'Sopa de letras', lineas: items.map((x, j) => (conPistas ? `${j + 1}. ${x.palabra}` : x.palabra)), sopa });
+        }
     } else if (formato === 'SOPA' || formato === 'ANAGRAMA') {
-        elegidas.forEach(({ h, nombre }, k) => {
-            let items = palabrasDeHoja(h, t);
-            const vistas = new Set();
-            items = items.filter(x => !vistas.has(x.palabra) && vistas.add(x.palabra));
+        elegidas.forEach(({ h, i, nombre }, k) => {
+            let items = tomar(i, elementosHoja(h, formato, t));
             if (!items.length) return;
             if (formato === 'SOPA') {
-                items = items.slice(0, 20);
                 const sopa = crearSopa(items.map(x => x.palabra), dificil);
                 if (!sopa) return;
                 const puestas = new Set(sopa.puestas.map(p => p.w));
                 items = items.filter(x => puestas.has(x.palabra));
-                if (k > 0) { pdf.addPage(); D.y = MM.margen; }
+                nuevaHoja();
                 seccion(nombre);
                 const conPistas = items.some(x => x.pista);
                 instruccion(conPistas
@@ -562,38 +619,38 @@ export async function generarPdfRecurso(recurso, {
                     : `Encuentra estas ${items.length} palabras en la sopa de letras${dificil ? ' (también hacia atrás)' : ''}.`);
                 dibujarSopa(D, sopa, false);
                 if (conPistas) {
-                    items.forEach((x, i) => {
-                        D.parrafo(`${i + 1}. ${x.pista} (${x.palabra.length} letras)`, { tam: 10, interlinea: 1.3 });
+                    items.forEach((x, j) => {
+                        D.parrafo(`${j + 1}. ${x.pista} (${x.palabra.length} letras)`, { tam: 10, interlinea: 1.3 });
                         D.y += 1.2;
                     });
                 } else columnas(D, items.map(x => x.palabra), 4);
-                sol.push({ titulo: nombre, lineas: items.map((x, i) => (conPistas ? `${i + 1}. ${x.palabra}` : x.palabra)), sopa });
+                sol.push({ titulo: nombre, lineas: items.map((x, j) => (conPistas ? `${j + 1}. ${x.palabra}` : x.palabra)), sopa });
             } else {
                 seccion(nombre);
                 if (k === 0) instruccion('Ordena las letras para formar la palabra correcta.');
-                const lista = orden(items).slice(0, 40);
-                lista.forEach((x, i) => {
+                const lista = orden(items);
+                lista.forEach((x, j) => {
                     let rev = x.palabra;
                     for (let r = 0; r < 6 && rev === x.palabra; r++) rev = mezclar(x.palabra.split('')).join('');
-                    const linea = x.pista ? `${i + 1}. ${x.pista}` : '';
+                    const linea = x.pista ? `${j + 1}. ${x.pista}` : '';
                     if (linea) D.parrafo(linea, { tam: 10, interlinea: 1.3 });
                     D.salto(9);
                     D.fuente('bold', 12, MORADO);
-                    pdf.text(`${x.pista ? '' : `${i + 1}.  `}${rev.split('').join(' ')}`, MM.margen + (x.pista ? 6 : 0), D.y + 4.5);
+                    pdf.text(`${x.pista ? '' : `${j + 1}.  `}${rev.split('').join(' ')}`, MM.margen + (x.pista ? 6 : 0), D.y + 4.5);
                     D.raya(MM.margen + 95, MM.margen + ANCHO_UTIL, D.y + 5);
                     D.y += 9;
                 });
-                sol.push({ titulo: nombre, lineas: lista.map((x, i) => `${i + 1}. ${x.palabra}`) });
+                sol.push({ titulo: nombre, lineas: lista.map((x, j) => `${j + 1}. ${x.palabra}`) });
             }
         });
     } else if (formato === 'RULETA') {
         let n = 0;
-        elegidas.forEach(({ h, nombre }, k) => {
+        elegidas.forEach(({ h, i, nombre }) => {
             const frases = frasesRuleta(h);
             if (!frases.length) return;
-            if (k > 0) { pdf.addPage(); D.y = MM.margen; }
+            nuevaHoja();
             seccion(nombre);
-            const qs = orden(preguntasDeHoja(h));
+            const qs = orden(tomar(i, preguntasDeHoja(h)));
             instruccion(qs.length
                 ? 'Responde a las pistas: cada respuesta te ayuda a descubrir la frase oculta del panel. Escribe las letras en las casillas.'
                 : 'Descubre la frase oculta y escribe sus letras en las casillas.');
@@ -607,8 +664,8 @@ export async function generarPdfRecurso(recurso, {
             sol.push({ titulo: nombre, lineas, paneles: frases });
         });
     } else if (formato === 'LINEA') {
-        elegidas.forEach(({ h, nombre }) => {
-            const evs = (h.eventos || []).filter(e => e.titulo);
+        elegidas.forEach(({ h, i, nombre }) => {
+            const evs = tomar(i, (h.eventos || []).filter(e => e.titulo));
             if (evs.length < 2) return;
             seccion(nombre);
             instruccion('Numera los acontecimientos del más antiguo (1) al más reciente y escribe su fecha.');
@@ -630,15 +687,13 @@ export async function generarPdfRecurso(recurso, {
                 D.y += alto + 2;
             });
             const ordenados = [...evs].sort((a, b) => valorFecha(a) - valorFecha(b));
-            sol.push({ titulo: nombre, lineas: ordenados.map((e, i) => `${i + 1}. ${fechaTexto(e)} - ${e.titulo}`) });
+            sol.push({ titulo: nombre, lineas: ordenados.map((e, k) => `${k + 1}. ${fechaTexto(e)} - ${e.titulo}`) });
         });
     } else if (formato === 'ETIQUETAS') {
-        let primera = true;
-        for (const { h, nombre } of elegidas) {
-            const markers = (h.markers || []).filter(m => m.text);
+        for (const { h, i, nombre } of elegidas) {
+            const markers = tomar(i, (h.markers || []).filter(m => m.text));
             if (!h.imageUrl || !markers.length) continue;
-            if (!primera) { pdf.addPage(); D.y = MM.margen; }
-            primera = false;
+            nuevaHoja();
             seccion(nombre);
             instruccion('Escribe el nombre de cada parte señalada con un número.');
             const img = await cargarImagen(h.imageUrl);
@@ -649,12 +704,12 @@ export async function generarPdfRecurso(recurso, {
                 D.salto(alto + 4);
                 const x0 = (MM.ancho - w) / 2, y0 = D.y;
                 pdf.addImage(img.data, 'JPEG', x0, y0, w, alto);
-                markers.forEach((m, i) => {
+                markers.forEach((m, k) => {
                     const x = x0 + (m.anchorX / 100) * w, y = y0 + (m.anchorY / 100) * alto;
                     pdf.setFillColor(255, 255, 255); pdf.setDrawColor(220, 38, 38); pdf.setLineWidth(0.6);
                     pdf.circle(x, y, 3, 'FD');
                     D.fuente('bold', 8.5, [220, 38, 38]);
-                    pdf.text(String(i + 1), x, y + 1.1, { align: 'center' });
+                    pdf.text(String(k + 1), x, y + 1.1, { align: 'center' });
                 });
                 D.y += alto + 6;
             } else {
@@ -663,37 +718,155 @@ export async function generarPdfRecurso(recurso, {
             D.titulo('Banco de palabras', [30, 64, 175]);
             D.parrafo(mezclar(markers.map(m => m.text)).join('   ·   '), { tam: 10 });
             D.y += 3;
-            columnas(D, markers.map((_, i) => `${i + 1}. ____________________`), 3, 10.5);
-            sol.push({ titulo: nombre, lineas: markers.map((m, i) => `${i + 1}. ${m.text}`) });
+            columnas(D, markers.map((_, k) => `${k + 1}. ____________________`), 3, 10.5);
+            sol.push({ titulo: nombre, lineas: markers.map((m, k) => `${k + 1}. ${m.text}`) });
         }
     }
+    return sol;
+}
 
-    // ── Soluciones ──
+// Soluciones de un recurso (lista de dibujarFormato); conTitulos = poner el nombre de cada hoja
+function dibujarSoluciones(D, sol, conTitulos) {
+    sol.forEach(s => {
+        if (conTitulos) D.titulo(s.titulo);
+        if (s.sopa) dibujarSopa(D, s.sopa, true);
+        (s.paneles || []).forEach(f => panelRuleta(D, f, true));
+        const largas = s.lineas.some(l => seguro(l).length > 34);
+        if (largas) s.lineas.forEach(l => { D.parrafo(l, { tam: 10, interlinea: 1.3 }); D.y += 1; });
+        else columnas(D, s.lineas, 3, 10);
+    });
+}
+
+function pieDePagina(D, texto) {
+    const { pdf } = D;
+    const total = pdf.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
+        pdf.setPage(i);
+        D.fuente('normal', 8, [170, 170, 170]);
+        pdf.text(seguro(`pikt.es · ${texto || ''}`).slice(0, 90), MM.margen, MM.alto - 8);
+        pdf.text(`${i} / ${total}`, MM.ancho - MM.margen, MM.alto - 8, { align: 'right' });
+    }
+}
+
+const nombreArchivo = (t) => String(t || 'ficha').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'ficha';
+
+// ─────────────────────────────────────────────────────────────
+// Generador principal
+//   max / aleatorio: usar solo «max» elementos (al azar o los primeros)
+// ─────────────────────────────────────────────────────────────
+export async function generarPdfRecurso(recurso, {
+    formato, hojas: indices = null, barajar = false, soluciones = true, juego = null, qr = true, dificil = false, descargar = true,
+    max = null, aleatorio = true,
+} = {}) {
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+    const D = crearMaquetador(pdf);
+    const todas = hojasDe(recurso);
+    const elegidas = todas.map((h, i) => ({ i, nombre: nombreHoja(h, i) })).filter(x => !indices || indices.includes(x.i));
+    const varias = elegidas.length > 1;
+    const subtitulo = elegidas.length === 1 && todas.length > 1 ? elegidas[0].nombre : '';
+    const qrImg = juego?.url && qr ? await cargarQR(juego.url) : null;
+
+    cabecera(D, recurso, formato, subtitulo, juego, qrImg);
+    const sol = await dibujarFormato(D, recurso, { formato, indices, barajar, dificil, max, aleatorio });
+
     if (soluciones && sol.length) {
         pdf.addPage(); D.y = MM.margen;
         D.fuente('bold', 15, [44, 62, 80]);
         pdf.text(seguro(`Soluciones · ${recurso.titulo || ''}`), MM.margen, D.y + 5);
         D.y += 10;
-        sol.forEach(s => {
-            if (sol.length > 1 || varias) D.titulo(s.titulo);
-            if (s.sopa) dibujarSopa(D, s.sopa, true);
-            (s.paneles || []).forEach(f => panelRuleta(D, f, true));
-            const largas = s.lineas.some(l => seguro(l).length > 34);
-            if (largas) s.lineas.forEach(l => { D.parrafo(l, { tam: 10, interlinea: 1.3 }); D.y += 1; });
-            else columnas(D, s.lineas, 3, 10);
-        });
+        dibujarSoluciones(D, sol, sol.length > 1 || varias);
     }
 
-    // ── Pie de página ──
-    const total = pdf.getNumberOfPages();
-    for (let i = 1; i <= total; i++) {
-        pdf.setPage(i);
-        D.fuente('normal', 8, [170, 170, 170]);
-        pdf.text(seguro(`pikt.es · ${recurso.titulo || ''}`).slice(0, 90), MM.margen, MM.alto - 8);
-        pdf.text(`${i} / ${total}`, MM.ancho - MM.margen, MM.alto - 8, { align: 'right' });
+    pieDePagina(D, recurso.titulo);
+    if (descargar) pdf.save(`${nombreArchivo(recurso.titulo)}-${formato.toLowerCase()}.pdf`);
+    return pdf;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FICHA MEZCLADA (centroPdf/FichaMix.jsx): varias partes en un solo PDF
+//   partes: [
+//     { tipo: 'recurso', titulo, recurso, formato, hojas, max, aleatorio, barajar, dificil },
+//     { tipo: 'html', titulo, alumno: nodo, soluciones: nodo },   // bloques [data-bloque] (ejercicios generados)
+//   ]
+// Los bloques HTML se capturan con html2canvas y se colocan a la anchura útil.
+// ─────────────────────────────────────────────────────────────
+async function anadirBloquesHtml(D, nodo) {
+    if (!nodo) return;
+    const html2canvas = (await import('html2canvas')).default;
+    for (const b of nodo.querySelectorAll('[data-bloque]')) {
+        const canvas = await html2canvas(b, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true });
+        if (!canvas.width || !canvas.height) continue;
+        const h = (canvas.height * ANCHO_UTIL) / canvas.width;
+        D.salto(Math.min(h, MM.alto - 2 * MM.margen - 6));
+        D.pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', MM.margen, D.y, ANCHO_UTIL, h);
+        D.y += h;
+    }
+}
+
+function tituloParte(D, k, titulo) {
+    const { pdf } = D;
+    D.salto(20);
+    D.y += 3;
+    pdf.setFillColor(237, 233, 254);
+    pdf.roundedRect(MM.margen, D.y, ANCHO_UTIL, 8.5, 2, 2, 'F');
+    D.fuente('bold', 11.5, MORADO);
+    pdf.text(seguro(`Parte ${k}${titulo ? ` · ${titulo}` : ''}`).slice(0, 95), MM.margen + 3, D.y + 5.9);
+    D.y += 12;
+}
+
+export async function generarPdfMix({ titulo = 'Ficha', subtitulo = '', partes = [], soluciones = true, descargar = true } = {}) {
+    const { jsPDF } = await import('jspdf');
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+    const D = crearMaquetador(pdf);
+
+    // Cabecera
+    D.fuente('bold', 18, [44, 62, 80]);
+    const tit = pdf.splitTextToSize(seguro(titulo || 'Ficha'), ANCHO_UTIL);
+    tit.forEach((l, i) => pdf.text(l, MM.margen, D.y + 6.5 + i * 7.5));
+    D.y += 6.5 + tit.length * 7.5 - 2;
+    if (subtitulo) { D.fuente('bold', 10, MORADO); pdf.text(seguro(subtitulo), MM.margen, D.y + 3); D.y += 7; }
+    D.fuente('normal', 10, [90, 90, 90]);
+    pdf.text('Nombre: ________________________________________   Curso: __________   Fecha: ___________', MM.margen, D.y + 3);
+    D.y += 7;
+    pdf.setDrawColor(221, 214, 254); pdf.setLineWidth(0.5);
+    pdf.line(MM.margen, D.y, MM.ancho - MM.margen, D.y);
+    D.y += 2;
+
+    // Partes
+    const resultados = [];
+    let k = 0;
+    for (const p of partes) {
+        k++;
+        tituloParte(D, k, p.titulo);
+        if (p.tipo === 'recurso') {
+            const sol = await dibujarFormato(D, p.recurso, {
+                formato: p.formato, indices: p.hojas || null, barajar: !!p.barajar, dificil: !!p.dificil,
+                max: p.max ?? null, aleatorio: p.aleatorio !== false,
+            });
+            resultados.push({ ...p, k, sol });
+        } else {
+            await anadirBloquesHtml(D, p.alumno);
+            resultados.push({ ...p, k });
+        }
+        D.y += 3;
     }
 
-    const nombre = (recurso.titulo || 'ficha').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
-    if (descargar) pdf.save(`${nombre || 'ficha'}-${formato.toLowerCase()}.pdf`);
+    // Soluciones de todas las partes
+    if (soluciones) {
+        pdf.addPage(); D.y = MM.margen;
+        D.fuente('bold', 15, [44, 62, 80]);
+        pdf.text(seguro(`Soluciones · ${titulo || ''}`).slice(0, 80), MM.margen, D.y + 5);
+        D.y += 9;
+        for (const r of resultados) {
+            tituloParte(D, r.k, r.titulo);
+            if (r.tipo === 'recurso') dibujarSoluciones(D, r.sol || [], (r.sol || []).length > 1);
+            else await anadirBloquesHtml(D, r.soluciones);
+            D.y += 2;
+        }
+    }
+
+    pieDePagina(D, titulo);
+    if (descargar) pdf.save(`${nombreArchivo(titulo)}-mix.pdf`);
     return pdf;
 }

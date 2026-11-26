@@ -9,6 +9,11 @@ import KartingJoinRace     from './KartingOnline/KartingJoinRace';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
+import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
+import { categoriasDeRecurso, conOpcionesParaElegir } from './utils/normalizarPreguntas';
+import HojasRecurso, { filtrarHojas } from './components/HojasRecurso';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 // Conducir con las manos (webcam): volante + marchas con los dedos. Se carga al activarlo.
 const VolanteManos = React.lazy(() => import('./manos/VolanteManos.jsx'));
 const LS_MANOS = 'pikt_karting_manos';
@@ -221,14 +226,21 @@ function buildCar(scene, mainColor=0xe74c3c, darkColor=0xc0392b) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// PANTALLA PREVIA – selección de recurso con multi-hoja (estilo Duelo Piratas)
+// PANTALLA PREVIA – selección de recurso igual que el Racing 3D (buscador, orden,
+// «me gusta», recursos PiKT y hojas con HojasRecurso) + circuito + 🧒 Modo peques
 // ════════════════════════════════════════════════════════════════════════════
+const LS_FACIL = 'pikt_karting_facil';
+const COLORES_HOJAS = ['#FF6B00', '#7B2FFF', '#00a86b', '#0072FF', '#ee0979', '#56ab2f'];
+const hojasComoLista = (h) => (Array.isArray(h) ? (h.length ? h : ['General']) : [h || 'General']);
+
 function PantallaPrevia({ onIniciar, onConstruir, onAlmacen, onOnline }) {
-  const [circuito,     setCircuito]     = useState(1);
-  const [recursos,     setRecursos]     = useState([]);
-  const [cargando,     setCargando]     = useState(true);
-  const [recursoSel,   setRecursoSel]   = useState(null);
-  const [hojasChecked, setHojasChecked] = useState([]);
+  const [circuito,   setCircuito]   = useState(1);
+  const [facil,      setFacil]      = useState(() => { try { return localStorage.getItem(LS_FACIL)==='1'; } catch { return false; } });
+  const [recursos,   setRecursos]   = useState([]);
+  const [cargando,   setCargando]   = useState(true);
+  const [recursoSel, setRecursoSel] = useState(null);
+  const [filtro,     setFiltro]     = useState('');
+  const [orden,      setOrden]      = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
 
   useEffect(() => {
     (async () => {
@@ -237,189 +249,91 @@ function PantallaPrevia({ onIniciar, onConstruir, onAlmacen, onOnline }) {
           getDocs(query(collection(db,'resources'), where('tipoJuego','==','CAZABURBUJAS'), where('isPrivate','==',false))),
           getDocs(query(collection(db,'resources'), where('tipoJuego','==','KARTINGED'),   where('isPrivate','==',false))),
         ]);
-        setRecursos([...s1.docs,...s2.docs].map(d=>({id:d.id,...d.data()})));
-      } catch(e) { console.error(e); }
+        const profes = [...s1.docs,...s2.docs].map(d=>({id:d.id,...d.data()}));
+        setRecursos(await conRecursosPikt(profes, 'CAZABURBUJAS'));
+      } catch(e) { console.error('Karting:', e); }
       setCargando(false);
     })();
   }, []);
 
-  const seleccionar = (r) => {
-    setRecursoSel(r);
-    const hojas = r.hojas || [];
-    setHojasChecked(hojas.length > 1 ? hojas.map((_,i)=>i) : []);
-  };
-
-  const hojas        = recursoSel?.hojas || [];
-  const tieneHojas   = hojas.length > 1;
-  const todasActivas = tieneHojas && hojasChecked.length === hojas.length;
-
-  const toggleHoja = (i) => setHojasChecked(prev =>
-    prev.includes(i) ? prev.filter(x=>x!==i) : [...prev, i]
-  );
-
-  const pregsCount = tieneHojas
-    ? hojasChecked.reduce((acc,i) => acc + (hojas[i]?.preguntas?.length || 0), 0)
-    : (recursoSel?.hojas?.[0]?.preguntas?.length || recursoSel?.preguntas?.length || 0);
-
-  const iniciar = () => {
-    if (!recursoSel) return;
-    let selectedNames;
-    if (!tieneHojas) {
-      selectedNames = ['General'];
-    } else {
-      selectedNames = hojasChecked.map(i => hojas[i]?.nombreHoja).filter(Boolean);
-      if (!selectedNames.length) return;
-    }
-    onIniciar(recursoSel, selectedNames, circuito);
-  };
+  const cambiarFacil = (v) => { setFacil(v); try { localStorage.setItem(LS_FACIL, v?'1':'0'); } catch { /* sin almacenamiento */ } };
+  const filtrados = recursos.filter(r => !filtro || `${r.titulo} ${r.temas||''} ${r.ciclo||''}`.toLowerCase().includes(filtro.toLowerCase()));
+  const lista = ordenarRecursos(filtrados, orden);
 
   const st = {
-    page:  { minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)', display:'flex', flexDirection:'column', alignItems:'center', padding:'30px 20px', color:'white', fontFamily:"'Segoe UI',sans-serif" },
+    page:  { minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)', display:'flex', flexDirection:'column', alignItems:'center', padding:'30px 16px', color:'white', fontFamily:"'Segoe UI',sans-serif" },
     title: { fontSize:'2.2rem', fontWeight:900, margin:'0 0 6px', background:'linear-gradient(90deg,#FF6B00,#FFD700)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' },
-    grid:  { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:16, width:'100%', maxWidth:860 },
-    card:  (sel) => ({ background: sel?'rgba(255,107,0,0.25)':'rgba(255,255,255,0.07)', border:`2px solid ${sel?'#FF6B00':'rgba(255,255,255,0.12)'}`, borderRadius:14, padding:'16px 18px', cursor:'pointer', transition:'all .2s' }),
+    grid:  { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:12, width:'100%', maxWidth:900 },
+    card:  (sel) => ({ background: sel?'rgba(255,107,0,0.25)':'rgba(255,255,255,0.07)', border:`2px solid ${sel?'#FF6B00':'rgba(255,255,255,0.12)'}`, borderRadius:14, padding:'14px 16px', cursor:'pointer', transition:'all .2s' }),
+    opcion: (sel, c='#FF6B00') => ({ padding:'12px 22px', borderRadius:14, cursor:'pointer', border:`2px solid ${sel?c:'rgba(255,255,255,0.18)'}`, background: sel ? `${c}2e` : 'rgba(255,255,255,0.05)', color:'white', textAlign:'center', transition:'all 0.2s', boxShadow: sel ? `0 0 18px ${c}55` : 'none' }),
+    mini: (c) => ({ padding:'10px 22px', borderRadius:12, cursor:'pointer', border:`1px solid ${c}59`, background:`${c}14`, color:c, fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5 }),
   };
 
   return (
     <div style={st.page}>
       <div style={{fontSize:'3rem',marginBottom:8}}>🏎️</div>
       <h1 style={st.title}>Karting Educativo</h1>
-      <p style={{color:'#aaa',marginBottom:18}}>Elige un circuito y un recurso para la carrera</p>
+      <p style={{color:'#aaa',marginBottom:18,textAlign:'center'}}>Elige un circuito, cómo conducir y las preguntas de la carrera</p>
 
       {/* Selector de circuito */}
-      <div style={{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap',justifyContent:'center'}}>
+      <div style={{display:'flex',gap:12,marginBottom:14,flexWrap:'wrap',justifyContent:'center'}}>
         {[
-          { n:1, label:'Circuito 1', sub:'Asfalto', icon:'🏎️', grad:'linear-gradient(135deg,#3a3a3a,#555)' },
-          { n:2, label:'Circuito 2', sub:'Tierra',  icon:'🚙', grad:'linear-gradient(135deg,#7a5c28,#a07830)' },
-        ].map(({n,label,sub,icon,grad})=>{
-          const sel = circuito===n;
-          return (
-            <button key={n} onClick={()=>setCircuito(n)} style={{
-              padding:'14px 28px', borderRadius:14, cursor:'pointer',
-              border:`2px solid ${sel?'#FF6B00':'rgba(255,255,255,0.18)'}`,
-              background: sel ? 'rgba(255,107,0,0.18)' : 'rgba(255,255,255,0.05)',
-              color:'white', textAlign:'center', transition:'all 0.2s',
-              boxShadow: sel ? '0 0 18px rgba(255,107,0,0.35)' : 'none',
-            }}>
-              <div style={{fontSize:'1.5rem',marginBottom:3}}>{icon}</div>
-              <div style={{fontWeight:800,fontSize:'0.95rem'}}>{label}</div>
-              <div style={{
-                fontSize:'0.72rem', fontWeight:700, letterSpacing:1,
-                padding:'2px 8px', borderRadius:6, marginTop:5,
-                background: sel ? grad : 'rgba(255,255,255,0.1)',
-                color: sel ? 'white' : 'rgba(255,255,255,0.6)',
-                display:'inline-block',
-              }}>{sub}</div>
-            </button>
-          );
-        })}
+          { n:1, label:'Circuito 1', sub:'Asfalto', icon:'🏎️' },
+          { n:2, label:'Circuito 2', sub:'Tierra',  icon:'🚙' },
+        ].map(({n,label,sub,icon})=>(
+          <button key={n} onClick={()=>setCircuito(n)} style={st.opcion(circuito===n)}>
+            <div style={{fontSize:'1.5rem',marginBottom:3}}>{icon}</div>
+            <div style={{fontWeight:800,fontSize:'0.95rem'}}>{label}</div>
+            <div style={{fontSize:'0.75rem',opacity:0.7}}>{sub}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Modo de conducción */}
+      <div style={{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap',justifyContent:'center'}}>
+        <button onClick={()=>cambiarFacil(false)} style={{...st.opcion(!facil,'#FF6B00'),maxWidth:260}}>
+          <div style={{fontSize:'1.4rem'}}>🏁</div>
+          <div style={{fontWeight:800}}>Normal</div>
+          <div style={{fontSize:'0.75rem',opacity:0.75}}>Tú aceleras, frenas y giras</div>
+        </button>
+        <button onClick={()=>cambiarFacil(true)} style={{...st.opcion(facil,'#2ecc71'),maxWidth:260}}>
+          <div style={{fontSize:'1.4rem'}}>🧒</div>
+          <div style={{fontWeight:800}}>Modo peques</div>
+          <div style={{fontSize:'0.75rem',opacity:0.75}}>Acelera solo, va más despacio y te ayuda a girar: solo ◀ ▶</div>
+        </button>
       </div>
 
       {/* Botones de circuito propio */}
-      <div style={{display:'flex',gap:10,marginBottom:24,flexWrap:'wrap',justifyContent:'center'}}>
-        <button onClick={onConstruir} style={{
-          padding:'10px 24px', borderRadius:12, cursor:'pointer',
-          border:'1px solid rgba(255,215,0,0.35)',
-          background:'rgba(255,215,0,0.08)', color:'#FFD700',
-          fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
-          transition:'background .15s',
-        }}>
-          ✏️ Construir circuito
-        </button>
-        <button onClick={onAlmacen} style={{
-          padding:'10px 24px', borderRadius:12, cursor:'pointer',
-          border:'1px solid rgba(100,180,255,0.35)',
-          background:'rgba(100,180,255,0.08)', color:'#64b4ff',
-          fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
-          transition:'background .15s',
-        }}>
-          🗂️ Almacén de circuitos
-        </button>
-        <button onClick={onOnline} style={{
-          padding:'10px 24px', borderRadius:12, cursor:'pointer',
-          border:'1px solid rgba(46,204,113,0.35)',
-          background:'rgba(46,204,113,0.08)', color:'#2ecc71',
-          fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
-          transition:'background .15s',
-        }}>
-          🌐 Juego Online
-        </button>
+      <div style={{display:'flex',gap:10,marginBottom:22,flexWrap:'wrap',justifyContent:'center'}}>
+        <button onClick={onConstruir} style={st.mini('#FFD700')}>✏️ Construir circuito</button>
+        <button onClick={onAlmacen}   style={st.mini('#64b4ff')}>🗂️ Almacén de circuitos</button>
+        <button onClick={onOnline}    style={st.mini('#2ecc71')}>🌐 Juego Online</button>
       </div>
 
+      <input value={filtro} onChange={e=>setFiltro(e.target.value)} placeholder="🔎 Buscar recurso, tema o curso…"
+        style={{width:'100%',maxWidth:900,padding:'11px 14px',borderRadius:12,border:'1.5px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.07)',color:'white',fontSize:'0.95rem',marginBottom:14,boxSizing:'border-box'}} />
+      <OrdenRecursos valor={orden} onChange={setOrden} oscuro color="#FF6B00" style={{width:'100%',maxWidth:900,marginBottom:14}} />
+
       {cargando ? <p style={{color:'#aaa'}}>Cargando recursos...</p> : (
-        <>
-          <div style={st.grid}>
-            {recursos.map(r=>(
-              <div key={r.id} style={st.card(recursoSel?.id===r.id)} onClick={()=>seleccionar(r)}>
-                <div style={{fontWeight:700,fontSize:'1rem',marginBottom:4}}>🚗 {r.titulo}</div>
-                <div style={{color:'#aaa',fontSize:'0.78rem'}}>{r.temas||'Sin tema'} · {r.ciclo||''}</div>
-                <div style={{color:'#aaa',fontSize:'0.78rem'}}>{r.hojas?.length||1} hoja(s)</div>
-              </div>
-            ))}
-            {!recursos.length && <p style={{color:'#aaa'}}>No hay recursos disponibles.</p>}
-          </div>
-
-          {recursoSel && (
-            <div style={{marginTop:28,width:'100%',maxWidth:860}}>
-              {/* Selector multi-hoja */}
-              {tieneHojas && (
-                <div style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:14,padding:'14px 16px',marginBottom:14}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                    <div style={{color:'#FFD700',fontSize:'0.88rem',fontWeight:700}}>📋 Hojas a incluir en la carrera</div>
-                    <button
-                      onClick={() => setHojasChecked(todasActivas ? [] : hojas.map((_,i)=>i))}
-                      style={{background:'rgba(255,215,0,0.15)',border:'1px solid rgba(255,215,0,0.35)',color:'#FFD700',borderRadius:6,padding:'3px 12px',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>
-                      {todasActivas ? 'Ninguna' : 'Todas'}
-                    </button>
-                  </div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-                    {hojas.map((h,i) => {
-                      const nombre = h.nombreHoja || `Hoja ${i+1}`;
-                      const count  = h.preguntas?.length || 0;
-                      const activa = hojasChecked.includes(i);
-                      return (
-                        <button key={i} onClick={() => toggleHoja(i)} style={{
-                          padding:'7px 14px', borderRadius:9, cursor:'pointer',
-                          border:  activa ? '2px solid #FF6B00' : '2px solid rgba(255,255,255,0.18)',
-                          background: activa ? 'rgba(255,107,0,0.2)' : 'rgba(255,255,255,0.05)',
-                          color:   activa ? '#FF6B00' : 'rgba(255,255,255,0.55)',
-                          fontSize:'0.82rem', fontWeight:700, transition:'all 0.15s',
-                        }}>
-                          {nombre} <span style={{opacity:0.6,fontWeight:400}}>({count})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Info recurso */}
-              <div style={{background:'rgba(255,107,0,0.1)',border:'2px solid rgba(255,107,0,0.3)',borderRadius:14,padding:'12px 20px',marginBottom:14,textAlign:'center'}}>
-                <div style={{color:'#FFD700',fontWeight:800,marginBottom:4}}>{recursoSel.titulo}</div>
-                <div style={{color:'#aaa',fontSize:'0.82rem'}}>
-                  {pregsCount} pregunta{pregsCount!==1?'s':''}
-                  {tieneHojas && hojasChecked.length > 0 && hojasChecked.length < hojas.length &&
-                    <span> · {hojasChecked.length}/{hojas.length} hojas seleccionadas</span>}
-                </div>
-              </div>
-
-              {tieneHojas && hojasChecked.length === 0 ? (
-                <p style={{color:'#ff5252',textAlign:'center',fontSize:'0.9rem'}}>⚠️ Selecciona al menos una hoja</p>
-              ) : (
-                <div style={{display:'flex',justifyContent:'center'}}>
-                  <button onClick={iniciar} style={{
-                    padding:'14px 40px', borderRadius:14, border:'none', cursor:'pointer',
-                    fontWeight:800, fontSize:'1.1rem', color:'white',
-                    background:'linear-gradient(135deg,#FF6B00,#CC4400)',
-                    boxShadow:'0 4px 20px rgba(255,107,0,0.4)',
-                  }}>
-                    🏁 ¡Empezar carrera!
-                  </button>
-                </div>
-              )}
+        <div style={st.grid}>
+          {lista.map(r=>(
+            <div key={r.id} style={st.card(recursoSel?.id===r.id)} onClick={()=>setRecursoSel(r)}>
+              <div style={{fontWeight:700,fontSize:'1rem',marginBottom:4}}>{r.esPikt ? 'π ' : '🚗 '}{r.titulo}</div>
+              <div style={{color:'#aaa',fontSize:'0.78rem'}}>{r.temas || r.profesorNombre || ''}{r.ciclo ? ` · ${r.ciclo}` : ''}</div>
+              <div style={{color:'#aaa',fontSize:'0.78rem'}}>{r.hojas?.length||1} hoja(s)</div>
+              <ValoracionRecurso r={r} oscuro style={{marginTop:6}} />
             </div>
-          )}
-        </>
+          ))}
+          {!lista.length && <p style={{color:'#aaa'}}>No hay recursos disponibles.</p>}
+        </div>
+      )}
+
+      {recursoSel && (
+        <div style={{width:'100%',maxWidth:900,marginTop:18,marginBottom:30}}>
+          <HojasRecurso key={recursoSel.id} recurso={recursoSel} color="#FF6B00" colores={COLORES_HOJAS}
+            textoContinuar="🏁 ¡Empezar carrera!"
+            onElegir={(h)=>{ contarJugada(recursoSel); onIniciar(recursoSel, hojasComoLista(h), circuito, facil); }} />
+        </div>
       )}
     </div>
   );
@@ -852,6 +766,31 @@ function Joystick({ joyRef }) {
   );
 }
 
+// 🧒 Modo peques: dos botones grandes (izquierda / derecha), cada uno en su lado de la pantalla.
+// Escriben en las mismas teclas que el teclado (ArrowLeft / ArrowRight).
+function BotonesPeques({ keysRef }) {
+  const [pulsado, setPulsado] = useState(null);
+  const t = Math.max(84, Math.min(130, Math.round(window.innerWidth * 0.16)));
+  const boton = (lado, tecla, icono) => {
+    const on = pulsado === lado;
+    const fin = () => { keysRef.current[tecla] = false; setPulsado(p => (p === lado ? null : p)); };
+    return (
+      <button
+        onPointerDown={(e) => { e.preventDefault(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* */ } keysRef.current[tecla] = true; setPulsado(lado); }}
+        onPointerUp={fin} onPointerCancel={fin} onLostPointerCapture={fin}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          position:'fixed', bottom:72, [lado]:24, /* encima de ← Volver / ✋ */ width:t, height:t, borderRadius:'50%',
+          border:'4px solid rgba(255,255,255,0.85)', background: on ? 'rgba(46,204,113,0.85)' : 'rgba(255,255,255,0.22)',
+          color:'white', fontSize:t*0.45, fontWeight:900, cursor:'pointer', touchAction:'none', userSelect:'none',
+          WebkitUserSelect:'none', WebkitTouchCallout:'none', backdropFilter:'blur(6px)', zIndex:50,
+          boxShadow:'0 4px 18px rgba(0,0,0,0.35)', transform: on ? 'scale(0.94)' : 'none',
+        }}>{icono}</button>
+    );
+  };
+  return <>{boton('left', 'ArrowLeft', '◀')}{boton('right', 'ArrowRight', '▶')}</>;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // JUEGO 3D
 // ════════════════════════════════════════════════════════════════════════════
@@ -944,6 +883,7 @@ function FloatingToast({ type, seconds }) {
 // ════════════════════════════════════════════════════════════════════════════
 export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
   skipCountdown=false, timerBase=null, onCheckpoint=null, onLapComplete=null, maxLaps=MAX_LAPS,
+  facil=false, // 🧒 Modo peques: acelera solo, más lento y con ayuda fuerte al volante (solo ◀ ▶)
 }) {
   const isC2 = circuito === 2;
   const cfg = {
@@ -1017,15 +957,12 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
   // ── Pool de preguntas ────────────────────────────────────────────────────
   useEffect(() => {
     if (!recurso) { questionPoolRef.current = []; return; }
-    let pool = [];
-    if (!hojas || hojas.includes('General') || !recurso.hojas?.length) {
-      pool = recurso.hojas?.flatMap(h => h.preguntas || []) || recurso.preguntas || [];
-    } else {
-      pool = hojas.flatMap(nombre => {
-        const h = recurso.hojas?.find(hh => hh.nombreHoja === nombre);
-        return h?.preguntas || [];
-      });
-    }
+    // Normalizadas (profes y PiKT): las de escribir pasan a elegir entre opciones
+    const sel = !hojas || hojas.includes('General') ? 'General' : hojas;
+    const lista = filtrarHojas(categoriasDeRecurso(recurso), sel).flatMap(c => c.preguntas);
+    const pool = conOpcionesParaElegir(lista)
+      .filter(p => p?.tipo === 'MULTIPLE' && p.opciones?.length)
+      .map(p => ({ pregunta: p.enunciado, opcionesFijas: p.opciones, correcta: p.correcta }));
     questionPoolRef.current = shuffle(pool);
     qIdxRef.current = 0;
   }, [recurso, hojas]);
@@ -1217,9 +1154,9 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
     ai.scale.set(0.70,0.70,0.70);
 
     let speed=0;
-    const MAX_SPEED=0.30, ACCEL=0.007, FRICTION=0.965, BRAKE_F=0.90, TURN=0.022, SLIDE_FACTOR=0.88;
+    const MAX_SPEED=facil?0.17:0.30, ACCEL=facil?0.005:0.007, FRICTION=0.965, BRAKE_F=0.90, TURN=0.022, SLIDE_FACTOR=0.88;
     let aiSpeed=0, aiWpIdx=cfg.startWp, aiStuckFrames=0, aiReverseFrames=0;
-    const AI_MAX=0.20, AI_ACCEL=0.006, AI_TURN=0.10, AI_STUCK_LIMIT=45;
+    const AI_MAX=facil?0.13:0.20, AI_ACCEL=0.006, AI_TURN=0.10, AI_STUCK_LIMIT=45;
 
     const effectiveBase = skipCountdown ? (timerBase || Date.now()) : 0;
     let phaseLocal = skipCountdown ? 'racing' : 'countdown', countdownStart=Date.now();
@@ -1290,7 +1227,27 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
         const joyGas   = joy.active && joy.y < -0.15;
         const joyBrake = joy.active && joy.y >  0.15;
 
-        if (gasKey || joyGas) {
+        if (facil) {
+          // 🧒 Acelera solo (frena solo si se pulsa ⬇) y el volante sigue la carretera:
+          // el niño solo corrige con ◀ ▶ (una tecla o un botón grande cada vez)
+          if (brakeKey) speed *= BRAKE_F;
+          else speed = Math.min(speed + ACCEL, MAX_SPEED);
+          // si se ha saltado un punto de la ruta, pasar al siguiente (no dar la vuelta)
+          const nIdx=(playerWpIdx+1)%cfg.waypoints.length;
+          const [cx,cz]=cfg.waypoints[playerWpIdx], [sx,sz]=cfg.waypoints[nIdx];
+          if (Math.hypot(car.position.x-sx,car.position.z-sz) < Math.hypot(car.position.x-cx,car.position.z-cz)) playerWpIdx=nIdx;
+          const [wX,wZ]=cfg.waypoints[playerWpIdx], [nX,nZ]=cfg.waypoints[(playerWpIdx+1)%cfg.waypoints.length];
+          const dWp=Math.hypot(wX-car.position.x,wZ-car.position.z);
+          const bl=Math.max(0,1-dWp/(TW*2.5));
+          const tX=wX+(nX-wX)*bl, tZ=wZ+(nZ-wZ)*bl;
+          let diff=Math.atan2(-(tX-car.position.x),-(tZ-car.position.z))-car.rotation.y;
+          while(diff> Math.PI) diff-=2*Math.PI;
+          while(diff<-Math.PI) diff+=2*Math.PI;
+          const auto=Math.sign(diff)*Math.min(Math.abs(diff)*0.9,1);
+          const jugador=(leftKey?1:0)-(rightKey?1:0)+(joy.active?-joy.x:0);
+          const giro=Math.max(-1,Math.min(1,auto*0.75+jugador*0.6));
+          if (speed>0) car.rotation.y+=TURN*1.3*giro;
+        } else if (gasKey || joyGas) {
           const power = joyGas ? Math.min(-joy.y, 1) : 1;
           speed = Math.min(speed + ACCEL*power, MAX_SPEED);
         } else if (brakeKey || joyBrake) {
@@ -1301,7 +1258,7 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
         }
         if (Math.abs(speed)<0.0005) speed=0;
 
-        if (speed!==0) {
+        if (speed!==0 && !facil) {
           const dir=speed>0?1:-1;
           // Keyboard steering
           if (leftKey)  car.rotation.y += TURN*dir;
@@ -1560,6 +1517,11 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
           {countdown===0&&(
             <div style={{fontSize:42,fontWeight:'bold',color:'#2ecc71',textShadow:'0 0 20px rgba(46,204,113,0.9)',letterSpacing:4}}>¡GO!</div>
           )}
+          {facil && (
+            <div style={{fontSize:15,fontWeight:700,textAlign:'center',maxWidth:280,lineHeight:1.35}}>
+              🧒 El kart acelera solo.<br/>Gira con ◀ ▶ (flechas o los botones)
+            </div>
+          )}
         </div>
       )}
 
@@ -1604,7 +1566,7 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
 
       {/* Joystick — abajo derecha */}
       {!activeQuestion && phase!=='countdown' && !manosOn && (
-        <Joystick joyRef={joystickRef} />
+        facil ? <BotonesPeques keysRef={keysRef} /> : <Joystick joyRef={joystickRef} />
       )}
 
       {/* Volante con las manos (encima también de la pregunta, para ver los dedos) */}
@@ -1646,6 +1608,7 @@ export default function KartingTrack({ alTerminar } = {}) {
   const [recurso,      setRecurso]     = useState(null);
   const [hojas,        setHojas]       = useState(['General']);
   const [circuito,     setCircuito]    = useState(1);
+  const [facil,        setFacil]       = useState(false);
   const [resultado,    setResultado]   = useState(null);
   const [customPaths,  setCustomPaths]  = useState(null);
   const [customObjects,setCustomObjects]= useState([]);
@@ -1722,7 +1685,7 @@ export default function KartingTrack({ alTerminar } = {}) {
 
   if (fase==='PREVIO')
     return <PantallaPrevia
-      onIniciar={(r,h,c)=>{ setRecurso(r); setHojas(h); setCircuito(c); setFase('JUGANDO'); }}
+      onIniciar={(r,h,c,f)=>{ setRecurso(r); setHojas(h); setCircuito(c); setFacil(!!f); setFase('JUGANDO'); }}
       onConstruir={() => { setLoadedCircuit(null); setEditorSource('PREVIO'); setFase('EDITOR'); }}
       onAlmacen={() => setFase('ALMACEN')}
       onOnline={() => setFase('ONLINE_MENU')}
@@ -1738,6 +1701,7 @@ export default function KartingTrack({ alTerminar } = {}) {
       recurso={recurso}
       hojas={hojas}
       circuito={circuito}
+      facil={facil}
       onTerminar={(res)=>{ setResultado(res); setFase('RESULTADO'); }}
       onSalir={salir}
     />

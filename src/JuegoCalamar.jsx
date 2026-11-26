@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 import * as THREE from 'three';
 import { ArrowLeft, Search, Play, Users, Trophy, Volume2, VolumeX, LogOut } from 'lucide-react';
 import { db } from './firebase';
@@ -1944,6 +1946,7 @@ function ModalEnviarProfeBase({ datos, nombreSugerido, onClose }) {
 // =====================================================================
 function BuscadorRecursos({ onBack, onPick }) {
     const [busqueda, setBusqueda] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     const [todos, setTodos] = useState([]);
     const [cargando, setCargando] = useState(true);
 
@@ -1964,10 +1967,11 @@ function BuscadorRecursos({ onBack, onPick }) {
     }, []);
 
     const q = limpiar(busqueda);
-    const resultados = !q ? todos : todos.filter(({ r }) =>
+    const resultados0 = !q ? todos : todos.filter(({ r }) =>
         limpiar(r.titulo).includes(q) || limpiar(r.temas).includes(q) ||
         (r.hojas || []).some(h => limpiar(h.nombreHoja).includes(q))
     );
+    const resultados = ordenarRecursos(resultados0, orden, (x) => x.r);
 
     return (
         <div style={menuWrap}>
@@ -1982,11 +1986,12 @@ function BuscadorRecursos({ onBack, onPick }) {
                         width: '100%', padding: 11, borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
                         background: 'rgba(0,0,0,0.35)', color: '#e7f3ec', marginBottom: 12, boxSizing: 'border-box', fontFamily: 'inherit',
                     }} />
+                <OrdenRecursos valor={orden} onChange={setOrden} oscuro color={'#e6317f'} style={{ marginBottom: 12 }} />
                 <div style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {cargando ? <p style={{ color: '#8aa0ad', textAlign: 'center' }}>Cargando biblioteca…</p>
                         : resultados.length === 0 ? <p style={{ color: '#8aa0ad', textAlign: 'center' }}>Sin recursos compatibles.</p>
                             : resultados.map(({ r, n }) => (
-                                <button key={r.id} onClick={() => onPick(r)} style={{
+                                <button key={r.id} onClick={() => { contarJugada(r); onPick(r); }} style={{
                                     textAlign: 'left', padding: '11px 13px', borderRadius: 10,
                                     border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
                                     color: '#e7f3ec', cursor: 'pointer', fontFamily: 'inherit',
@@ -1998,6 +2003,7 @@ function BuscadorRecursos({ onBack, onPick }) {
                                     <div style={{ fontSize: 11, color: '#8aa0ad', marginTop: 3 }}>
                                         {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {n} pregunta(s)
                                     </div>
+                                    <ValoracionRecurso r={r} oscuro tam={11} style={{ marginTop: 6 }} />
                                 </button>
                             ))}
                 </div>

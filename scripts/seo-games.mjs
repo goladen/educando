@@ -147,6 +147,13 @@ export const GAMES = [
     nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
   },
   {
+    slug: 'arco', emoji: '🏹', color: '#7cb342',
+    h1: 'Tiro con arco 3D con preguntas',
+    title: 'Tiro con arco 3D con preguntas y gafas VR, gratis | PiKT',
+    desc: 'Tensa el arco y clava la flecha en la diana de la respuesta correcta o en las palabras de una categoría. Física real con caída y viento, en un campo al aire libre. Ordenador, móvil, pantalla táctil y gafas VR.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
+  },
+  {
     slug: 'mansion', emoji: '🏚️', color: '#7c3aed',
     h1: 'La Mansión Pitagórica: escape room 3D con preguntas',
     title: 'Escape room 3D con preguntas y gafas VR, gratis | PiKT',
@@ -175,6 +182,20 @@ export const GAMES = [
     nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Todas las materias',
   },
   {
+    slug: 'phishing', emoji: '🎣', color: '#5b5bd6',
+    h1: '¿Phishing o legítimo? Test de phishing para alumnos y profesores',
+    title: '¿Phishing o legítimo? Test interactivo para aprender a detectar engaños | PiKT',
+    desc: 'Dos tests con mensajes que parecen reales (correo, web, WhatsApp, Instagram y SMS), uno para alumnos y otro para profes, para aprender a reconocer el phishing: remitentes falsos, enlaces trampa, adjuntos peligrosos, prisas y robo de códigos. Pistas marcadas en cada mensaje y 5 reglas de oro. Gratis y sin registro.',
+    nivel: 'Primaria, Secundaria y Bachillerato', materia: 'Tecnología y Digitalización',
+  },
+  {
+    slug: 'phishing/profes', emoji: '🍎', color: '#0f766e',
+    h1: 'Test de phishing para profesores: ¿sabrías detectar el engaño?',
+    title: 'Test de phishing para docentes: correos, adjuntos y webs falsas | PiKT',
+    desc: 'Trece situaciones reales del día a día de un centro: fraude del «director», contraseña de Microsoft 365 que caduca, justificantes con adjuntos peligrosos, facturas con macros, Hacienda y buzón de voz. Correos y webs realistas con las pistas marcadas. Gratis.',
+    nivel: 'Profesorado', materia: 'Competencia digital docente',
+  },
+  {
     slug: 'invasores', emoji: '👾', color: '#22d3ee',
     h1: 'Invasión Pi: arcade retro de preguntas',
     title: 'Invasión Pi: arcade retro de mates y preguntas para 1-4 jugadores | PiKT',
@@ -182,11 +203,25 @@ export const GAMES = [
     nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'fisica/laboratorio', emoji: '🧪', color: '#0891b2',
+    h1: 'Laboratorio 3D de Física y Química: experimentos sencillos',
+    title: 'Laboratorio 3D: experimentos sencillos de Física y Química | PiKT',
+    desc: 'Experimentos caseros paso a paso en 3D: extintor de CO₂, indicador de lombarda, líquidos en capas, huevo y botella, ludión, refracción y más. Predicción, explicación y ficha PDF con los pasos para imprimir. Gratis.',
+    nivel: 'Primaria y ESO', materia: 'Física y Química',
+  },
+  {
     slug: 'fisica/unidades', emoji: '🔁', color: '#0891b2',
     h1: 'Cambio de unidades: factores de conversión y saltos',
     title: 'Cambio de unidades y factores de conversión | PiKT',
     desc: 'Aprende a cambiar de unidades con la escalera de saltos y los factores de conversión: longitud, masa, volumen, velocidad, densidad, temperatura y radianes. Problemas, juegos y fichas PDF gratis.',
     nivel: 'Primaria, ESO y Bachillerato', materia: 'Física y Química y Matemáticas',
+  },
+  {
+    slug: 'primaria/menseki', emoji: '📐', color: '#0d9488',
+    h1: 'Menseki: laberintos de áreas para Primaria y ESO',
+    title: 'Menseki: laberintos de áreas (Area Maze) | PiKT',
+    desc: 'Retos de laberintos de áreas: halla el área o el lado que falta encadenando divisiones, restas y proporciones. 30 retos de Primaria y Secundaria con pista, solución paso a paso y lápiz para la pizarra digital. Gratis y sin registro.',
+    nivel: 'Primaria y ESO', materia: 'Matemáticas',
   },
   {
     slug: 'primaria/geometria/unidades', emoji: '📏', color: '#16a34a',

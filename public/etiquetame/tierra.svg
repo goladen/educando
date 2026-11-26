@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <defs>
+    <radialGradient id="fondo" cx="50%" cy="50%" r="70%">
+      <stop offset="0" stop-color="#f4f8fd"/>
+      <stop offset="1" stop-color="#dce8f5"/>
+    </radialGradient>
+    <radialGradient id="oceano" cx="38%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#7cc4f0"/>
+      <stop offset="0.55" stop-color="#2f80c9"/>
+      <stop offset="1" stop-color="#143e70"/>
+    </radialGradient>
+    <radialGradient id="sombra" cx="35%" cy="32%" r="78%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+    </radialGradient>
+    <radialGradient id="nucleoInt" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.6" stop-color="#fff6c2"/>
+      <stop offset="1" stop-color="#ffe680"/>
+    </radialGradient>
+    <clipPath id="esfera"><circle cx="500" cy="370" r="270"/></clipPath>
+  </defs>
+
+  <rect width="1000" height="700" fill="url(#fondo)"/>
+  <!-- sombra en el suelo -->
+  <ellipse cx="510" cy="668" rx="230" ry="16" fill="#000" opacity="0.12"/>
+
+  <!-- Superficie de la Tierra -->
+  <circle cx="500" cy="370" r="270" fill="url(#oceano)"/>
+  <g clip-path="url(#esfera)" fill="#5fae4e" stroke="#3f8a35" stroke-width="2">
+    <path d="M300 170 C340 140 410 150 430 190 C450 230 410 250 420 290 C430 330 470 340 455 380 C440 420 390 400 370 440 C350 480 310 470 290 430 C270 390 290 350 270 320 C250 290 260 200 300 170 Z"/>
+    <path d="M330 500 C370 480 430 490 450 520 C470 550 440 600 400 610 C360 620 320 590 310 560 C300 530 310 510 330 500 Z"/>
+    <path d="M520 430 C560 410 610 420 640 450 C670 480 700 470 720 500 C740 540 700 590 650 600 C600 610 570 570 540 560 C510 550 490 520 495 480 C498 455 505 440 520 430 Z"/>
+    <path d="M250 260 C262 250 275 262 270 280 C265 300 245 300 240 285 C236 272 242 265 250 260 Z"/>
+  </g>
+  <circle cx="500" cy="370" r="270" fill="url(#sombra)"/>
+
+  <!-- Corte en cuña (cuarto superior derecho) -->
+  <!-- Corteza -->
+  <path d="M500 370 L770 370 A270 270 0 0 0 500 100 Z" fill="#8d5a3b"/>
+  <!-- Parte rígida del manto superior (forma la litosfera con la corteza) -->
+  <path d="M500 370 L752 370 A252 252 0 0 0 500 118 Z" fill="#d9822b"/>
+  <!-- Manto superior -->
+  <path d="M500 370 L736 370 A236 236 0 0 0 500 134 Z" fill="#f5a623"/>
+  <!-- Manto inferior -->
+  <path d="M500 370 L700 370 A200 200 0 0 0 500 170 Z" fill="#e8612c"/>
+  <!-- Núcleo externo -->
+  <path d="M500 370 L645 370 A145 145 0 0 0 500 225 Z" fill="#f7c948"/>
+  <!-- Núcleo interno -->
+  <path d="M500 370 L582 370 A82 82 0 0 0 500 288 Z" fill="url(#nucleoInt)"/>
+
+  <!-- Bordes de las capas -->
+  <g fill="none" stroke="#5a3a26" stroke-opacity="0.35" stroke-width="1.5">
+    <path d="M752 370 A252 252 0 0 0 500 118"/>
+    <path d="M736 370 A236 236 0 0 0 500 134"/>
+    <path d="M700 370 A200 200 0 0 0 500 170"/>
+    <path d="M645 370 A145 145 0 0 0 500 225"/>
+    <path d="M582 370 A82 82 0 0 0 500 288"/>
+  </g>
+  <!-- Aristas del corte -->
+  <path d="M770 370 L500 370 L500 100" fill="none" stroke="#3b2414" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- Llave de la litosfera (corteza + parte rígida del manto) -->
+  <path d="M736 378 L736 388 L753 388 L753 400 M753 388 L770 388 L770 378" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -10,6 +10,8 @@ import { despertarAudio, sonidoFinal } from './utils/sonidosFeedback';
 import { categoriasDeRecurso, conOpcionesParaElegir, barajar } from './utils/normalizarPreguntas';
 import { conRecursosPikt } from './bancoPreguntas/recursosPikt';
 import HojasRecurso, { filtrarHojas, textoHojas } from './components/HojasRecurso';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from './components/ValoracionRecurso';
+import { contarJugada } from './utils/valoracionRecursos';
 import { crearMansion, pedirSesionVR, VIDAS } from './mansion/motorMansion';
 import { ESCENARIOS, ORDEN_ESCENARIOS } from './mansion/escenarios';
 import { FRASES, fraseDe, urlFrase } from './mansion/narracion';
@@ -71,6 +73,7 @@ function PantallaPrevia({ onIniciar, onSalir }) {
     const [cargando, setCargando] = useState(true);
     const [sel, setSel] = useState(null);
     const [filtro, setFiltro] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     useEffect(() => {
         (async () => {
             try {
@@ -81,7 +84,9 @@ function PantallaPrevia({ onIniciar, onSalir }) {
             setCargando(false);
         })();
     }, []);
-    const lista = recursos.filter(r => !filtro || `${r.titulo} ${r.temas || ''} ${r.ciclo || ''}`.toLowerCase().includes(filtro.toLowerCase()));
+    const filtrados = recursos.filter(r => !filtro || `${r.titulo} ${r.temas || ''} ${r.ciclo || ''}`.toLowerCase().includes(filtro.toLowerCase()));
+    // La opción especial del juego siempre la primera; el resto, en el orden elegido
+    const lista = [...filtrados.filter(r => r.libre), ...ordenarRecursos(filtrados.filter(r => !(r.libre)), orden)];
     return (
         <div style={{ ...fondo, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px' }}>
             <div style={{ width: '100%', maxWidth: 900, display: 'flex' }}><button onClick={onSalir} style={boton('rgba(255,255,255,0.12)', { padding: '8px 14px', fontSize: '0.85rem' })}>← Salir</button></div>
@@ -91,6 +96,7 @@ function PantallaPrevia({ onIniciar, onSalir }) {
                 Escape room en 3D: responde para abrir las puertas, busca las pistas del <b>candado</b> y escapa sin que te atrapen. ¡También con gafas de realidad virtual!
             </p>
             <input value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="🔎 Buscar recurso, tema o curso…" style={{ width: '100%', maxWidth: 900, padding: '11px 14px', borderRadius: 12, border: '1.5px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '0.95rem', marginBottom: 14, boxSizing: 'border-box' }} />
+            <OrdenRecursos valor={orden} onChange={setOrden} oscuro color={MORADO} style={{ width: '100%', maxWidth: 900, marginBottom: 14 }} />
             {cargando ? <p style={{ color: '#c4b5fd' }}>Cargando recursos…</p> : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(230px,1fr))', gap: 12, width: '100%', maxWidth: 900 }}>
                     {lista.map(r => (
@@ -98,13 +104,14 @@ function PantallaPrevia({ onIniciar, onSalir }) {
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{r.libre ? '' : r.esPikt ? 'π ' : '📚 '}{r.titulo}</div>
                             <div style={{ color: '#c4b5fd', fontSize: '0.78rem' }}>{r.temas || r.profesorNombre || ''}{r.ciclo ? ` · ${r.ciclo}` : ''}</div>
                             {!r.libre && <div style={{ color: '#c4b5fd', fontSize: '0.78rem' }}>{r.hojas?.length || 1} hoja(s)</div>}
+                            <ValoracionRecurso r={r} oscuro style={{ marginTop: 6 }} />
                         </div>
                     ))}
                 </div>
             )}
             {sel && (
                 <div style={{ width: '100%', maxWidth: 900, marginTop: 18, marginBottom: 30 }}>
-                    <HojasRecurso key={sel.id} recurso={sel} color={MORADO} colores={COLORES_OPCION} textoContinuar="🏚️ Continuar" onElegir={(h) => onIniciar(sel, h)} />
+                    <HojasRecurso key={sel.id} recurso={sel} color={MORADO} colores={COLORES_OPCION} textoContinuar="🏚️ Continuar" onElegir={(h) => { contarJugada(sel); onIniciar(sel, h); }} />
                 </div>
             )}
         </div>

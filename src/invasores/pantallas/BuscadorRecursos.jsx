@@ -7,6 +7,8 @@ import { conRecursosPikt } from '../../bancoPreguntas/recursosPikt';
 import { limpiar } from '../../utils/normalizarPreguntas';
 import { desdeRecurso, jugables } from '../preguntas';
 import { BTN, PANEL } from '../tema';
+import { ValoracionRecurso, OrdenRecursos, ordenarRecursos } from '../../components/ValoracionRecurso';
+import { contarJugada } from '../../utils/valoracionRecursos';
 
 export default function BuscadorRecursos({ variante, onPick, onCerrar }) {
   const [todos, setTodos] = useState([]);
@@ -14,6 +16,7 @@ export default function BuscadorRecursos({ variante, onPick, onCerrar }) {
   const [busqueda, setBusqueda] = useState('');
   const [codigo, setCodigo] = useState('');
   const [aviso, setAviso] = useState('');
+  const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
 
   const cuenta = (r) => jugables(desdeRecurso(r), variante).length;
 
@@ -43,13 +46,14 @@ export default function BuscadorRecursos({ variante, onPick, onCerrar }) {
       if (snap.empty) { setAviso('No hay ningún recurso con ese código.'); return; }
       const r = { ...snap.docs[0].data(), id: snap.docs[0].id };
       if (!cuenta(r)) { setAviso('Ese recurso no tiene preguntas que se puedan jugar en esta variante.'); return; }
+      contarJugada(r);
       onPick(r);
     } catch (e) { setAviso(`Error: ${e.message}`); }
   };
 
   const q = limpiar(busqueda);
-  const resultados = !q ? todos : todos.filter(({ r }) =>
-    limpiar(r.titulo).includes(q) || limpiar(r.temas).includes(q) || (r.hojas || []).some((h) => limpiar(h.nombreHoja).includes(q)));
+  const resultados = ordenarRecursos(!q ? todos : todos.filter(({ r }) =>
+    limpiar(r.titulo).includes(q) || limpiar(r.temas).includes(q) || (r.hojas || []).some((h) => limpiar(h.nombreHoja).includes(q))), orden, (x) => x.r);
 
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/85 p-3" onPointerDown={(e) => e.target === e.currentTarget && onCerrar()}>
@@ -68,16 +72,18 @@ export default function BuscadorRecursos({ variante, onPick, onCerrar }) {
         {aviso && <p className="font-pixel text-lg text-amber-300">{aviso}</p>}
         <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por título, tema u hoja…"
           className="rounded-md border-2 border-slate-600 bg-slate-950 px-3 py-2 font-pixel text-xl text-slate-100 outline-none focus:border-cyan-400" />
+        <OrdenRecursos valor={orden} onChange={setOrden} oscuro color="#22d3ee" />
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
           {cargando ? <p className="py-6 text-center font-arcade text-[10px] text-slate-400">CARGANDO…</p>
             : resultados.length === 0 ? <p className="py-6 text-center font-pixel text-xl text-slate-400">Sin recursos compatibles.</p>
               : resultados.slice(0, 120).map(({ r, n }) => (
-                <button key={r.id} type="button" onClick={() => onPick(r)}
+                <button key={r.id} type="button" onClick={() => { contarJugada(r); onPick(r); }}
                   className="rounded-md border-2 border-slate-700 bg-slate-800/70 px-3 py-2 text-left transition-colors hover:border-cyan-400">
                   <div className="font-pixel text-xl leading-tight text-slate-50">{r.titulo || 'Sin título'}</div>
                   <div className="font-pixel text-base text-slate-400">
                     {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {n} pregunta(s)
                   </div>
+                  <ValoracionRecurso r={r} oscuro tam={12} style={{ marginTop: 4 }} />
                 </button>
               ))}
         </div>

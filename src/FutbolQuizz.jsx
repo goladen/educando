@@ -3,6 +3,8 @@ import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+import { ValoracionRecurso, OrdenRecursos } from './components/ValoracionRecurso';
+import { contarJugada, crearBuscador } from './utils/valoracionRecursos';
 
 // Partido 3D en tiempo real (three.js): se carga solo al elegir ese modo
 const Futbol3D = lazy(() => import('./futbol3d/Futbol3D'));
@@ -242,6 +244,7 @@ const EstilosPregunta = () => (
 function PantallaInicio({ onJugar, onExit }) {
     const [codigo, setCodigo] = useState('');
     const [tema, setTema] = useState('');
+    const [orden, setOrden] = useState('jugados'); // 🔥 más jugados · ❤️ más gustan · 🆕 recientes
     const [buscando, setBuscando] = useState(false);
     const [error, setError] = useState('');
     const [resultados, setResultados] = useState([]);
@@ -267,6 +270,7 @@ function PantallaInicio({ onJugar, onExit }) {
 
     // Tras elegir recurso: si tiene varias hojas, pedir cuáles; si no, lanzar directo
     const seleccionarRecurso = (r) => {
+        contarJugada(r); // ranking «🔥 Más jugados»
         const hojas = hojasDe(r);
         if (hojas.length > 1) {
             setRecursoElegido(r);
@@ -312,12 +316,10 @@ function PantallaInicio({ onJugar, onExit }) {
     const buscarPorTema = async () => {
         setBuscando(true); setError(''); setResultados([]);
         try {
-            const ref = collection(db, 'resources');
-            const snap = await getDocs(query(ref, orderBy('fechaCreacion', 'desc'), limit(150)));
-            const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+            // Toda la biblioteca en el orden elegido (sin el antiguo tope de 150); los 30 primeros que sirvan
             const tiposOk = new Set(['CAZABURBUJAS', 'PASAPALABRA', 'THINKHOOT']);
             const t = clean(tema);
-            const res = raw.filter(r => {
+            const filtro = (r) => {
                 const tj = r.tipoJuego;
                 const esVivo = tj === 'THINKHOOT' || (r.tipo === 'PRO' && tj !== 'WORDLE' && tj !== 'MATHLIVE');
                 if (!tiposOk.has(tj) && !esVivo) return false;
@@ -329,7 +331,8 @@ function PantallaInicio({ onJugar, onExit }) {
                     if (!inTit && !inHoja && !inTema) return false;
                 }
                 return true;
-            }).slice(0, 30);
+            };
+            const { items: res } = await crearBuscador({ orden, filtro, porPagina: 30 }).siguiente();
             setResultados(res);
             if (res.length === 0) setError('Sin resultados. Prueba con el código del profesor.');
         } catch (e) { setError('Error buscando: ' + e.message); }
@@ -447,6 +450,7 @@ function PantallaInicio({ onJugar, onExit }) {
                             onKeyDown={e => { if (e.key === 'Enter') buscarPorTema(); }} />
                         <button onClick={buscarPorTema} disabled={buscando} style={btn('#16a34a')}>Buscar</button>
                     </div>
+                    <OrdenRecursos valor={orden} onChange={setOrden} oscuro color="#16a34a" />
                     {buscando && <div style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>⏳ Buscando…</div>}
                     {error && <div style={{ color: '#fca5a5', fontSize: '0.85rem' }}>⚠ {error}</div>}
 
@@ -457,7 +461,7 @@ function PantallaInicio({ onJugar, onExit }) {
                                 return (
                                     <button key={r.id} onClick={() => seleccionarRecurso(r)} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 12px', cursor: 'pointer', color: 'white' }}>
                                         <span style={{ ...{ padding: '3px 8px', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700 }, background: tl.color }}>{tl.txt}</span>
-                                        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{r.titulo || 'Sin título'}</span>
+                                        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{r.titulo || 'Sin título'}<ValoracionRecurso r={r} oscuro tam={11} style={{ display: 'flex', marginTop: 3 }} /></span>
                                         <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
                                         <span style={{ color: '#94a3b8', fontSize: '1.2rem' }}>▶</span>
                                     </button>

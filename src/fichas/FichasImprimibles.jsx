@@ -20,11 +20,12 @@ import { sonidoCorrecto, sonidoIncorrecto, despertarAudio } from '../utils/sonid
 //            contenido del apartado en el modo pizarra (el motor pinta su propia actividad) }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const LETRAS = 'abcdefghijklmnopqrstuvwxyz';
-const ESPACIOS = { compacto: 0.6, normal: 1, amplio: 1.6 };
+export const LETRAS = 'abcdefghijklmnopqrstuvwxyz';
+export const ESPACIOS = { compacto: 0.6, normal: 1, amplio: 1.6 };
 
 // El «motor» describe la materia (tipos, generador, cómo se pinta cada apartado…)
-const MotorCtx = createContext(null);
+// (exportados para la ficha mezclada del centro de PDF: centroPdf/FichaMix.jsx)
+export const MotorCtx = createContext(null);
 const useMotor = () => useContext(MotorCtx);
 
 export const barajar = (arr) => {
@@ -38,7 +39,7 @@ export const tiposDe = (motor, ej) => (motor.fuentes ? motor.fuentes[ej?.fuente]
 const tituloDe = (motor, fuente, tipo) => (motor.fuentes ? motor.fuentes[fuente]?.titulos?.[tipo] : motor.titulos[tipo]) || '';
 const catPorDefecto = (motor, tipo, ej) => motor.categorias?.(tipo, ej)?.[0]?.[0] || 'todos';
 
-const nuevoEjercicio = (motor, { fuente, tipo, nivel = 1, n = 3, catProb }) => {
+export const nuevoEjercicio = (motor, { fuente, tipo, nivel = 1, n = 3, catProb }) => {
     const base = { key: nuevaClave(), ...(fuente ? { fuente } : {}), tipo, nivel, n };
     const ej = { ...base, titulo: tituloDe(motor, fuente, tipo), tituloAuto: true, catProb: catProb || catPorDefecto(motor, tipo, base), apartados: [] };
     ej.n = Math.min(n, motor.maxApartados(ej));
@@ -330,7 +331,7 @@ function Pizarra({ ficha, onSalir }) {
 // ═════════════════════════════════════════════════════════════════════════════
 //  EDITOR DE UN EJERCICIO
 // ═════════════════════════════════════════════════════════════════════════════
-function EditorEjercicio({ ej, i, total, onChange, onMover, onBorrar, isMobile }) {
+export function EditorEjercicio({ ej, i, total, onChange, onMover, onBorrar, isMobile, etiqueta = null }) {
     const motor = useMotor();
     const tipos = tiposDe(motor, ej);
     const fuenteAct = motor.fuentes?.[ej.fuente];
@@ -369,7 +370,7 @@ function EditorEjercicio({ ej, i, total, onChange, onMover, onBorrar, isMobile }
     return (
         <div style={{ background: 'white', borderRadius: 18, padding: isMobile ? '12px 10px' : '16px 18px', boxShadow: '0 6px 16px rgba(0,0,0,0.07)', borderLeft: `6px solid ${color}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 900, color, fontSize: '1.1rem' }}>Ejercicio {i + 1}</span>
+                <span style={{ fontWeight: 900, color, fontSize: '1.1rem' }}>{etiqueta || `Ejercicio ${i + 1}`}</span>
                 <span style={{ flex: 1 }} />
                 <button onClick={() => onMover(-1)} disabled={i === 0} style={{ ...mini, opacity: i === 0 ? 0.35 : 1 }} title="Subir">↑</button>
                 <button onClick={() => onMover(1)} disabled={i === total - 1} style={{ ...mini, opacity: i === total - 1 ? 0.35 : 1 }} title="Bajar">↓</button>
